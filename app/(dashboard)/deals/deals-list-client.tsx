@@ -125,9 +125,17 @@ export function DealsListClient({ initialData, pageSize }: DealsListClientProps)
               {createdCountLabel} in your pipeline.
             </p>
           </div>
-          <Link href="/deals/new" className={buttonVariants()}>
-            Create New Deal
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/deals/ai-create"
+              className={buttonVariants({ variant: "outline" })}
+            >
+              AI Create Deal
+            </Link>
+            <Link href="/deals/new" className={buttonVariants()}>
+              Create New Deal
+            </Link>
+          </div>
         </div>
 
         <div className="mt-6 space-y-3">

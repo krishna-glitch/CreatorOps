@@ -1,9 +1,14 @@
 import { TRPCError } from "@trpc/server";
 import { and, desc, eq, gte, lt, or } from "drizzle-orm";
 import { z } from "zod";
+import { extractDealFromMessage } from "@/src/server/services/ai/extractDeal";
 import { brands } from "@/server/infrastructure/database/schema/brands";
 import { deals } from "@/server/infrastructure/database/schema/deals";
-import { DatabaseError } from "@/server/utils/errors";
+import {
+  DatabaseError,
+  ExternalServiceError,
+  ValidationError,
+} from "@/server/utils/errors";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const createDealInputSchema = z.object({
@@ -22,6 +27,10 @@ const listDealsInputSchema = z.object({
 
 const getDealByIdInputSchema = z.object({
   id: z.string().uuid(),
+});
+
+const parseDealMessageInputSchema = z.object({
+  message: z.string().trim().min(1).max(5000),
 });
 
 export const dealsRouter = createTRPCRouter({
@@ -107,6 +116,39 @@ export const dealsRouter = createTRPCRouter({
       }
 
       return deal;
+    }),
+  parseMessage: protectedProcedure
+    .input(parseDealMessageInputSchema)
+    .mutation(async ({ input }) => {
+      try {
+        return await extractDealFromMessage(input.message);
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+
+        if (error instanceof ValidationError) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: error.message,
+            cause: error,
+          });
+        }
+
+        const wrappedError =
+          error instanceof ExternalServiceError
+            ? error
+            : new ExternalServiceError(
+                "Groq",
+                error instanceof Error ? error : undefined,
+              );
+
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Could not parse deal message",
+          cause: wrappedError,
+        });
+      }
     }),
   create: protectedProcedure
     .input(createDealInputSchema)
