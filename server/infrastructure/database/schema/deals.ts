@@ -9,6 +9,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { authUsers } from "./auth";
 import { brands } from "./brands";
+import { deliverables } from "./deliverables";
 
 export const deals = pgTable(
   "deals",
@@ -37,9 +38,10 @@ export const deals = pgTable(
 );
 
 // Relations: Deal belongs to Brand
-export const dealsRelations = relations(deals, ({ one }) => ({
+export const dealsRelations = relations(deals, ({ one, many }) => ({
   brand: one(brands, {
     fields: [deals.brandId],
     references: [brands.id],
   }),
+  deliverables: many(deliverables),
 }));

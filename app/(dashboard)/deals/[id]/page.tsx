@@ -9,6 +9,7 @@ import {
   formatDealDate,
   StatusBadge,
 } from "@/src/components/deals/StatusBadge";
+import { DealDeliverablesSection } from "@/src/components/deliverables/DealDeliverablesSection";
 import { appRouter } from "@/server/api/root";
 
 type DealDetailPageProps = {
@@ -112,6 +113,8 @@ export default async function DealDetailPage({ params }: DealDetailPageProps) {
               </dl>
             </section>
           </div>
+
+          <DealDeliverablesSection dealId={deal.id} />
         </div>
       </div>
     );

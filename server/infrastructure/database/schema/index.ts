@@ -4,3 +4,4 @@ export { authUsers } from "./auth";
 // Relations
 export { brands, brandsRelations } from "./brands";
 export { deals, dealsRelations } from "./deals";
+export { deliverables, deliverablesRelations } from "./deliverables";
