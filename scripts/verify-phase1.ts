@@ -1,5 +1,5 @@
 import * as dotenv from "dotenv";
-import { eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { brands } from "../server/infrastructure/database/schema/brands";
@@ -23,7 +23,7 @@ async function verify() {
   }
 
   function fail(test: string, err?: string) {
-    console.log(`  ❌ ${test}${err ? ": " + err : ""}`);
+    console.log(`  ❌ ${test}${err ? `: ${err}` : ""}`);
     failed++;
   }
 
@@ -207,7 +207,7 @@ async function verify() {
   }
 
   // --- Summary ---
-  console.log("\n" + "═".repeat(50));
+  console.log(`\n${"═".repeat(50)}`);
   console.log(`\n📊 Results: ${passed} passed, ${failed} failed`);
   if (failed === 0) {
     console.log("🎉 All Phase 1 verifications PASSED!");

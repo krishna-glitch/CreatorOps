@@ -1,12 +1,4 @@
-import {
-  Bell,
-  Home,
-  LineChart,
-  Package,
-  Package2,
-  ShoppingCart,
-  Users,
-} from "lucide-react";
+import { Bell, Home, Package2, ShoppingCart, Store } from "lucide-react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
@@ -35,32 +27,25 @@ export function DashboardSidebar() {
               Dashboard
             </Link>
             <Link
-              href="#"
+              href="/deals/new"
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-500 transition-all hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50"
+            >
+              <ShoppingCart className="h-4 w-4" />
+              New Deal
+            </Link>
+            <Link
+              href="/deals"
               className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-500 transition-all hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50"
             >
               <ShoppingCart className="h-4 w-4" />
               Deals
             </Link>
             <Link
-              href="#"
+              href="/brands"
               className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-500 transition-all hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50"
             >
-              <Package className="h-4 w-4" />
+              <Store className="h-4 w-4" />
               Brands
-            </Link>
-            <Link
-              href="#"
-              className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-500 transition-all hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50"
-            >
-              <Users className="h-4 w-4" />
-              Contacts
-            </Link>
-            <Link
-              href="#"
-              className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-500 transition-all hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50"
-            >
-              <LineChart className="h-4 w-4" />
-              Analytics
             </Link>
           </nav>
         </div>

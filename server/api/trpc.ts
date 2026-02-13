@@ -8,11 +8,12 @@
  * 4. Error formatting with Zod support
  */
 
-import { initTRPC } from "@trpc/server";
+import { initTRPC, TRPCError } from "@trpc/server";
 import type { FetchCreateContextFnOptions } from "@trpc/server/adapters/fetch";
 import superjson from "superjson";
 import { ZodError } from "zod";
 import { db } from "@/db";
+import { createClient } from "@/lib/supabase/server";
 
 /**
  * 1. CONTEXT
@@ -22,12 +23,15 @@ import { db } from "@/db";
  * when processing a request.
  */
 export const createTRPCContext = async (opts: FetchCreateContextFnOptions) => {
-  // Get the session from the request (we'll add auth later)
-  // const session = await getServerSession();
+  // Get the session from the request
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   return {
     db,
-    // session,
+    user,
     headers: opts.req.headers,
   };
 };
@@ -97,27 +101,19 @@ export const publicProcedure = t.procedure.use(timingMiddleware);
  * Protected (authenticated) procedure
  *
  * If you want a query or mutation to ONLY be accessible to logged in users, use this.
- * It verifies the session is valid and guarantees `ctx.session.user` is not null.
- *
- * @example
- * export const router = createTRPCRouter({
- *   getSecretMessage: protectedProcedure.query(() => {
- *     return "you can now see this secret message!";
- *   }),
- * });
+ * It verifies the session is valid and guarantees `ctx.user` is not null.
  */
 export const protectedProcedure = t.procedure
   .use(timingMiddleware)
   .use(async ({ ctx, next }) => {
-    // TODO: Add authentication check here
-    // if (!ctx.session?.user) {
-    //   throw new TRPCError({ code: 'UNAUTHORIZED' });
-    // }
+    if (!ctx.user) {
+      throw new TRPCError({ code: "UNAUTHORIZED" });
+    }
 
     return next({
       ctx: {
         ...ctx,
-        // session: { ...ctx.session, user: ctx.session.user },
+        user: ctx.user,
       },
     });
   });

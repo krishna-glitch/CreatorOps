@@ -13,10 +13,10 @@ export default async function DashboardLayout({
 }) {
   const supabase = await createClient();
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session?.user) {
+  if (!user) {
     redirect("/login");
   }
 
@@ -26,7 +26,7 @@ export default async function DashboardLayout({
       <div className="flex flex-col">
         <header className="flex h-14 items-center gap-4 border-b bg-gray-100/40 px-4 lg:h-[60px] lg:px-6 dark:bg-gray-800/40">
           <Link
-            href="#"
+            href="/dashboard"
             className="flex items-center gap-2 font-semibold md:hidden"
           >
             <Package2 className="h-6 w-6" />
@@ -46,7 +46,7 @@ export default async function DashboardLayout({
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-500 hidden md:inline-block">
-              {session.user.email}
+              {user.email}
             </span>
             <LogoutButton />
           </div>
