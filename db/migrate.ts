@@ -6,13 +6,13 @@ import postgres from "postgres";
 dotenv.config({ path: ".env.local" });
 
 const runMigrations = async () => {
-  if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL is not set");
+  if (!process.env.DIRECT_URL) {
+    throw new Error("DIRECT_URL is not set");
   }
 
   console.log("⏳ Running migrations...");
 
-  const connection = postgres(process.env.DATABASE_URL, { max: 1 });
+  const connection = postgres(process.env.DIRECT_URL, { max: 1 });
   const db = drizzle(connection);
 
   await migrate(db, { migrationsFolder: "./drizzle" });

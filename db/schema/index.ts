@@ -1,7 +1,2 @@
-// Export all schemas here
-// Example:
-// export * from './users';
-// export * from './deals';
-
-// Placeholder - will be populated in Phase 3
-export {};
+// Re-export all schemas from the canonical location
+export * from '../../server/infrastructure/database/schema/index';
