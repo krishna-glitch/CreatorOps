@@ -28,7 +28,11 @@ async function testConnection() {
     });
 
     // Execute a simple SQL query that doesn't require any tables
-    const { data, error } = await supabase.rpc("version" as any);
+    const { error } = await supabase.rpc("version" as never);
+
+    if (error) {
+      console.warn("⚠️ RPC check failed:", error.message);
+    }
 
     // Even if this specific RPC fails, if we get a response, the connection works
     console.log("✅ Supabase project is accessible!");
@@ -45,8 +49,9 @@ async function testConnection() {
     console.log("3. Push to database with: npm run db:push");
 
     process.exit(0);
-  } catch (error: any) {
-    console.error("❌ Connection failed:", error.message);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("❌ Connection failed:", message);
     process.exit(1);
   }
 }

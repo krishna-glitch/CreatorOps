@@ -28,7 +28,7 @@ const exampleRouter = createTRPCRouter({
   /**
    * Get all items (example)
    */
-  getAll: publicProcedure.query(({ ctx }) => {
+  getAll: publicProcedure.query(() => {
     // Example: return ctx.db.select().from(items);
     return [
       { id: 1, name: "Example Item 1" },
@@ -41,7 +41,7 @@ const exampleRouter = createTRPCRouter({
    */
   create: publicProcedure
     .input(z.object({ name: z.string().min(1) }))
-    .mutation(({ input, ctx }) => {
+    .mutation(({ input }) => {
       // Example: return ctx.db.insert(items).values(input);
       return {
         id: Math.floor(Math.random() * 1000),
