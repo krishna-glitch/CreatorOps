@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, gte, lt, or } from "drizzle-orm";
 import { z } from "zod";
 import { brands } from "@/server/infrastructure/database/schema/brands";
 import { deals } from "@/server/infrastructure/database/schema/deals";
@@ -14,7 +14,100 @@ const createDealInputSchema = z.object({
   status: z.enum(["INBOUND", "NEGOTIATING", "AGREED", "PAID"]),
 });
 
+const listDealsInputSchema = z.object({
+  cursor: z.string().datetime({ offset: true }).optional(),
+  cursorId: z.string().uuid().optional(),
+  limit: z.number().int().min(1).max(100).default(20),
+});
+
+const getDealByIdInputSchema = z.object({
+  id: z.string().uuid(),
+});
+
 export const dealsRouter = createTRPCRouter({
+  list: protectedProcedure
+    .input(listDealsInputSchema.optional())
+    .query(async ({ ctx, input }) => {
+      const limit = input?.limit ?? 20;
+      const cursorDate = input?.cursor ? new Date(input.cursor) : null;
+      const cursorId = input?.cursorId;
+
+      const results = await ctx.db.query.deals.findMany({
+        where: and(eq(deals.userId, ctx.user.id), (() => {
+          if (!cursorDate) {
+            return undefined;
+          }
+
+          if (!cursorId) {
+            return lt(deals.createdAt, cursorDate);
+          }
+
+          const cursorNextMillisecond = new Date(cursorDate.getTime() + 1);
+
+          return or(
+            lt(deals.createdAt, cursorDate),
+            and(
+              gte(deals.createdAt, cursorDate),
+              lt(deals.createdAt, cursorNextMillisecond),
+              lt(deals.id, cursorId),
+            ),
+          );
+        })()),
+        with: {
+          brand: {
+            columns: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+        orderBy: (dealsTable, { desc }) => [
+          desc(dealsTable.createdAt),
+          desc(dealsTable.id),
+        ],
+        limit: limit + 1,
+      });
+
+      const hasMore = results.length > limit;
+      const items = hasMore ? results.slice(0, -1) : results;
+      const nextCursor =
+        hasMore && items.length > 0
+          ? items[items.length - 1]?.createdAt.toISOString() ?? null
+          : null;
+      const nextCursorId =
+        hasMore && items.length > 0 ? items[items.length - 1]?.id ?? null : null;
+
+      return {
+        items,
+        nextCursor,
+        nextCursorId,
+        hasMore,
+      };
+    }),
+  getById: protectedProcedure
+    .input(getDealByIdInputSchema)
+    .query(async ({ ctx, input }) => {
+      const deal = await ctx.db.query.deals.findFirst({
+        where: and(eq(deals.id, input.id), eq(deals.userId, ctx.user.id)),
+        with: {
+          brand: {
+            columns: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      if (!deal) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Deal not found",
+        });
+      }
+
+      return deal;
+    }),
   create: protectedProcedure
     .input(createDealInputSchema)
     .mutation(async ({ ctx, input }) => {

@@ -1,9 +1,23 @@
-import { Bell, Home, Package2, ShoppingCart, Store } from "lucide-react";
-import Link from "next/link";
+"use client";
 
-import { Button } from "@/components/ui/button";
+import { Bell, Home, Package2, Plus, ShoppingCart, Store } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+
+function isActiveRoute(pathname: string, href: string) {
+  if (href === "/dashboard") {
+    return pathname === href;
+  }
+
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export function DashboardSidebar() {
+  const pathname = usePathname();
+
   return (
     <div className="hidden border-r bg-gray-100/40 md:block dark:bg-gray-800/40">
       <div className="flex h-full max-h-screen flex-col gap-2">
@@ -18,31 +32,45 @@ export function DashboardSidebar() {
           </Button>
         </div>
         <div className="flex-1">
+          <div className="px-2 py-2 lg:px-4">
+            <Link href="/deals/new" className={cn(buttonVariants(), "w-full")}>
+              <Plus className="h-4 w-4" />
+              New Deal
+            </Link>
+          </div>
           <nav className="grid items-start px-2 text-sm font-medium lg:px-4">
             <Link
               href="/dashboard"
-              className="flex items-center gap-3 rounded-lg bg-gray-100 px-3 py-2 text-gray-900 transition-all hover:text-gray-900 dark:bg-gray-800 dark:text-gray-50 dark:hover:text-gray-50"
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2 transition-all",
+                isActiveRoute(pathname, "/dashboard")
+                  ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-50"
+                  : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50",
+              )}
             >
               <Home className="h-4 w-4" />
               Dashboard
             </Link>
             <Link
-              href="/deals/new"
-              className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-500 transition-all hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50"
-            >
-              <ShoppingCart className="h-4 w-4" />
-              New Deal
-            </Link>
-            <Link
               href="/deals"
-              className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-500 transition-all hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50"
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2 transition-all",
+                isActiveRoute(pathname, "/deals")
+                  ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-50"
+                  : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50",
+              )}
             >
               <ShoppingCart className="h-4 w-4" />
               Deals
             </Link>
             <Link
               href="/brands"
-              className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-500 transition-all hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50"
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2 transition-all",
+                isActiveRoute(pathname, "/brands")
+                  ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-50"
+                  : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50",
+              )}
             >
               <Store className="h-4 w-4" />
               Brands

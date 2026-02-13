@@ -1,23 +1,34 @@
-import Link from "next/link";
-import { buttonVariants } from "@/components/ui/button";
+import { redirect } from "next/navigation";
+import { db } from "@/db";
+import { createClient } from "@/lib/supabase/server";
+import { appRouter } from "@/server/api/root";
+import { DealsListClient } from "./deals-list-client";
 
-export default function DealsPage() {
-  return (
-    <div className="mx-auto w-full max-w-4xl px-3 py-4 sm:px-6 sm:py-6">
-      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-950 sm:p-8">
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-          Deals
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Deal list view will be expanded in Phase 4. You can continue creating
-          deals now.
-        </p>
-        <div className="mt-6">
-          <Link href="/deals/new" className={buttonVariants()}>
-            Create New Deal
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
+const PAGE_SIZE = 20;
+
+export default async function DealsPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const caller = appRouter.createCaller({
+    db,
+    user,
+    headers: new Headers(),
+  });
+
+  let initialData: Awaited<ReturnType<typeof caller.deals.list>> | null = null;
+
+  try {
+    initialData = await caller.deals.list({ limit: PAGE_SIZE });
+  } catch (error) {
+    console.error("Failed to prefetch deals list", error);
+  }
+
+  return <DealsListClient initialData={initialData} pageSize={PAGE_SIZE} />;
 }
