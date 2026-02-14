@@ -3,6 +3,7 @@ import { calculateDeadlineState } from "@/src/server/domain/services/DeadlineCal
 import { brands } from "@/server/infrastructure/database/schema/brands";
 import { deals } from "@/server/infrastructure/database/schema/deals";
 import { deliverables } from "@/server/infrastructure/database/schema/deliverables";
+import { feedbackItems } from "@/server/infrastructure/database/schema/feedback";
 import { payments } from "@/server/infrastructure/database/schema/payments";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -279,5 +280,95 @@ export const analyticsRouter = createTRPCRouter({
         revenueTrend: emptyRevenueTrend,
       };
     }
+  }),
+  getFeedbackInsights: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.user.id;
+
+    const [feedbackTypeCounts, brandFeedbackStats] = await Promise.all([
+      ctx.db
+        .select({
+          feedbackType: feedbackItems.feedbackType,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(feedbackItems)
+        .innerJoin(deals, eq(feedbackItems.dealId, deals.id))
+        .where(eq(deals.userId, userId))
+        .groupBy(feedbackItems.feedbackType)
+        .orderBy(desc(sql`count(*)`)),
+      ctx.db
+        .select({
+          brandId: brands.id,
+          brandName: brands.name,
+          feedbackCount: sql<number>`count(*)::int`,
+          avgSeverity: sql<number>`coalesce(avg(${feedbackItems.severity}), 0)::float`,
+          highSeverityCount: sql<number>`
+            coalesce(
+              sum(
+                case
+                  when ${feedbackItems.severity} > 7 then 1
+                  else 0
+                end
+              ),
+              0
+            )::int
+          `,
+          copyFeedbackCount: sql<number>`
+            coalesce(
+              sum(
+                case
+                  when ${feedbackItems.feedbackType} = 'COPY' then 1
+                  else 0
+                end
+              ),
+              0
+            )::int
+          `,
+        })
+        .from(feedbackItems)
+        .innerJoin(deals, eq(feedbackItems.dealId, deals.id))
+        .innerJoin(brands, eq(deals.brandId, brands.id))
+        .where(eq(deals.userId, userId))
+        .groupBy(brands.id, brands.name)
+        .orderBy(desc(sql`count(*)`)),
+    ]);
+
+    const totalFeedbackItems = feedbackTypeCounts.reduce(
+      (sum, row) => sum + row.count,
+      0,
+    );
+
+    const topFeedbackType = feedbackTypeCounts[0] ?? null;
+    const demandingClients = brandFeedbackStats.filter(
+      (row) => row.highSeverityCount > 3,
+    );
+
+    const patternInsights: string[] = [];
+
+    for (const row of brandFeedbackStats) {
+      if (row.feedbackCount <= 0) {
+        continue;
+      }
+
+      const copyShare = row.copyFeedbackCount / row.feedbackCount;
+      if (copyShare >= 0.5 && row.copyFeedbackCount >= 2) {
+        patternInsights.push(
+          `${row.brandName} often requests copy changes (${row.copyFeedbackCount}/${row.feedbackCount} feedback items).`,
+        );
+      }
+    }
+
+    return {
+      totalFeedbackItems,
+      topFeedbackType: topFeedbackType
+        ? {
+            feedbackType: topFeedbackType.feedbackType,
+            count: topFeedbackType.count,
+          }
+        : null,
+      feedbackTypeCounts,
+      brandFeedbackStats,
+      demandingClients,
+      patternInsights,
+    };
   }),
 });

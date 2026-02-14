@@ -8,8 +8,10 @@
 import { aiRouter } from "./routers/ai";
 import { analyticsRouter } from "./routers/analytics";
 import { brandsRouter } from "./routers/brands";
+import { conflictsRouter } from "./routers/conflicts";
 import { dealsRouter } from "./routers/deals";
 import { deliverablesRouter } from "./routers/deliverables";
+import { feedbackRouter } from "./routers/feedback";
 import { jobsRouter } from "./routers/jobs";
 import { paymentsRouter } from "./routers/payments";
 import { remindersRouter } from "./routers/reminders";
@@ -20,8 +22,10 @@ export const appRouter = createTRPCRouter({
   analytics: analyticsRouter,
   brand: brandsRouter,
   brands: brandsRouter,
+  conflicts: conflictsRouter,
   deals: dealsRouter,
   deliverables: deliverablesRouter,
+  feedback: feedbackRouter,
   jobs: jobsRouter,
   payments: paymentsRouter,
   reminders: remindersRouter,

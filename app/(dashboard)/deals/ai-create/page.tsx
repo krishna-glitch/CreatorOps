@@ -369,11 +369,13 @@ export default function AICreateDealPage() {
       return;
     }
 
+    const validCurrency: Currency = currency;
+
     createDealMutation.mutate({
       brand_id: brandId,
       title: title.trim(),
       total_value: parsedTotalValue,
-      currency,
+      currency: validCurrency,
       status,
     });
   };
@@ -451,8 +453,8 @@ export default function AICreateDealPage() {
                 type="button"
                 onClick={() => setParseMode("smart")}
                 className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${parseMode === "smart"
-                    ? "bg-emerald-600 text-white shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
+                  ? "bg-emerald-600 text-white shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
                   }`}
               >
                 ⚡ Smart Parse
@@ -470,10 +472,10 @@ export default function AICreateDealPage() {
                   setParseMode("ai");
                 }}
                 className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${parseMode === "ai"
-                    ? "bg-emerald-600 text-white shadow-sm"
-                    : isAIExtractionDisabled
-                      ? "cursor-not-allowed text-muted-foreground/50"
-                      : "text-muted-foreground hover:text-foreground"
+                  ? "bg-emerald-600 text-white shadow-sm"
+                  : isAIExtractionDisabled
+                    ? "cursor-not-allowed text-muted-foreground/50"
+                    : "text-muted-foreground hover:text-foreground"
                   }`}
               >
                 🤖 AI Parse{isAIExtractionDisabled ? " (Quota)" : ""}
@@ -492,7 +494,7 @@ export default function AICreateDealPage() {
                 : "Uses Groq AI for complex or ambiguous messages."}
             </p>
             {hasExtraction &&
-            (confidence === null || confidence < 0.6 || !detectedBrandName) ? (
+              (confidence === null || confidence < 0.6 || !detectedBrandName) ? (
               <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
                 Low-confidence parse. Review brand, amount, currency, and status
                 before creating.

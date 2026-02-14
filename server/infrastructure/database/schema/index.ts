@@ -5,5 +5,18 @@ export { authUsers } from "./auth";
 export { brands, brandsRelations } from "./brands";
 export { deals, dealsRelations } from "./deals";
 export { deliverables, deliverablesRelations } from "./deliverables";
+export {
+  conflicts,
+  conflictsRelations,
+  conflictSeverityEnum,
+  conflictTypeEnum,
+  exclusivityPlatformEnum,
+  exclusivityRegionEnum,
+  exclusivityRules,
+  exclusivityRulesRelations,
+  exclusivityScopeEnum,
+} from "./exclusivity";
+export { feedbackItems, feedbackItemsRelations } from "./feedback";
 export { payments, paymentsRelations } from "./payments";
 export { reminders, remindersRelations } from "./reminders";
+export { reworkCycles, reworkCyclesRelations } from "./reworkCycles";

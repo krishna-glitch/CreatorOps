@@ -6,6 +6,7 @@ import { parseDealFromMessage } from "@/src/server/services/parser/dealParser";
 import { getAIExtractionAvailability } from "@/src/server/services/ai/quotaFlag";
 import { brands } from "@/server/infrastructure/database/schema/brands";
 import { deals } from "@/server/infrastructure/database/schema/deals";
+import { exclusivityRules } from "@/server/infrastructure/database/schema/exclusivity";
 import {
   DatabaseError,
   ExternalServiceError,
@@ -19,6 +20,39 @@ const createDealInputSchema = z.object({
   total_value: z.number().positive().finite(),
   currency: z.enum(["USD", "INR"]),
   status: z.enum(["INBOUND", "NEGOTIATING", "AGREED", "PAID"]),
+  revision_limit: z.number().int().min(1).max(20).default(2),
+  exclusivity_rules: z
+    .array(
+      z
+        .object({
+          category_path: z.string().trim().min(1).max(200),
+          scope: z.enum(["EXACT_CATEGORY", "PARENT_CATEGORY"]),
+          start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+          end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+          platforms: z
+            .array(z.enum(["INSTAGRAM", "YOUTUBE", "TIKTOK"]))
+            .min(1)
+            .max(3),
+          regions: z
+            .array(z.enum(["US", "IN", "GLOBAL"]))
+            .min(1)
+            .max(3)
+            .default(["GLOBAL"]),
+          notes: z.string().trim().max(1000).optional(),
+        })
+        .refine(
+          (value) => new Date(value.end_date).getTime() > new Date(value.start_date).getTime(),
+          {
+            message: "End date must be after start date",
+            path: ["end_date"],
+          },
+        ),
+    )
+    .default([]),
+});
+
+const updateDealInputSchema = createDealInputSchema.extend({
+  id: z.string().uuid(),
 });
 
 const listDealsInputSchema = z.object({
@@ -109,6 +143,18 @@ export const dealsRouter = createTRPCRouter({
             columns: {
               id: true,
               name: true,
+            },
+          },
+          exclusivityRules: {
+            columns: {
+              id: true,
+              categoryPath: true,
+              scope: true,
+              startDate: true,
+              endDate: true,
+              platforms: true,
+              regions: true,
+              notes: true,
             },
           },
         },
@@ -207,19 +253,68 @@ export const dealsRouter = createTRPCRouter({
           });
         }
 
-        const [created] = await ctx.db
-          .insert(deals)
-          .values({
-            userId: ctx.user.id,
-            brandId: input.brand_id,
-            title: input.title,
-            totalValue: input.total_value.toString(),
-            currency: input.currency,
-            status: input.status,
-          })
-          .returning({
-            id: deals.id,
+        const created = await ctx.db.transaction(async (tx) => {
+          const [newDeal] = await tx
+            .insert(deals)
+            .values({
+              userId: ctx.user.id,
+              brandId: input.brand_id,
+              title: input.title,
+              totalValue: input.total_value.toString(),
+              currency: input.currency,
+              status: input.status,
+              revisionLimit: input.revision_limit,
+              revisionsUsed: 0,
+            })
+            .returning({
+              id: deals.id,
+            });
+
+          if (!newDeal) {
+            return null;
+          }
+
+          if (input.exclusivity_rules.length > 0) {
+            await tx.insert(exclusivityRules).values(
+              input.exclusivity_rules.map((rule) => ({
+                dealId: newDeal.id,
+                categoryPath: rule.category_path,
+                scope: rule.scope,
+                startDate: rule.start_date,
+                endDate: rule.end_date,
+                platforms: rule.platforms,
+                regions: rule.regions,
+                notes: rule.notes ?? null,
+              })),
+            );
+          }
+
+          const createdDeal = await tx.query.deals.findFirst({
+            where: and(eq(deals.id, newDeal.id), eq(deals.userId, ctx.user.id)),
+            with: {
+              brand: {
+                columns: {
+                  id: true,
+                  name: true,
+                },
+              },
+              exclusivityRules: {
+                columns: {
+                  id: true,
+                  categoryPath: true,
+                  scope: true,
+                  startDate: true,
+                  endDate: true,
+                  platforms: true,
+                  regions: true,
+                  notes: true,
+                },
+              },
+            },
           });
+
+          return createdDeal ?? null;
+        });
 
         if (!created) {
           throw new TRPCError({
@@ -228,34 +323,15 @@ export const dealsRouter = createTRPCRouter({
           });
         }
 
-        const createdDeal = await ctx.db.query.deals.findFirst({
-          where: and(eq(deals.id, created.id), eq(deals.userId, ctx.user.id)),
-          with: {
-            brand: {
-              columns: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        });
-
-        if (!createdDeal) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Failed to load created deal",
-          });
-        }
-
         console.log("[audit] deal.created", {
           userId: ctx.user.id,
-          dealId: createdDeal.id,
-          brandId: createdDeal.brandId,
-          status: createdDeal.status,
+          dealId: created.id,
+          brandId: created.brandId,
+          status: created.status,
           createdAt: new Date().toISOString(),
         });
 
-        return createdDeal;
+        return created;
       } catch (error) {
         if (error instanceof TRPCError) {
           throw error;
@@ -269,6 +345,123 @@ export const dealsRouter = createTRPCRouter({
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Could not create deal",
+          cause: wrappedError,
+        });
+      }
+    }),
+  update: protectedProcedure
+    .input(updateDealInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const existing = await ctx.db.query.deals.findFirst({
+          where: and(eq(deals.id, input.id), eq(deals.userId, ctx.user.id)),
+          columns: { id: true },
+        });
+
+        if (!existing) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Deal not found",
+          });
+        }
+
+        const brand = await ctx.db.query.brands.findFirst({
+          where: and(eq(brands.id, input.brand_id), eq(brands.userId, ctx.user.id)),
+          columns: { id: true },
+        });
+
+        if (!brand) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Brand not found",
+          });
+        }
+
+        await ctx.db.transaction(async (tx) => {
+          await tx
+            .update(deals)
+            .set({
+              brandId: input.brand_id,
+              title: input.title,
+              totalValue: input.total_value.toString(),
+              currency: input.currency,
+              status: input.status,
+              revisionLimit: input.revision_limit,
+              updatedAt: new Date(),
+            })
+            .where(and(eq(deals.id, input.id), eq(deals.userId, ctx.user.id)));
+
+          await tx.delete(exclusivityRules).where(eq(exclusivityRules.dealId, input.id));
+
+          if (input.exclusivity_rules.length > 0) {
+            await tx.insert(exclusivityRules).values(
+              input.exclusivity_rules.map((rule) => ({
+                dealId: input.id,
+                categoryPath: rule.category_path,
+                scope: rule.scope,
+                startDate: rule.start_date,
+                endDate: rule.end_date,
+                platforms: rule.platforms,
+                regions: rule.regions,
+                notes: rule.notes ?? null,
+              })),
+            );
+          }
+        });
+
+        const updatedDeal = await ctx.db.query.deals.findFirst({
+          where: and(eq(deals.id, input.id), eq(deals.userId, ctx.user.id)),
+          with: {
+            brand: {
+              columns: {
+                id: true,
+                name: true,
+              },
+            },
+            exclusivityRules: {
+              columns: {
+                id: true,
+                categoryPath: true,
+                scope: true,
+                startDate: true,
+                endDate: true,
+                platforms: true,
+                regions: true,
+                notes: true,
+              },
+            },
+          },
+        });
+
+        if (!updatedDeal) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to load updated deal",
+          });
+        }
+
+        console.log("[audit] deal.updated", {
+          userId: ctx.user.id,
+          dealId: updatedDeal.id,
+          brandId: updatedDeal.brandId,
+          status: updatedDeal.status,
+          updatedAt: new Date().toISOString(),
+        });
+
+        return updatedDeal;
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+
+        const wrappedError =
+          error instanceof Error
+            ? new DatabaseError("deals.update", error)
+            : new DatabaseError("deals.update");
+
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Could not update deal",
           cause: wrappedError,
         });
       }

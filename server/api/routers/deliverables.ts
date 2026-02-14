@@ -1,7 +1,13 @@
 import { TRPCError } from "@trpc/server";
+import { randomUUID } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { calculateDeadlineState } from "@/src/server/domain/services/DeadlineCalculator";
+import {
+  detectExclusivityConflicts,
+  type Conflict,
+} from "@/src/server/domain/services/ConflictDetector";
+import { conflicts } from "@/server/infrastructure/database/schema/exclusivity";
 import { deals } from "@/server/infrastructure/database/schema/deals";
 import { deliverables } from "@/server/infrastructure/database/schema/deliverables";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -31,6 +37,10 @@ const deliverableStatusSchema = z.enum([
 
 const createDeliverableInputSchema = z.object({
   deal_id: z.string().uuid(),
+  deliverable_id: z.string().uuid().optional(),
+  conflict_session_id: z.string().uuid().optional(),
+  acknowledge_conflicts: z.boolean().default(false),
+  category_path: z.string().trim().min(1).max(200).optional(),
   platform: deliverablePlatformSchema,
   type: deliverableTypeSchema,
   quantity: z.number().int().positive().default(1),
@@ -67,6 +77,8 @@ const deleteDeliverableInputSchema = z.object({
 const listByDealInputSchema = z.object({
   deal_id: z.string().uuid(),
 });
+
+const detectorPlatformSchema = z.enum(["INSTAGRAM", "YOUTUBE", "TIKTOK"]);
 
 export const deliverablesRouter = createTRPCRouter({
   listByDeal: protectedProcedure
@@ -120,14 +132,86 @@ export const deliverablesRouter = createTRPCRouter({
           });
         }
 
+        const deliverableId = input.deliverable_id ?? randomUUID();
+        const scheduledAt = input.scheduled_at ? new Date(input.scheduled_at) : null;
+        const deliverablePlatform = detectorPlatformSchema.safeParse(input.platform);
+        const userRules = await ctx.db.query.exclusivityRules.findMany({
+          with: {
+            deal: {
+              columns: {
+                id: true,
+                userId: true,
+              },
+            },
+          },
+        });
+
+        const applicableRules = userRules
+          .filter((rule) => rule.deal.userId === ctx.user.id && rule.dealId !== input.deal_id)
+          .map((rule) => ({
+            id: rule.id,
+            deal_id: rule.dealId,
+            category_path: rule.categoryPath,
+            scope: rule.scope,
+            start_date: rule.startDate,
+            end_date: rule.endDate,
+            platforms: rule.platforms,
+            regions: rule.regions,
+            notes: rule.notes,
+          }));
+
+        const detectedConflicts =
+          deliverablePlatform.success && scheduledAt
+            ? detectExclusivityConflicts(
+              {
+                id: deliverableId,
+                category: input.category_path ?? null,
+                platform: deliverablePlatform.data,
+                scheduled_at: scheduledAt,
+              },
+              applicableRules,
+            )
+            : [];
+
+        if (detectedConflicts.length > 0) {
+          const conflictEventTime = new Date().toISOString();
+          await ctx.db.insert(conflicts).values(
+            detectedConflicts.map((conflict) => ({
+              type: conflict.type,
+              newDealOrDeliverableId: deliverableId,
+              conflictingRuleId: conflict.conflicting_rule_id,
+              overlap: {
+                ...conflict.overlap,
+                conflict_session_id: input.conflict_session_id ?? null,
+                proceeded_despite_conflict: input.acknowledge_conflicts,
+                acknowledged_by_user_id: input.acknowledge_conflicts ? ctx.user.id : null,
+                detected_at: conflictEventTime,
+              },
+              severity: conflict.severity,
+              suggestedResolutions: conflict.suggested_resolutions,
+              autoResolved: input.acknowledge_conflicts,
+            })),
+          );
+        }
+
+        if (detectedConflicts.length > 0 && !input.acknowledge_conflicts) {
+          return {
+            created: null as null,
+            conflicts: detectedConflicts as Conflict[],
+            requires_acknowledgement: true as const,
+            proceeded_despite_conflict: false as const,
+          };
+        }
+
         const [created] = await ctx.db
           .insert(deliverables)
           .values({
+            id: deliverableId,
             dealId: input.deal_id,
             platform: input.platform,
             type: input.type,
             quantity: input.quantity,
-            scheduledAt: input.scheduled_at ? new Date(input.scheduled_at) : null,
+            scheduledAt,
             postedAt: input.posted_at ? new Date(input.posted_at) : null,
             status: input.status,
           })
@@ -140,7 +224,13 @@ export const deliverablesRouter = createTRPCRouter({
           });
         }
 
-        return created;
+        return {
+          created,
+          conflicts: detectedConflicts as Conflict[],
+          requires_acknowledgement: false as const,
+          proceeded_despite_conflict:
+            detectedConflicts.length > 0 && input.acknowledge_conflicts,
+        };
       } catch (error) {
         if (error instanceof TRPCError) {
           throw error;

@@ -44,6 +44,23 @@ function formatPaymentAmount(
   return formatDealCurrency(value, { currency: normalizedCurrency });
 }
 
+function formatRevisionHours(totalMinutes: number) {
+  const hours = totalMinutes / 60;
+  return `${hours.toFixed(1)} hours`;
+}
+
+function getRevisionStatusClassName(revisionsUsed: number, revisionLimit: number) {
+  if (revisionsUsed > revisionLimit) {
+    return "border-transparent bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300";
+  }
+
+  if (revisionsUsed >= revisionLimit) {
+    return "border-transparent bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300";
+  }
+
+  return "border-transparent bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300";
+}
+
 export default async function DealDetailPage({ params }: DealDetailPageProps) {
   const { id } = await params;
 
@@ -65,6 +82,7 @@ export default async function DealDetailPage({ params }: DealDetailPageProps) {
   try {
     const deal = await caller.deals.getById({ id });
     const payments = await caller.payments.listByDeal({ deal_id: id });
+    const revisionStats = await caller.feedback.getDealRevisionStats({ deal_id: id });
 
     const totalExpected = payments.reduce(
       (sum, payment) => sum + (Number(payment.amount) || 0),
@@ -76,6 +94,24 @@ export default async function DealDetailPage({ params }: DealDetailPageProps) {
       0,
     );
     const outstanding = Math.max(totalExpected - totalPaid, 0);
+    const revisionLimit = deal.revisionLimit;
+    const revisionsUsed = deal.revisionsUsed;
+    const revisionProgressPercent = Math.min(
+      100,
+      Math.round((revisionsUsed / Math.max(revisionLimit, 1)) * 100),
+    );
+    const revisionBarColor =
+      revisionsUsed > revisionLimit
+        ? "bg-red-500"
+        : revisionsUsed >= revisionLimit
+          ? "bg-yellow-500"
+          : "bg-green-500";
+    const revisionAlertMessage =
+      revisionsUsed > revisionLimit
+        ? "Revision limit exceeded. Negotiate an additional fee for extra revision cycles."
+        : revisionsUsed >= revisionLimit
+          ? "Revision limit reached. Negotiate an additional fee before additional revisions."
+          : null;
 
     return (
       <div className="mx-auto w-full max-w-4xl px-3 py-4 sm:px-6 sm:py-6">
@@ -96,13 +132,9 @@ export default async function DealDetailPage({ params }: DealDetailPageProps) {
               >
                 Back to Deals
               </Link>
-              <button
-                type="button"
-                disabled
-                className={buttonVariants({ variant: "default" })}
-              >
-                Edit (Coming Soon)
-              </button>
+              <Link href={`/deals/${deal.id}/edit`} className={buttonVariants({ variant: "default" })}>
+                Edit Deal
+              </Link>
             </div>
           </div>
 
@@ -130,6 +162,16 @@ export default async function DealDetailPage({ params }: DealDetailPageProps) {
                     <StatusBadge status={deal.status} />
                   </dd>
                 </div>
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-sm text-muted-foreground">Revisions</dt>
+                  <dd>
+                    <span
+                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getRevisionStatusClassName(revisionsUsed, revisionLimit)}`}
+                    >
+                      {revisionsUsed} / {revisionLimit} revisions used
+                    </span>
+                  </dd>
+                </div>
               </dl>
             </section>
 
@@ -151,6 +193,32 @@ export default async function DealDetailPage({ params }: DealDetailPageProps) {
               </dl>
             </section>
           </div>
+
+          <section className="mt-6 rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+            <h2 className="text-sm font-medium">Revision Limit</h2>
+            <p className="mt-2 text-sm font-medium">
+              {revisionsUsed} / {revisionLimit} revisions used
+            </p>
+            <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800">
+              <div
+                className={`h-full ${revisionBarColor}`}
+                style={{ width: `${revisionProgressPercent}%` }}
+              />
+            </div>
+            {revisionAlertMessage ? (
+              <p
+                className={`mt-3 rounded-lg px-3 py-2 text-sm ${revisionsUsed > revisionLimit ? "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300" : "bg-yellow-50 text-yellow-800 dark:bg-yellow-950/40 dark:text-yellow-300"}`}
+              >
+                {revisionAlertMessage}
+              </p>
+            ) : null}
+            <p className="mt-3 text-sm text-muted-foreground">
+              Total revision time:{" "}
+              <span className="font-medium text-foreground">
+                {formatRevisionHours(revisionStats.totalRevisionTimeMinutes)}
+              </span>
+            </p>
+          </section>
 
           <DealDeliverablesSection dealId={deal.id} />
 

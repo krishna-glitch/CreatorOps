@@ -1,8 +1,8 @@
 # CreatorOps OS - Project Status
 
 **Last Updated:** 2026-02-14  
-**Current Phase:** Phase 10 - Deadline Tracking & Reminders (Complete)  
-**Overall Progress:** Phases 0-10 Complete
+**Current Phase:** Phase 12 - Exclusivity Conflict Detection (Complete)  
+**Overall Progress:** Phases 0-12 Complete
 
 ---
 
@@ -21,6 +21,8 @@
 | **Phase 8** - Next Features | ✅ Complete | 100% | 2026-02-14 |
 | **Phase 9** - Dashboard & Insights | ✅ Complete | 100% | 2026-02-14 |
 | **Phase 10** - Deadline Tracking & Reminders | ✅ Complete | 100% | 2026-02-14 |
+| **Phase 11** - Feedback Tracking & Revision Cycles | ✅ Complete | 100% | 2026-02-14 |
+| **Phase 12** - Exclusivity Conflict Detection | ✅ Complete | 100% | 2026-02-14 |
 
 ---
 
@@ -338,6 +340,48 @@
 
 ---
 
+## ✅ Phase 11: Feedback Tracking & Revision Cycles (COMPLETE)
+
+**Status:** ✅ Complete  
+**Start Date:** 2026-02-14  
+**Completion Date:** 2026-02-14  
+**Progress:** 100%
+
+### Completed Work
+- Feedback + rework schemas added (`feedback_items`, `rework_cycles`) with relations to deals and deliverables
+- Feedback router added (`create`, `update`, `listByDeal`, `listByDeliverable`) with rework auto-creation
+- Deliverable feedback UI added with modal form, severity color-coding, feedback badges, and cycle count
+- Revision limit enforcement added (`revision_limit`, `revisions_used`) with non-blocking warnings
+- Rework cycle contract overage flag added (`exceeds_contract_limit`)
+- Rework time tracking added (`time_spent_minutes`) with completion prompt (hours/minutes, optional)
+- Deal detail revision metrics added (usage badge, progress bar, total revision time)
+- Feedback analytics added (feedback type patterns, brand-level feedback stats, demanding client detection)
+- New analytics page added with **Feedback Insights**
+- **Feedback tracking with revision limits**
+
+---
+
+## ✅ Phase 12: Exclusivity Conflict Detection (COMPLETE)
+
+**Status:** ✅ Complete  
+**Start Date:** 2026-02-14  
+**Completion Date:** 2026-02-14  
+**Progress:** 100%
+
+### Completed Work
+- Exclusivity rule + conflict schemas added with enums, relations, and migration
+- Conflict detector service added (`detectExclusivityConflicts`) with exact/parent category logic, date overlap, and platform overlap checks
+- Unit tests added for exclusivity conflict detection (including null date and multi-rule edge cases)
+- Deal create/edit forms updated with **Exclusivity Rules** section (multiple rules, date validation, add/delete support)
+- Deliverable create flow updated to run pre-save conflict detection and log all detected conflicts
+- Non-blocking conflict UX implemented (warn only): cancel, reschedule-and-recheck, or create anyway
+- Proceed tracking added when user creates despite conflict (`proceeded_despite_conflict`, user acknowledgment metadata)
+- Conflicts dashboard added (`/conflicts`) with active/resolved filter, severity color coding, overlap details, and mark resolved action
+- Sidebar conflict count badge added for active conflicts
+- **Exclusivity conflict detection**
+
+---
+
 ## 🎯 Current Sprint Goals
 
 ### This Week (Completed)
@@ -348,10 +392,10 @@
 5. ~~Create authentication pages~~ ✅
 
 ### Next Week
-1. Kick off Phase 11 implementation plan and milestones
+1. Add automated tests for feedback/rework flows, revision limits, and analytics aggregations
 2. Add automated tests for reminder generation, delivery retries, and dashboard reminder actions
 3. Expand brand model fields (persisted notes, contacts, metadata)
-4. Begin next feature track (feedback loop, conflict detection, or workflow automation)
+4. Begin next feature track (conflict detection, workflow automation, or profitability forecasting)
 
 ---
 

@@ -8,7 +8,9 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { deals } from "./deals";
+import { feedbackItems } from "./feedback";
 import { reminders } from "./reminders";
+import { reworkCycles } from "./reworkCycles";
 
 export const deliverables = pgTable(
   "deliverables",
@@ -39,5 +41,7 @@ export const deliverablesRelations = relations(deliverables, ({ one, many }) => 
     fields: [deliverables.dealId],
     references: [deals.id],
   }),
+  feedbackItems: many(feedbackItems),
   reminders: many(reminders),
+  reworkCycles: many(reworkCycles),
 }));

@@ -43,11 +43,6 @@ const CURRENCY_PATTERNS: Array<{ pattern: RegExp; currency: Currency }> = [
 ];
 
 export function extractCurrency(text: string): Currency | null {
-    const monetary = extractAmountAndCurrency(text);
-    if (monetary.currency) {
-        return monetary.currency;
-    }
-
     for (const { pattern, currency } of CURRENCY_PATTERNS) {
         if (pattern.test(text)) {
             return currency;
@@ -59,19 +54,11 @@ export function extractCurrency(text: string): Currency | null {
 
 // ── Amount Extraction ──────────────────────────────────────────────────
 
-const CURRENCY_TOKEN_REGEX =
-    /(?:\$|₹|USD|INR|rs\.?|rupees?|dollars?)/i;
-const MULTIPLIER_REGEX = /([kKmM])?/;
-
 const AMOUNT_WITH_CURRENCY_PATTERNS: RegExp[] = [
-    new RegExp(
-        `(${CURRENCY_TOKEN_REGEX.source})\\s*([\\d.,]+)\\s*${MULTIPLIER_REGEX.source}`,
-        "gi",
-    ),
-    new RegExp(
-        `([\\d.,]+)\\s*${MULTIPLIER_REGEX.source}\\s*(${CURRENCY_TOKEN_REGEX.source})\\b`,
-        "gi",
-    ),
+    // currency-first: $1,500  ₹50,000  $1.5k  USD 2k
+    /(?:\$|₹|USD|INR|rs\.?|rupees?|dollars?)\s*([\d.,]+)\s*([kKmM])?/gi,
+    // currency-last: 1,500 USD  1.5k INR  5000 rupees
+    /([\d.,]+)\s*([kKmM])?\s*(?:\$|₹|USD|INR|rs\.?|rupees?|dollars?)\b/gi,
 ];
 
 const BARE_AMOUNT_PATTERNS: RegExp[] = [
@@ -135,13 +122,9 @@ function extractAmountAndCurrency(text: string): {
         let match: RegExpExecArray | null = null;
 
         while ((match = pattern.exec(text)) !== null) {
-            const tokenA = match[1] ?? "";
-            const tokenB = match[2] ?? "";
-            const tokenC = match[3] ?? "";
-
-            const currency = normalizeCurrency(tokenA) ?? normalizeCurrency(tokenC);
-            const amountRaw = normalizeCurrency(tokenA) ? tokenB : tokenA;
-            const multiplier = normalizeCurrency(tokenA) ? tokenC : tokenB;
+            const amountRaw = match[1] ?? "";
+            const multiplier = match[2] ?? "";
+            const currency = normalizeCurrency(match[0]);
 
             if (!currency || !amountRaw) {
                 continue;

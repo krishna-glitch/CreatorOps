@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,32 @@ import {
 } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc/client";
 
+const exclusivityRuleFormSchema = z
+  .object({
+    category_path: z
+      .string()
+      .trim()
+      .min(1, { message: "Category is required" })
+      .max(200, { message: "Category must be at most 200 characters" }),
+    scope: z.enum(["EXACT_CATEGORY", "PARENT_CATEGORY"], {
+      message: "Please select a scope",
+    }),
+    start_date: z.string().min(1, { message: "Start date is required" }),
+    end_date: z.string().min(1, { message: "End date is required" }),
+    platforms: z
+      .array(z.enum(["INSTAGRAM", "YOUTUBE", "TIKTOK"]))
+      .min(1, { message: "Select at least one platform" }),
+    regions: z.array(z.enum(["US", "IN", "GLOBAL"])).default(["GLOBAL"]),
+    notes: z.string().trim().max(1000).optional(),
+  })
+  .refine(
+    (value) => new Date(value.end_date).getTime() > new Date(value.start_date).getTime(),
+    {
+      message: "End date must be after start date",
+      path: ["end_date"],
+    },
+  );
+
 const createDealFormSchema = z.object({
   brand_id: z.string().uuid({ message: "Please select a brand" }),
   title: z
@@ -41,9 +67,10 @@ const createDealFormSchema = z.object({
   status: z.enum(["INBOUND", "NEGOTIATING", "AGREED", "PAID"], {
     message: "Please select a status",
   }),
+  exclusivity_rules: z.array(exclusivityRuleFormSchema).default([]),
 });
 
-type CreateDealFormValues = z.infer<typeof createDealFormSchema>;
+type CreateDealFormValues = z.input<typeof createDealFormSchema>;
 
 function getCreateDealErrorMessage(error: unknown): string {
   if (error instanceof Error) {
@@ -61,6 +88,7 @@ function getCreateDealErrorMessage(error: unknown): string {
 
 export default function NewDealPage() {
   const router = useRouter();
+  const platformOptions = ["INSTAGRAM", "YOUTUBE", "TIKTOK"] as const;
 
   const { data: brands, isLoading: isLoadingBrands } =
     trpc.brands.list.useQuery({ limit: 100 });
@@ -83,11 +111,43 @@ export default function NewDealPage() {
       total_value: undefined,
       currency: "USD",
       status: "INBOUND",
+      exclusivity_rules: [],
     },
+  });
+  const exclusivityRulesArray = useFieldArray({
+    control: form.control,
+    name: "exclusivity_rules",
   });
 
   const onSubmit = (values: CreateDealFormValues) => {
     createDealMutation.mutate(values);
+  };
+
+  const addExclusivityRule = () => {
+    exclusivityRulesArray.append({
+      category_path: "",
+      scope: "EXACT_CATEGORY",
+      start_date: "",
+      end_date: "",
+      platforms: ["INSTAGRAM"],
+      regions: ["GLOBAL"],
+      notes: "",
+    });
+  };
+
+  const togglePlatform = (ruleIndex: number, platform: (typeof platformOptions)[number]) => {
+    const fieldName = `exclusivity_rules.${ruleIndex}.platforms` as const;
+    const current = form.getValues(fieldName) ?? [];
+    const hasPlatform = current.includes(platform);
+    const nextPlatforms = hasPlatform
+      ? current.filter((item) => item !== platform)
+      : [...current, platform];
+
+    form.setValue(fieldName, nextPlatforms, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
   };
 
   const isSubmitting = createDealMutation.isPending;
@@ -281,6 +341,172 @@ export default function NewDealPage() {
                     </FormItem>
                   )}
                 />
+              </div>
+
+              <div className="rounded-xl border border-gray-200 p-4 sm:p-5 dark:border-gray-800">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-medium">Exclusivity Rules</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Add one or more exclusivity constraints for this deal.
+                    </p>
+                  </div>
+                  <Button type="button" variant="outline" onClick={addExclusivityRule}>
+                    Add Rule
+                  </Button>
+                </div>
+
+                {exclusivityRulesArray.fields.length === 0 ? (
+                  <p className="mt-4 text-sm text-muted-foreground">
+                    No exclusivity rules added yet.
+                  </p>
+                ) : (
+                  <div className="mt-4 space-y-4">
+                    {exclusivityRulesArray.fields.map((field, index) => {
+                      const selectedPlatforms =
+                        form.watch(`exclusivity_rules.${index}.platforms`) ?? [];
+
+                      return (
+                        <div
+                          key={field.id}
+                          className="rounded-lg border border-gray-200 p-4 dark:border-gray-800"
+                        >
+                          <div className="mb-3 flex items-center justify-between gap-2">
+                            <p className="text-sm font-medium">Rule {index + 1}</p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => exclusivityRulesArray.remove(index)}
+                            >
+                              Delete Rule
+                            </Button>
+                          </div>
+
+                          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <FormField
+                              control={form.control}
+                              name={`exclusivity_rules.${index}.category_path`}
+                              render={({ field: categoryField }) => (
+                                <FormItem>
+                                  <FormLabel className="text-sm font-medium">
+                                    Category
+                                  </FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      placeholder="Tech/Smartphones"
+                                      className="focus-visible:border-emerald-500 focus-visible:ring-emerald-500/30"
+                                      {...categoryField}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name={`exclusivity_rules.${index}.scope`}
+                              render={({ field: scopeField }) => (
+                                <FormItem>
+                                  <FormLabel className="text-sm font-medium">
+                                    Scope
+                                  </FormLabel>
+                                  <Select
+                                    value={scopeField.value}
+                                    onValueChange={scopeField.onChange}
+                                  >
+                                    <FormControl>
+                                      <SelectTrigger className="focus:ring-emerald-500/30 focus:ring-offset-0">
+                                        <SelectValue placeholder="Select scope" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="EXACT_CATEGORY">EXACT</SelectItem>
+                                      <SelectItem value="PARENT_CATEGORY">PARENT</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <FormField
+                              control={form.control}
+                              name={`exclusivity_rules.${index}.start_date`}
+                              render={({ field: startDateField }) => (
+                                <FormItem>
+                                  <FormLabel className="text-sm font-medium">
+                                    Start Date
+                                  </FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="date"
+                                      className="focus-visible:border-emerald-500 focus-visible:ring-emerald-500/30"
+                                      {...startDateField}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name={`exclusivity_rules.${index}.end_date`}
+                              render={({ field: endDateField }) => (
+                                <FormItem>
+                                  <FormLabel className="text-sm font-medium">
+                                    End Date
+                                  </FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="date"
+                                      className="focus-visible:border-emerald-500 focus-visible:ring-emerald-500/30"
+                                      {...endDateField}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          <div className="mt-4">
+                            <p className="text-sm font-medium">Platforms</p>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {platformOptions.map((platform) => {
+                                const active = selectedPlatforms.includes(platform);
+                                return (
+                                  <Button
+                                    key={platform}
+                                    type="button"
+                                    variant="outline"
+                                    className={
+                                      active
+                                        ? "border-emerald-600 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300"
+                                        : ""
+                                    }
+                                    onClick={() => togglePlatform(index, platform)}
+                                  >
+                                    {platform}
+                                  </Button>
+                                );
+                              })}
+                            </div>
+                            <p className="mt-2 text-xs text-red-600">
+                              {
+                                form.formState.errors.exclusivity_rules?.[index]?.platforms
+                                  ?.message
+                              }
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
 

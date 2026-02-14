@@ -1,10 +1,21 @@
 "use client";
 
-import { Bell, Home, Package2, Plus, ShoppingCart, Store } from "lucide-react";
+import {
+  AlertTriangle,
+  BarChart3,
+  Bell,
+  Home,
+  Package2,
+  Plus,
+  ShoppingCart,
+  Store,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
 
 function isActiveRoute(pathname: string, href: string) {
@@ -17,6 +28,10 @@ function isActiveRoute(pathname: string, href: string) {
 
 export function DashboardSidebar() {
   const pathname = usePathname();
+  const conflictsSummaryQuery = trpc.conflicts.summary.useQuery(undefined, {
+    refetchOnWindowFocus: true,
+  });
+  const activeConflictCount = conflictsSummaryQuery.data?.activeCount ?? 0;
 
   return (
     <div className="hidden border-r bg-gray-100/40 md:block dark:bg-gray-800/40">
@@ -74,6 +89,41 @@ export function DashboardSidebar() {
             >
               <Store className="h-4 w-4" />
               Brands
+            </Link>
+            <Link
+              href="/conflicts"
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2 transition-all",
+                isActiveRoute(pathname, "/conflicts")
+                  ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-50"
+                  : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50",
+              )}
+            >
+              <AlertTriangle className="h-4 w-4" />
+              <span>Conflicts</span>
+              <Badge
+                variant="outline"
+                className={cn(
+                  "ml-auto",
+                  activeConflictCount > 0
+                    ? "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300"
+                    : "",
+                )}
+              >
+                {activeConflictCount}
+              </Badge>
+            </Link>
+            <Link
+              href="/analytics"
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2 transition-all",
+                isActiveRoute(pathname, "/analytics")
+                  ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-50"
+                  : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50",
+              )}
+            >
+              <BarChart3 className="h-4 w-4" />
+              Analytics
             </Link>
           </nav>
         </div>
