@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, gte, lt, sql } from "drizzle-orm";
+import { calculateDeadlineState } from "@/src/server/domain/services/DeadlineCalculator";
 import { brands } from "@/server/infrastructure/database/schema/brands";
 import { deals } from "@/server/infrastructure/database/schema/deals";
 import { deliverables } from "@/server/infrastructure/database/schema/deliverables";
@@ -161,6 +162,7 @@ export const analyticsRouter = createTRPCRouter({
             type: deliverables.type,
             quantity: deliverables.quantity,
             scheduledAt: deliverables.scheduledAt,
+            postedAt: deliverables.postedAt,
             status: deliverables.status,
             dealTitle: deals.title,
             brandName: brands.name,
@@ -238,6 +240,16 @@ export const analyticsRouter = createTRPCRouter({
       const overdueItemsCount =
         (paymentStats?.overduePaymentsCount ?? 0) +
         (deliverableStats?.overdueDeliverablesCount ?? 0);
+      const upcomingDeliverablesWithDeadlines = upcomingDeliverables.map(
+        (deliverable) => ({
+          ...deliverable,
+          ...calculateDeadlineState({
+            scheduled_at: deliverable.scheduledAt,
+            posted_at: deliverable.postedAt,
+            now,
+          }),
+        }),
+      );
 
       return {
         totalRevenueThisMonth: Number(paymentStats?.totalRevenueThisMonth ?? "0"),
@@ -247,7 +259,7 @@ export const analyticsRouter = createTRPCRouter({
         upcomingDeliverablesCount:
           deliverableStats?.upcomingDeliverablesCount ?? 0,
         overdueItemsCount,
-        upcomingDeliverables,
+        upcomingDeliverables: upcomingDeliverablesWithDeadlines,
         recentDeals,
         revenueTrend,
       };

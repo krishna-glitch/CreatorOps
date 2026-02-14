@@ -10,6 +10,7 @@ import {
   PlusCircle,
   TriangleAlert,
 } from "lucide-react";
+import { formatDistanceStrict } from "date-fns";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -33,6 +34,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { trpc } from "@/lib/trpc/client";
+import { DeadlineStateBadge } from "@/src/components/deliverables/DeadlineStateBadge";
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-US", {
@@ -120,6 +122,15 @@ type TimelineItem = {
   type: string;
   scheduledAt: Date | null;
   status: string;
+  deadline_state:
+    | "COMPLETED"
+    | "ON_TRACK"
+    | "DUE_SOON"
+    | "DUE_TODAY"
+    | "LATE"
+    | "LATE_1D"
+    | "LATE_3D";
+  deadline_state_reason: string;
 };
 
 function DeliverablesTimeline({
@@ -190,34 +201,36 @@ function DeliverablesTimeline({
       return null;
     }
 
-    const isOverdue = new Date(item.scheduledAt) < now;
+    const isLate =
+      item.deadline_state === "LATE" ||
+      item.deadline_state === "LATE_1D" ||
+      item.deadline_state === "LATE_3D";
+    const isDueToday = item.deadline_state === "DUE_TODAY";
+    const cardClassName = isLate
+      ? "border-rose-200 bg-rose-50/40"
+      : isDueToday
+        ? "border-orange-200 bg-orange-50/40"
+        : "border-gray-100 bg-white";
 
     return (
       <button
         key={item.id}
         type="button"
         onClick={() => onOpenDeal(item.dealId)}
-        className={`w-full rounded-xl border p-3 text-left ${
-          isOverdue
-            ? "border-rose-200 bg-rose-50/40"
-            : "border-gray-100 bg-white"
-        }`}
+        className={`w-full rounded-xl border p-3 text-left ${cardClassName}`}
       >
         <div className="flex items-center justify-between gap-3">
           <p className="font-medium text-gray-900">{item.dealTitle}</p>
-          <Badge
-            variant="outline"
-            className={chipToneClasses(isOverdue ? "red" : "blue")}
-          >
-            {item.status}
-          </Badge>
+          <DeadlineStateBadge
+            state={item.deadline_state}
+            reason={item.deadline_state_reason}
+          />
         </div>
         <p className="mt-1 text-sm text-gray-600">
           {item.platform} · {item.type}
         </p>
-        <p className={`text-xs ${isOverdue ? "text-rose-700" : "text-gray-500"}`}>
-          {isOverdue ? "Overdue " : "Scheduled "}
-          {formatTime(item.scheduledAt)}
+        <p className={`text-xs ${isLate ? "text-rose-700" : "text-gray-500"}`}>
+          {item.deadline_state_reason} · {formatTime(item.scheduledAt)}
         </p>
       </button>
     );
@@ -300,6 +313,31 @@ function chipToneClasses(tone: "green" | "yellow" | "red" | "blue") {
     return "border-rose-200 bg-rose-100 text-rose-700";
   }
   return "border-blue-200 bg-blue-100 text-blue-700";
+}
+
+function reminderPriorityTone(priority: "LOW" | "MED" | "HIGH" | "CRITICAL") {
+  if (priority === "CRITICAL") {
+    return "border-rose-300 bg-rose-100 text-rose-800";
+  }
+  if (priority === "HIGH") {
+    return "border-orange-300 bg-orange-100 text-orange-800";
+  }
+  if (priority === "MED") {
+    return "border-amber-200 bg-amber-100 text-amber-700";
+  }
+  return "border-blue-200 bg-blue-100 text-blue-700";
+}
+
+function formatReminderRelative(dueAt: Date | string) {
+  const now = new Date();
+  const due = dueAt instanceof Date ? dueAt : new Date(dueAt);
+  const distance = formatDistanceStrict(due, now);
+
+  if (due > now) {
+    return `Due in ${distance}`;
+  }
+
+  return `Overdue by ${distance}`;
 }
 
 function StatCardSkeleton() {
@@ -408,8 +446,22 @@ function QuickActionsCard() {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const utils = trpc.useUtils();
   const statsQuery = trpc.analytics.getDashboardStats.useQuery(undefined, {
     staleTime: 30_000,
+  });
+  const remindersQuery = trpc.reminders.listOpen.useQuery(undefined, {
+    staleTime: 15_000,
+  });
+  const markDoneReminderMutation = trpc.reminders.markDone.useMutation({
+    onSuccess: async () => {
+      await utils.reminders.listOpen.invalidate();
+    },
+  });
+  const snoozeReminderMutation = trpc.reminders.snooze.useMutation({
+    onSuccess: async () => {
+      await utils.reminders.listOpen.invalidate();
+    },
   });
 
   const stats = statsQuery.data;
@@ -437,6 +489,12 @@ export default function DashboardPage() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [router]);
+
+  const isReminderActionPending = (reminderId: string) =>
+    (markDoneReminderMutation.isPending &&
+      markDoneReminderMutation.variables?.id === reminderId) ||
+    (snoozeReminderMutation.isPending &&
+      snoozeReminderMutation.variables?.id === reminderId);
 
   return (
     <div className="space-y-6">
@@ -715,10 +773,77 @@ export default function DashboardPage() {
                     type: deliverable.type,
                     scheduledAt: deliverable.scheduledAt,
                     status: deliverable.status,
+                    deadline_state: deliverable.deadline_state,
+                    deadline_state_reason: deliverable.deadline_state_reason,
                   })) ?? []
                 }
                 onOpenDeal={(dealId) => router.push(`/deals/${dealId}`)}
               />
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-2xl border bg-white/80 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+            <CardHeader>
+              <CardTitle className="text-base">Active Reminders</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {remindersQuery.isLoading ? (
+                <p className="text-sm text-gray-500">Loading reminders...</p>
+              ) : remindersQuery.isError ? (
+                <p className="text-sm text-rose-600">Could not load reminders.</p>
+              ) : (remindersQuery.data?.length ?? 0) === 0 ? (
+                <p className="text-sm text-gray-500">No active reminders.</p>
+              ) : (
+                <div className="space-y-3">
+                  {remindersQuery.data?.map((reminder) => {
+                    const pending = isReminderActionPending(reminder.id);
+                    return (
+                      <div
+                        key={reminder.id}
+                        className="rounded-xl border border-gray-100 bg-white p-3"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <button
+                            type="button"
+                            className="text-left text-sm font-medium text-gray-900 hover:text-blue-700"
+                            onClick={() => router.push(`/deals/${reminder.dealId}`)}
+                          >
+                            {reminder.reason}
+                          </button>
+                          <Badge
+                            variant="outline"
+                            className={reminderPriorityTone(reminder.priority)}
+                          >
+                            {reminder.priority}
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-gray-500">
+                          {reminder.dealTitle} · {formatDate(reminder.dueAt)} {formatTime(reminder.dueAt)} ·{" "}
+                          {formatReminderRelative(reminder.dueAt)}
+                        </p>
+                        <div className="mt-3 flex items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={pending}
+                            onClick={() => markDoneReminderMutation.mutate({ id: reminder.id })}
+                            className="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            Mark Done
+                          </button>
+                          <button
+                            type="button"
+                            disabled={pending}
+                            onClick={() => snoozeReminderMutation.mutate({ id: reminder.id })}
+                            className="rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            Snooze 1d
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
         </>

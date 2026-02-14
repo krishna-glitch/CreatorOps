@@ -16,6 +16,28 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Reminder Jobs + Email Requirements
+
+Set these environment variables before running reminder jobs:
+
+- `UPSTASH_REDIS_URL` (or `REDIS_URL`) for BullMQ
+- `RESEND_API_KEY` for email delivery
+- `RESEND_FROM_EMAIL` (verified sender domain in Resend)
+- `SUPABASE_SERVICE_ROLE_KEY` and `NEXT_PUBLIC_SUPABASE_URL` (resolve user emails in background jobs)
+- Optional test override: `REMINDER_TEST_RECIPIENT_EMAIL`
+
+Run reminder worker (hourly cron + queue worker):
+
+```bash
+npm run jobs:reminders:worker
+```
+
+Run reminder scan manually (MVP testing):
+
+```bash
+npm run jobs:reminders:run
+```
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

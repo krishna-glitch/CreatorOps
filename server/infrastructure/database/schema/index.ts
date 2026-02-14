@@ -6,3 +6,4 @@ export { brands, brandsRelations } from "./brands";
 export { deals, dealsRelations } from "./deals";
 export { deliverables, deliverablesRelations } from "./deliverables";
 export { payments, paymentsRelations } from "./payments";
+export { reminders, remindersRelations } from "./reminders";

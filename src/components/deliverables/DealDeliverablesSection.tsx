@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc/client";
 import { formatDealDate } from "@/src/components/deals/StatusBadge";
+import { DeadlineStateBadge } from "./DeadlineStateBadge";
 import { DeliverableForm } from "./DeliverableForm";
 
 type DealDeliverablesSectionProps = {
@@ -72,6 +74,9 @@ export function DealDeliverablesSection({ dealId }: DealDeliverablesSectionProps
                   Scheduled date
                 </th>
                 <th scope="col" className="px-3 py-2 font-medium">
+                  Deadline
+                </th>
+                <th scope="col" className="px-3 py-2 font-medium">
                   Status
                 </th>
               </tr>
@@ -91,7 +96,20 @@ export function DealDeliverablesSection({ dealId }: DealDeliverablesSectionProps
                       ? formatDealDate(deliverable.scheduledAt, undefined, true)
                       : "Not scheduled"}
                   </td>
-                  <td className="px-3 py-3">{deliverable.status}</td>
+                  <td className="px-3 py-3">
+                    <div className="space-y-1">
+                      <DeadlineStateBadge
+                        state={deliverable.deadline_state}
+                        reason={deliverable.deadline_state_reason}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {deliverable.deadline_state_reason}
+                      </p>
+                    </div>
+                  </td>
+                  <td className="px-3 py-3">
+                    <Badge variant="outline">{deliverable.status}</Badge>
+                  </td>
                 </tr>
               ))}
             </tbody>

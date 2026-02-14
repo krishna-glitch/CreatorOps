@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
+import { calculateDeadlineState } from "@/src/server/domain/services/DeadlineCalculator";
 import { deals } from "@/server/infrastructure/database/schema/deals";
 import { deliverables } from "@/server/infrastructure/database/schema/deliverables";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -85,10 +86,20 @@ export const deliverablesRouter = createTRPCRouter({
         });
       }
 
-      return ctx.db.query.deliverables.findMany({
+      const records = await ctx.db.query.deliverables.findMany({
         where: eq(deliverables.dealId, input.deal_id),
         orderBy: [desc(deliverables.createdAt), desc(deliverables.id)],
       });
+
+      const now = new Date();
+      return records.map((record) => ({
+        ...record,
+        ...calculateDeadlineState({
+          scheduled_at: record.scheduledAt,
+          posted_at: record.postedAt,
+          now,
+        }),
+      }));
     }),
 
   create: protectedProcedure

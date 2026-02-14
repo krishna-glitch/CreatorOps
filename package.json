@@ -14,6 +14,8 @@
     "db:migrate": "tsx db/migrate.ts",
     "db:test": "tsx db/test-connection.ts",
     "db:seed": "tsx scripts/seed.ts",
+    "jobs:reminders:worker": "tsx scripts/reminders-worker.ts",
+    "jobs:reminders:run": "tsx -e \"import { runCheckRemindersJob } from './src/server/jobs/checkReminders'; runCheckRemindersJob().then((result) => { console.log(JSON.stringify(result, null, 2)); process.exit(0); }).catch((error) => { console.error(error); process.exit(1); });\"",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
@@ -32,8 +34,11 @@
     "@trpc/next": "^11.0.0",
     "@trpc/react-query": "^11.0.0",
     "@trpc/server": "^11.0.0",
+    "bullmq": "^5.69.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
+    "date-fns-tz": "^3.2.0",
     "drizzle-orm": "^0.45.1",
     "groq-sdk": "^0.37.0",
     "lucide-react": "^0.564.0",
@@ -43,6 +48,7 @@
     "react-dom": "19.2.3",
     "react-hook-form": "^7.71.1",
     "recharts": "^3.7.0",
+    "resend": "^6.9.2",
     "sonner": "^2.0.7",
     "superjson": "^2.2.6",
     "tailwind-merge": "^3.4.0",
