@@ -18,6 +18,7 @@ type DealItem = DealsListResponse["items"][number];
 type DealsListClientProps = {
   initialData: DealsListResponse | null;
   pageSize: number;
+  aiExtractionEnabled: boolean;
 };
 
 function DealCardSkeleton() {
@@ -31,7 +32,11 @@ function DealCardSkeleton() {
   );
 }
 
-export function DealsListClient({ initialData, pageSize }: DealsListClientProps) {
+export function DealsListClient({
+  initialData,
+  pageSize,
+  aiExtractionEnabled,
+}: DealsListClientProps) {
   const [items, setItems] = useState<DealItem[]>(initialData?.items ?? []);
   const [hasMore, setHasMore] = useState(initialData?.hasMore ?? false);
   const [nextCursor, setNextCursor] = useState<string | null>(
@@ -65,6 +70,11 @@ export function DealsListClient({ initialData, pageSize }: DealsListClientProps)
     },
   );
 
+  const aiAvailabilityQuery = trpc.ai.extractionAvailability.useQuery(undefined, {
+    refetchOnWindowFocus: true,
+    refetchInterval: 60_000,
+  });
+
   useEffect(() => {
     if (!initialQuery.data) {
       return;
@@ -96,6 +106,8 @@ export function DealsListClient({ initialData, pageSize }: DealsListClientProps)
 
   const isInitialLoading = initialQuery.isLoading && items.length === 0;
   const isLoadingMore = loadMoreQuery.isFetching || pendingCursor !== null;
+  const isAIExtractionEnabled =
+    aiAvailabilityQuery.data?.enabled ?? aiExtractionEnabled;
 
   const createdCountLabel = useMemo(() => {
     if (items.length === 1) return "1 deal";
@@ -126,12 +138,18 @@ export function DealsListClient({ initialData, pageSize }: DealsListClientProps)
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Link
-              href="/deals/ai-create"
-              className={buttonVariants({ variant: "outline" })}
-            >
-              AI Create Deal
-            </Link>
+            {isAIExtractionEnabled ? (
+              <Link
+                href="/deals/ai-create"
+                className={buttonVariants({ variant: "outline" })}
+              >
+                AI Create Deal
+              </Link>
+            ) : (
+              <span className="rounded-md border border-dashed border-gray-300 px-3 py-2 text-xs text-muted-foreground dark:border-gray-700">
+                AI Create temporarily disabled (quota)
+              </span>
+            )}
             <Link href="/deals/new" className={buttonVariants()}>
               Create New Deal
             </Link>

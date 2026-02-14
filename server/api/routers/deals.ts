@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { and, desc, eq, gte, lt, or } from "drizzle-orm";
 import { z } from "zod";
 import { extractDealFromMessage } from "@/src/server/services/ai/extractDeal";
+import { getAIExtractionAvailability } from "@/src/server/services/ai/quotaFlag";
 import { brands } from "@/server/infrastructure/database/schema/brands";
 import { deals } from "@/server/infrastructure/database/schema/deals";
 import {
@@ -120,6 +121,15 @@ export const dealsRouter = createTRPCRouter({
   parseMessage: protectedProcedure
     .input(parseDealMessageInputSchema)
     .mutation(async ({ input }) => {
+      const availability = getAIExtractionAvailability();
+      if (!availability.enabled) {
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message:
+            "AI extraction is temporarily disabled due to quota. Please use manual form.",
+        });
+      }
+
       try {
         return await extractDealFromMessage(input.message);
       } catch (error) {
@@ -132,6 +142,15 @@ export const dealsRouter = createTRPCRouter({
             code: "BAD_REQUEST",
             message: error.message,
             cause: error,
+          });
+        }
+
+        const availabilityAfterFailure = getAIExtractionAvailability();
+        if (!availabilityAfterFailure.enabled) {
+          throw new TRPCError({
+            code: "TOO_MANY_REQUESTS",
+            message:
+              "AI extraction hit quota and is temporarily disabled. Please use manual form.",
           });
         }
 

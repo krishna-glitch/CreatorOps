@@ -10,6 +10,7 @@ import {
 import { authUsers } from "./auth";
 import { brands } from "./brands";
 import { deliverables } from "./deliverables";
+import { payments } from "./payments";
 
 export const deals = pgTable(
   "deals",
@@ -44,4 +45,5 @@ export const dealsRelations = relations(deals, ({ one, many }) => ({
     references: [brands.id],
   }),
   deliverables: many(deliverables),
+  payments: many(payments),
 }));

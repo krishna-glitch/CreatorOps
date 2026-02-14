@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { testGroqConnection } from "@/src/server/services/ai/client";
+import { getAIExtractionAvailability } from "@/src/server/services/ai/quotaFlag";
 import { ExternalServiceError } from "@/server/utils/errors";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 
@@ -9,6 +10,9 @@ const testConnectionInputSchema = z.object({
 });
 
 export const aiRouter = createTRPCRouter({
+  extractionAvailability: publicProcedure.query(() => {
+    return getAIExtractionAvailability();
+  }),
   testConnection: publicProcedure
     .input(testConnectionInputSchema.optional())
     .query(async ({ input }) => {

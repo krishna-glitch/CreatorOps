@@ -23,6 +23,7 @@ export default async function DealsPage() {
   });
 
   let initialData: Awaited<ReturnType<typeof caller.deals.list>> | null = null;
+  let aiExtractionEnabled = true;
 
   try {
     initialData = await caller.deals.list({ limit: PAGE_SIZE });
@@ -30,5 +31,18 @@ export default async function DealsPage() {
     console.error("Failed to prefetch deals list", error);
   }
 
-  return <DealsListClient initialData={initialData} pageSize={PAGE_SIZE} />;
+  try {
+    const availability = await caller.ai.extractionAvailability();
+    aiExtractionEnabled = availability.enabled;
+  } catch (error) {
+    console.error("Failed to prefetch AI extraction availability", error);
+  }
+
+  return (
+    <DealsListClient
+      initialData={initialData}
+      pageSize={PAGE_SIZE}
+      aiExtractionEnabled={aiExtractionEnabled}
+    />
+  );
 }

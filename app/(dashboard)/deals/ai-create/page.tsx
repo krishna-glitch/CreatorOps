@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -155,9 +155,14 @@ function findBrandMatch(extractedBrandName: string, brands: BrandItem[]): BrandM
 
 export default function AICreateDealPage() {
   const router = useRouter();
+  const hasRedirectedForQuotaRef = useRef(false);
 
   const { data: brands, isLoading: isLoadingBrands } =
     trpc.brands.list.useQuery({ limit: 100 });
+  const aiAvailabilityQuery = trpc.ai.extractionAvailability.useQuery(undefined, {
+    refetchOnWindowFocus: true,
+    refetchInterval: 60_000,
+  });
 
   const parseMessageMutation = trpc.deals.parseMessage.useMutation();
   const createDealMutation = trpc.deals.create.useMutation({
@@ -184,6 +189,7 @@ export default function AICreateDealPage() {
 
   const brandItems: BrandItem[] = brands?.items ?? [];
   const hasBrands = brandItems.length > 0;
+  const isAIExtractionDisabled = aiAvailabilityQuery.data?.enabled === false;
 
   const confidenceStyles = useMemo(() => {
     if (confidence === null) {
@@ -211,7 +217,30 @@ export default function AICreateDealPage() {
     }
   }, [brandMatch, hasExtraction, isBrandSelectionManual]);
 
+  useEffect(() => {
+    if (!isAIExtractionDisabled || hasRedirectedForQuotaRef.current) {
+      return;
+    }
+
+    hasRedirectedForQuotaRef.current = true;
+    toast.error(
+      "AI extraction is temporarily disabled due to quota. Redirecting to manual form.",
+      {
+        duration: 3000,
+      },
+    );
+    router.replace("/deals/new");
+  }, [isAIExtractionDisabled, router]);
+
   const handleExtract = () => {
+    if (isAIExtractionDisabled) {
+      toast.error("AI extraction is disabled due to quota. Use manual form.", {
+        duration: 3000,
+      });
+      router.push("/deals/new");
+      return;
+    }
+
     const normalizedMessage = message.trim();
     if (!normalizedMessage) {
       toast.error("Please paste a message before extracting.", {
@@ -247,9 +276,14 @@ export default function AICreateDealPage() {
           });
         },
         onError: (error) => {
-          toast.error(error.message || "Could not extract deal info.", {
-            duration: 3000,
-          });
+          toast.error(
+            "AI unavailable right now. You can still create this deal manually.",
+            {
+              duration: 3000,
+            },
+          );
+          console.warn("deals.parseMessage failed", error);
+          router.push("/deals/new");
         },
       },
     );
@@ -338,11 +372,16 @@ export default function AICreateDealPage() {
           <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
             AI Deal Intake
           </p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
-            Create Deal From Message
-          </h1>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+              Create Deal From Message
+            </h1>
+            <Button asChild type="button" variant="outline" size="sm">
+              <Link href="/deals/new">Create Manually</Link>
+            </Button>
+          </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Paste a creator message, extract details, review, and confirm.
+            AI pre-fills fields for speed. Manual create always works.
           </p>
         </div>
 
@@ -368,9 +407,13 @@ export default function AICreateDealPage() {
               <Button
                 type="button"
                 onClick={handleExtract}
-                disabled={isExtracting}
+                disabled={isExtracting || isAIExtractionDisabled}
               >
-                {isExtracting ? "Extracting..." : "Extract Deal Info"}
+                {isExtracting
+                  ? "Extracting..."
+                  : isAIExtractionDisabled
+                    ? "AI Disabled (Quota)"
+                    : "Extract Deal Info"}
               </Button>
             </div>
           </div>

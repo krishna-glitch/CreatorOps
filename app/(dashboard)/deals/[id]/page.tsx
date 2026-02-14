@@ -18,6 +18,32 @@ type DealDetailPageProps = {
   }>;
 };
 
+function getPaymentStatusClassName(status: string | null) {
+  const normalized = status ?? "UNKNOWN";
+
+  if (normalized === "PAID") {
+    return "border-transparent bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300";
+  }
+
+  if (normalized === "EXPECTED") {
+    return "border-transparent bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300";
+  }
+
+  if (normalized === "OVERDUE") {
+    return "border-transparent bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300";
+  }
+
+  return "border-transparent bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200";
+}
+
+function formatPaymentAmount(
+  value: string | number | null,
+  currency: string | null | undefined,
+) {
+  const normalizedCurrency = currency === "USD" || currency === "INR" ? currency : null;
+  return formatDealCurrency(value, { currency: normalizedCurrency });
+}
+
 export default async function DealDetailPage({ params }: DealDetailPageProps) {
   const { id } = await params;
 
@@ -38,6 +64,18 @@ export default async function DealDetailPage({ params }: DealDetailPageProps) {
 
   try {
     const deal = await caller.deals.getById({ id });
+    const payments = await caller.payments.listByDeal({ deal_id: id });
+
+    const totalExpected = payments.reduce(
+      (sum, payment) => sum + (Number(payment.amount) || 0),
+      0,
+    );
+    const totalPaid = payments.reduce(
+      (sum, payment) =>
+        payment.status === "PAID" ? sum + (Number(payment.amount) || 0) : sum,
+      0,
+    );
+    const outstanding = Math.max(totalExpected - totalPaid, 0);
 
     return (
       <div className="mx-auto w-full max-w-4xl px-3 py-4 sm:px-6 sm:py-6">
@@ -115,6 +153,111 @@ export default async function DealDetailPage({ params }: DealDetailPageProps) {
           </div>
 
           <DealDeliverablesSection dealId={deal.id} />
+
+          <section className="mt-6 rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-sm font-medium">Payments</h2>
+              <button
+                type="button"
+                disabled
+                className={buttonVariants({ variant: "default", size: "sm" })}
+              >
+                Add Payment (Coming Soon)
+              </button>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+                <p className="text-xs uppercase tracking-[0.1em] text-muted-foreground">
+                  Total expected
+                </p>
+                <p className="mt-1 text-sm font-semibold">
+                  {formatPaymentAmount(totalExpected, deal.currency)}
+                </p>
+              </div>
+              <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+                <p className="text-xs uppercase tracking-[0.1em] text-muted-foreground">
+                  Total paid
+                </p>
+                <p className="mt-1 text-sm font-semibold">
+                  {formatPaymentAmount(totalPaid, deal.currency)}
+                </p>
+              </div>
+              <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+                <p className="text-xs uppercase tracking-[0.1em] text-muted-foreground">
+                  Outstanding
+                </p>
+                <p className="mt-1 text-sm font-semibold">
+                  {formatPaymentAmount(outstanding, deal.currency)}
+                </p>
+              </div>
+            </div>
+
+            {payments.length === 0 ? (
+              <p className="mt-3 text-sm text-muted-foreground">
+                No payments added to this deal yet.
+              </p>
+            ) : (
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full min-w-[760px] text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200 text-muted-foreground dark:border-gray-800">
+                      <th scope="col" className="px-3 py-2 font-medium">
+                        Amount
+                      </th>
+                      <th scope="col" className="px-3 py-2 font-medium">
+                        Status
+                      </th>
+                      <th scope="col" className="px-3 py-2 font-medium">
+                        Dates
+                      </th>
+                      <th scope="col" className="px-3 py-2 font-medium">
+                        Payment method
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payments.map((payment) => (
+                      <tr
+                        key={payment.id}
+                        className="border-b border-gray-100 last:border-0 dark:border-gray-900"
+                      >
+                        <td className="px-3 py-3 font-medium">
+                          {formatPaymentAmount(payment.amount, payment.currency)}
+                        </td>
+                        <td className="px-3 py-3">
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getPaymentStatusClassName(payment.status)}`}
+                          >
+                            {payment.status ?? "UNKNOWN"}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3">
+                          <div className="space-y-1">
+                            <p>
+                              Expected:{" "}
+                              {payment.expectedDate
+                                ? formatDealDate(payment.expectedDate, undefined, true)
+                                : "N/A"}
+                            </p>
+                            <p>
+                              Paid:{" "}
+                              {payment.paidAt
+                                ? formatDealDate(payment.paidAt, undefined, true)
+                                : "N/A"}
+                            </p>
+                          </div>
+                        </td>
+                        <td className="px-3 py-3">
+                          {payment.paymentMethod ?? "N/A"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
         </div>
       </div>
     );

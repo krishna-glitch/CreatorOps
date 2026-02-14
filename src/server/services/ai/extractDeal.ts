@@ -4,6 +4,7 @@ import {
   buildExtractDealUserPrompt,
   EXTRACT_DEAL_SYSTEM_PROMPT,
 } from "./prompts/extractDeal";
+import { disableAIExtractionDueToQuota } from "./quotaFlag";
 import { ExternalServiceError, ValidationError } from "@/server/utils/errors";
 import logger from "@/server/utils/logger";
 
@@ -32,11 +33,14 @@ interface RetryOptions {
 }
 
 const RETRY_OPTIONS: RetryOptions = {
-  maxAttempts: 3,
-  initialDelay: 1000,
-  maxDelay: 10000,
+  maxAttempts: 2,
+  initialDelay: 600,
+  maxDelay: 2500,
   factor: 2,
 };
+
+const MAX_EXTRACTION_MESSAGE_CHARS = 1800;
+const MAX_COMPLETION_TOKENS = 220;
 
 function delayMs(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -61,6 +65,21 @@ function isRetryableGroqError(error: unknown) {
   );
 }
 
+function isQuotaGroqError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("quota") ||
+    message.includes("insufficient_quota") ||
+    message.includes("rate limit") ||
+    message.includes("too many requests") ||
+    message.includes("429")
+  );
+}
+
 async function callGroqWithRetry(message: string): Promise<string> {
   const client = getGroqClient();
   let lastError: Error | null = null;
@@ -69,7 +88,8 @@ async function callGroqWithRetry(message: string): Promise<string> {
     try {
       const response = await client.chat.completions.create({
         model: GROQ_EXTRACTION_MODEL,
-        temperature: 0.1,
+        temperature: 0,
+        max_completion_tokens: MAX_COMPLETION_TOKENS,
         response_format: { type: "json_object" },
         messages: [
           {
@@ -106,6 +126,16 @@ async function callGroqWithRetry(message: string): Promise<string> {
         error instanceof Error ? error : new Error("Unknown Groq API error");
       lastError = normalizedError;
 
+      if (isQuotaGroqError(normalizedError)) {
+        disableAIExtractionDueToQuota(normalizedError.message);
+        logger.warn("AI extraction disabled due to quota", {
+          operation: "extractDealFromMessage",
+          model: GROQ_EXTRACTION_MODEL,
+          error: normalizedError.message,
+        });
+        break;
+      }
+
       if (!isRetryableGroqError(normalizedError) || attempt === RETRY_OPTIONS.maxAttempts) {
         break;
       }
@@ -137,13 +167,23 @@ export async function extractDealFromMessage(message: string): Promise<Extracted
     });
   }
 
+  const modelMessage = normalizedMessage.slice(0, MAX_EXTRACTION_MESSAGE_CHARS);
+
+  if (normalizedMessage.length > MAX_EXTRACTION_MESSAGE_CHARS) {
+    logger.warn("Deal extraction message truncated", {
+      operation: "extractDealFromMessage",
+      originalLength: normalizedMessage.length,
+      truncatedLength: modelMessage.length,
+    });
+  }
+
   logger.info("Starting deal extraction", {
     operation: "extractDealFromMessage",
-    messageLength: normalizedMessage.length,
+    messageLength: modelMessage.length,
     model: GROQ_EXTRACTION_MODEL,
   });
 
-  const content = await callGroqWithRetry(normalizedMessage);
+  const content = await callGroqWithRetry(modelMessage);
 
   let parsed: unknown;
   try {

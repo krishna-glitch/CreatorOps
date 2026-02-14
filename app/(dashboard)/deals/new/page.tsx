@@ -63,7 +63,7 @@ export default function NewDealPage() {
   const router = useRouter();
 
   const { data: brands, isLoading: isLoadingBrands } =
-    trpc.brands.list.useQuery();
+    trpc.brands.list.useQuery({ limit: 100 });
 
   const createDealMutation = trpc.deals.create.useMutation({
     onSuccess: () => {
@@ -91,7 +91,8 @@ export default function NewDealPage() {
   };
 
   const isSubmitting = createDealMutation.isPending;
-  const hasBrands = Boolean(brands && brands.length > 0);
+  const brandItems = brands?.items ?? [];
+  const hasBrands = brandItems.length > 0;
 
   return (
     <div className="mx-auto w-full max-w-4xl px-3 py-4 sm:px-6 sm:py-6">
@@ -143,8 +144,8 @@ export default function NewDealPage() {
                               <SelectItem value="loading" disabled>
                                 Loading brands...
                               </SelectItem>
-                            ) : brands && brands.length > 0 ? (
-                              brands.map((brand) => (
+                            ) : brandItems.length > 0 ? (
+                              brandItems.map((brand) => (
                                 <SelectItem key={brand.id} value={brand.id}>
                                   {brand.name}
                                 </SelectItem>

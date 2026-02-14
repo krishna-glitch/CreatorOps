@@ -1,7 +1,8 @@
 import Groq from "groq-sdk";
 import { ExternalServiceError } from "@/server/utils/errors";
 
-export const GROQ_EXTRACTION_MODEL = "llama-3.3-70b-versatile";
+export const GROQ_EXTRACTION_MODEL =
+  process.env.GROQ_EXTRACTION_MODEL?.trim() || "llama-3.1-8b-instant";
 
 let groqClient: Groq | null = null;
 
@@ -29,6 +30,7 @@ export async function testGroqConnection(inputMessage: string) {
     const completion = await client.chat.completions.create({
       model: GROQ_EXTRACTION_MODEL,
       temperature: 0,
+      max_completion_tokens: 64,
       messages: [
         {
           role: "system",
