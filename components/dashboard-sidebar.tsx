@@ -7,11 +7,12 @@ import {
   Home,
   Package2,
   Plus,
+  Settings,
   ShoppingCart,
   Store,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -28,8 +29,9 @@ function isActiveRoute(pathname: string, href: string) {
 
 export function DashboardSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const conflictsSummaryQuery = trpc.conflicts.summary.useQuery(undefined, {
-    refetchOnWindowFocus: true,
+    staleTime: 30_000,
   });
   const activeConflictCount = conflictsSummaryQuery.data?.activeCount ?? 0;
 
@@ -48,7 +50,11 @@ export function DashboardSidebar() {
         </div>
         <div className="flex-1">
           <div className="px-2 py-2 lg:px-4">
-            <Link href="/deals/new" className={cn(buttonVariants(), "w-full")}>
+            <Link
+              href="/deals/new"
+              className={cn(buttonVariants(), "w-full")}
+              onClick={() => router.push("/deals/new")}
+            >
               <Plus className="h-4 w-4" />
               New Deal
             </Link>
@@ -124,6 +130,18 @@ export function DashboardSidebar() {
             >
               <BarChart3 className="h-4 w-4" />
               Analytics
+            </Link>
+            <Link
+              href="/settings"
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2 transition-all",
+                isActiveRoute(pathname, "/settings")
+                  ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-50"
+                  : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50",
+              )}
+            >
+              <Settings className="h-4 w-4" />
+              Settings
             </Link>
           </nav>
         </div>

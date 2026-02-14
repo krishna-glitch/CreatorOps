@@ -394,6 +394,7 @@ function RevenueChartSkeleton() {
 }
 
 function QuickActionsCard() {
+  const router = useRouter();
   const actions = [
     {
       label: "New Deal",
@@ -439,6 +440,7 @@ function QuickActionsCard() {
             <Link
               key={action.label}
               href={action.href}
+              onClick={() => router.push(action.href)}
               className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-gray-100 bg-white p-4 transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
             >
               <div className="flex items-start justify-between">

@@ -10,10 +10,28 @@ if (!process.env.DIRECT_URL) {
   throw new Error("DIRECT_URL is not set");
 }
 
-// For app queries - uses PgBouncer in transaction mode (connection pooling)
-const queryClient = postgres(process.env.DATABASE_URL);
+type GlobalDbState = {
+  queryClient?: ReturnType<typeof postgres>;
+};
+
+const globalDb = globalThis as typeof globalThis & { __db?: GlobalDbState };
+
+// Reuse a single query client in dev to avoid exhausting DB connections on HMR reloads.
+const queryClient =
+  globalDb.__db?.queryClient ??
+  postgres(process.env.DATABASE_URL, {
+    max: 5,
+    idle_timeout: 20,
+    connect_timeout: 10,
+  });
+
+if (process.env.NODE_ENV !== "production") {
+  globalDb.__db = { queryClient };
+}
+
 export const db = drizzle(queryClient, { schema });
 
-// For migrations - uses direct connection in session mode
-// This is required because PgBouncer transaction mode doesn't support all PostgreSQL features
-export const migrationClient = postgres(process.env.DIRECT_URL, { max: 1 });
+// For migrations/scripts, create a dedicated direct connection only when needed.
+export function createMigrationClient() {
+  return postgres(process.env.DIRECT_URL as string, { max: 1 });
+}

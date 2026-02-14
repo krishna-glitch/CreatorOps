@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, Filter, TrendingUp } from "lucide-react";
+import { BarChart3, Download, Filter, RefreshCcw, TrendingUp } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   Bar,
@@ -83,18 +83,27 @@ function escapeCsvField(value: string | number) {
 
 function EmptyChartState({ message }: { message: string }) {
   return (
-    <div className="flex h-[280px] items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/50 px-4 text-center text-sm text-slate-500">
-      {message}
+    <div className="flex h-[280px] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 bg-gradient-to-br from-slate-50/80 to-white px-6 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
+        <BarChart3 className="h-5 w-5 text-slate-400" />
+      </div>
+      <p className="max-w-[260px] text-sm leading-relaxed text-slate-500">
+        {message}
+      </p>
     </div>
   );
 }
 
 function LoadingChartState() {
   return (
-    <div
-      className="h-[280px] animate-pulse rounded-lg bg-slate-100"
-      aria-hidden="true"
-    />
+    <div className="space-y-3">
+      <div className="h-[260px] animate-pulse rounded-xl bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100" aria-hidden="true" />
+      <div className="flex gap-4">
+        <div className="h-3 w-20 animate-pulse rounded bg-slate-100" />
+        <div className="h-3 w-16 animate-pulse rounded bg-slate-100" />
+        <div className="h-3 w-24 animate-pulse rounded bg-slate-100" />
+      </div>
+    </div>
   );
 }
 
@@ -285,8 +294,27 @@ export default function AnalyticsPage() {
       ) : null}
 
       {insightsQuery.isError ? (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
-          Failed to load analytics. Try adjusting the date range.
+        <div className="flex items-center justify-between rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-rose-100">
+              <Filter className="h-4 w-4 text-rose-600" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-rose-800">Failed to load analytics</p>
+              <p className="text-xs text-rose-600">
+                {insightsQuery.error?.message || "Try adjusting the date range or refreshing."}
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => insightsQuery.refetch()}
+            className="shrink-0 border-rose-200 text-rose-700 hover:bg-rose-100"
+          >
+            <RefreshCcw className="mr-1.5 h-3.5 w-3.5" />
+            Retry
+          </Button>
         </div>
       ) : null}
 
@@ -503,7 +531,7 @@ export default function AnalyticsPage() {
                           key={`${entry.platform}-${entry.revenue}`}
                           fill={
                             CHART_COLORS.platform[
-                              index % CHART_COLORS.platform.length
+                            index % CHART_COLORS.platform.length
                             ]
                           }
                         />
@@ -600,7 +628,7 @@ export default function AnalyticsPage() {
                           key={`${entry.stage}-${entry.value}`}
                           fill={
                             CHART_COLORS.funnel[
-                              index % CHART_COLORS.funnel.length
+                            index % CHART_COLORS.funnel.length
                             ]
                           }
                         />
@@ -616,7 +644,7 @@ export default function AnalyticsPage() {
                         style={{
                           backgroundColor:
                             CHART_COLORS.funnel[
-                              index % CHART_COLORS.funnel.length
+                            index % CHART_COLORS.funnel.length
                             ],
                         }}
                       />

@@ -9,6 +9,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { deals } from "./deals";
 import { feedbackItems } from "./feedback";
+import { mediaAssets } from "./media_assets";
 import { reminders } from "./reminders";
 import { reworkCycles } from "./reworkCycles";
 
@@ -42,6 +43,7 @@ export const deliverablesRelations = relations(deliverables, ({ one, many }) => 
     references: [deals.id],
   }),
   feedbackItems: many(feedbackItems),
+  mediaAssets: many(mediaAssets),
   reminders: many(reminders),
   reworkCycles: many(reworkCycles),
 }));

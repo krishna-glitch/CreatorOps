@@ -13,6 +13,7 @@ import { dealsRouter } from "./routers/deals";
 import { deliverablesRouter } from "./routers/deliverables";
 import { feedbackRouter } from "./routers/feedback";
 import { jobsRouter } from "./routers/jobs";
+import { mediaAssetsRouter } from "./routers/mediaAssets";
 import { paymentsRouter } from "./routers/payments";
 import { remindersRouter } from "./routers/reminders";
 import { createTRPCRouter } from "./trpc";
@@ -27,6 +28,7 @@ export const appRouter = createTRPCRouter({
   deliverables: deliverablesRouter,
   feedback: feedbackRouter,
   jobs: jobsRouter,
+  mediaAssets: mediaAssetsRouter,
   payments: paymentsRouter,
   reminders: remindersRouter,
 });

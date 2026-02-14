@@ -7,7 +7,12 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Run auth/session middleware only on protected dashboard routes.
+    // Keep auth session fresh for protected app pages and tRPC API calls.
     "/dashboard/:path*",
+    "/deals/:path*",
+    "/brands/:path*",
+    "/conflicts/:path*",
+    "/analytics/:path*",
+    "/api/trpc/:path*",
   ],
 };

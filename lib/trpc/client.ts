@@ -1,1 +1,3 @@
-export { trpc } from "@/lib/trpc/provider";
+"use client";
+
+export { trpc } from "@/lib/trpc/react";

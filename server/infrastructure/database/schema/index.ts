@@ -17,6 +17,12 @@ export {
   exclusivityScopeEnum,
 } from "./exclusivity";
 export { feedbackItems, feedbackItemsRelations } from "./feedback";
+export {
+  mediaAssets,
+  mediaAssetsRelations,
+  mediaAssetStatusEnum,
+  mediaAssetTypeEnum,
+} from "./media_assets";
 export { payments, paymentsRelations } from "./payments";
 export { reminders, remindersRelations } from "./reminders";
 export { reworkCycles, reworkCyclesRelations } from "./reworkCycles";
