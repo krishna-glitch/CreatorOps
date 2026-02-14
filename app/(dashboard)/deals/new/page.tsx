@@ -1,11 +1,20 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Check, ChevronsUpDown } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import {
   Form,
   FormControl,
@@ -16,6 +25,11 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -23,6 +37,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc/client";
+import { cn } from "@/lib/utils";
 
 const exclusivityRuleFormSchema = z
   .object({
@@ -43,7 +58,8 @@ const exclusivityRuleFormSchema = z
     notes: z.string().trim().max(1000).optional(),
   })
   .refine(
-    (value) => new Date(value.end_date).getTime() > new Date(value.start_date).getTime(),
+    (value) =>
+      new Date(value.end_date).getTime() > new Date(value.start_date).getTime(),
     {
       message: "End date must be after start date",
       path: ["end_date"],
@@ -135,7 +151,10 @@ export default function NewDealPage() {
     });
   };
 
-  const togglePlatform = (ruleIndex: number, platform: (typeof platformOptions)[number]) => {
+  const togglePlatform = (
+    ruleIndex: number,
+    platform: (typeof platformOptions)[number],
+  ) => {
     const fieldName = `exclusivity_rules.${ruleIndex}.platforms` as const;
     const current = form.getValues(fieldName) ?? [];
     const hasPlatform = current.includes(platform);
@@ -186,37 +205,65 @@ export default function NewDealPage() {
                     control={form.control}
                     name="brand_id"
                     render={({ field }) => (
-                      <FormItem>
+                      <FormItem className="flex flex-col">
                         <FormLabel className="text-sm font-medium">
                           Brand
                         </FormLabel>
-                        <Select
-                          value={field.value}
-                          onValueChange={field.onChange}
-                        >
-                          <FormControl>
-                            <SelectTrigger className="focus:ring-emerald-500/30 focus:ring-offset-0">
-                              <SelectValue placeholder="Select brand" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {isLoadingBrands ? (
-                              <SelectItem value="loading" disabled>
-                                Loading brands...
-                              </SelectItem>
-                            ) : brandItems.length > 0 ? (
-                              brandItems.map((brand) => (
-                                <SelectItem key={brand.id} value={brand.id}>
-                                  {brand.name}
-                                </SelectItem>
-                              ))
-                            ) : (
-                              <SelectItem value="none" disabled>
-                                No brands found
-                              </SelectItem>
-                            )}
-                          </SelectContent>
-                        </Select>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                className={cn(
+                                  "w-full justify-between pl-3 text-left font-normal hover:bg-white focus:ring-emerald-500/30",
+                                  !field.value && "text-muted-foreground",
+                                )}
+                              >
+                                {field.value
+                                  ? brandItems.find(
+                                      (brand) => brand.id === field.value,
+                                    )?.name
+                                  : "Select brand"}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent
+                            className="w-[300px] p-0"
+                            align="start"
+                          >
+                            <Command>
+                              <CommandInput placeholder="Search brand..." />
+                              <CommandList>
+                                <CommandEmpty>No brand found.</CommandEmpty>
+                                <CommandGroup>
+                                  {brandItems.map((brand) => (
+                                    <CommandItem
+                                      value={brand.name}
+                                      key={brand.id}
+                                      onSelect={() => {
+                                        form.setValue("brand_id", brand.id, {
+                                          shouldValidate: true,
+                                        });
+                                      }}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          brand.id === field.value
+                                            ? "opacity-100"
+                                            : "opacity-0",
+                                        )}
+                                      />
+                                      {brand.name}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -260,23 +307,28 @@ export default function NewDealPage() {
                           Total Value
                         </FormLabel>
                         <FormControl>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="0.00"
-                            className="focus-visible:border-emerald-500 focus-visible:ring-emerald-500/30"
-                            value={field.value ?? ""}
-                            onChange={(event) => {
-                              const nextValue = event.target.value;
-                              field.onChange(
-                                nextValue === ""
-                                  ? undefined
-                                  : Number(nextValue),
-                              );
-                            }}
-                            onBlur={field.onBlur}
-                          />
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                              {form.watch("currency") === "USD" ? "$" : "₹"}
+                            </span>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="0.00"
+                              className="pl-7 focus-visible:border-emerald-500 focus-visible:ring-emerald-500/30"
+                              value={field.value ?? ""}
+                              onChange={(event) => {
+                                const nextValue = event.target.value;
+                                field.onChange(
+                                  nextValue === ""
+                                    ? undefined
+                                    : Number(nextValue),
+                                );
+                              }}
+                              onBlur={field.onBlur}
+                            />
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -351,7 +403,11 @@ export default function NewDealPage() {
                       Add one or more exclusivity constraints for this deal.
                     </p>
                   </div>
-                  <Button type="button" variant="outline" onClick={addExclusivityRule}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={addExclusivityRule}
+                  >
                     Add Rule
                   </Button>
                 </div>
@@ -364,7 +420,8 @@ export default function NewDealPage() {
                   <div className="mt-4 space-y-4">
                     {exclusivityRulesArray.fields.map((field, index) => {
                       const selectedPlatforms =
-                        form.watch(`exclusivity_rules.${index}.platforms`) ?? [];
+                        form.watch(`exclusivity_rules.${index}.platforms`) ??
+                        [];
 
                       return (
                         <div
@@ -372,11 +429,15 @@ export default function NewDealPage() {
                           className="rounded-lg border border-gray-200 p-4 dark:border-gray-800"
                         >
                           <div className="mb-3 flex items-center justify-between gap-2">
-                            <p className="text-sm font-medium">Rule {index + 1}</p>
+                            <p className="text-sm font-medium">
+                              Rule {index + 1}
+                            </p>
                             <Button
                               type="button"
                               variant="outline"
-                              onClick={() => exclusivityRulesArray.remove(index)}
+                              onClick={() =>
+                                exclusivityRulesArray.remove(index)
+                              }
                             >
                               Delete Rule
                             </Button>
@@ -421,8 +482,12 @@ export default function NewDealPage() {
                                       </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
-                                      <SelectItem value="EXACT_CATEGORY">EXACT</SelectItem>
-                                      <SelectItem value="PARENT_CATEGORY">PARENT</SelectItem>
+                                      <SelectItem value="EXACT_CATEGORY">
+                                        EXACT
+                                      </SelectItem>
+                                      <SelectItem value="PARENT_CATEGORY">
+                                        PARENT
+                                      </SelectItem>
                                     </SelectContent>
                                   </Select>
                                   <FormMessage />
@@ -477,7 +542,8 @@ export default function NewDealPage() {
                             <p className="text-sm font-medium">Platforms</p>
                             <div className="mt-2 flex flex-wrap gap-2">
                               {platformOptions.map((platform) => {
-                                const active = selectedPlatforms.includes(platform);
+                                const active =
+                                  selectedPlatforms.includes(platform);
                                 return (
                                   <Button
                                     key={platform}
@@ -488,7 +554,9 @@ export default function NewDealPage() {
                                         ? "border-emerald-600 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300"
                                         : ""
                                     }
-                                    onClick={() => togglePlatform(index, platform)}
+                                    onClick={() =>
+                                      togglePlatform(index, platform)
+                                    }
                                   >
                                     {platform}
                                   </Button>
@@ -497,8 +565,8 @@ export default function NewDealPage() {
                             </div>
                             <p className="mt-2 text-xs text-red-600">
                               {
-                                form.formState.errors.exclusivity_rules?.[index]?.platforms
-                                  ?.message
+                                form.formState.errors.exclusivity_rules?.[index]
+                                  ?.platforms?.message
                               }
                             </p>
                           </div>

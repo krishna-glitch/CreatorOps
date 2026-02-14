@@ -1,146 +1,634 @@
 "use client";
 
-import { AlertTriangle, BarChart3 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Download, Filter, TrendingUp } from "lucide-react";
+import { useMemo, useState } from "react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Funnel,
+  FunnelChart,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc/client";
 
-function feedbackTypeTone(feedbackType: string) {
-  if (feedbackType === "COPY") {
-    return "border-transparent bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300";
+const CHART_COLORS = {
+  revenue: "#0f766e",
+  revenueFill: "#14b8a6",
+  grid: "#e5e7eb",
+  text: "#475569",
+  platform: ["#0ea5e9", "#14b8a6", "#f59e0b", "#8b5cf6", "#ef4444"],
+  brands: "#2563eb",
+  funnel: ["#94a3b8", "#60a5fa", "#10b981", "#f97316"],
+};
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function compactCurrency(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(value);
+}
+
+function toDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function toIsoRange(startDate: string, endDate: string) {
+  const start = new Date(`${startDate}T00:00:00`);
+  const endExclusive = new Date(`${endDate}T00:00:00`);
+  endExclusive.setDate(endExclusive.getDate() + 1);
+
+  return {
+    start_date: start.toISOString(),
+    end_date: endExclusive.toISOString(),
+  };
+}
+
+function escapeCsvField(value: string | number) {
+  const stringValue = String(value);
+  if (
+    stringValue.includes(",") ||
+    stringValue.includes("\n") ||
+    stringValue.includes('"')
+  ) {
+    return `"${stringValue.replaceAll('"', '""')}"`;
   }
-  if (feedbackType === "COMPLIANCE") {
-    return "border-transparent bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300";
-  }
-  if (feedbackType === "CREATIVE_DIRECTION") {
-    return "border-transparent bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300";
-  }
-  return "border-transparent bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200";
+  return stringValue;
+}
+
+function EmptyChartState({ message }: { message: string }) {
+  return (
+    <div className="flex h-[280px] items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/50 px-4 text-center text-sm text-slate-500">
+      {message}
+    </div>
+  );
+}
+
+function LoadingChartState() {
+  return (
+    <div
+      className="h-[280px] animate-pulse rounded-lg bg-slate-100"
+      aria-hidden="true"
+    />
+  );
 }
 
 export default function AnalyticsPage() {
-  const feedbackInsightsQuery = trpc.analytics.getFeedbackInsights.useQuery(undefined, {
-    staleTime: 30_000,
-  });
+  const now = new Date();
+  const defaultStart = new Date(now.getFullYear(), now.getMonth() - 11, 1);
 
-  const data = feedbackInsightsQuery.data;
+  const [startDate, setStartDate] = useState<string>(toDateInput(defaultStart));
+  const [endDate, setEndDate] = useState<string>(toDateInput(now));
+
+  const rangeInput = useMemo(() => {
+    if (!startDate || !endDate || startDate > endDate) {
+      return undefined;
+    }
+    return toIsoRange(startDate, endDate);
+  }, [startDate, endDate]);
+
+  const insightsQuery = trpc.analytics.getAdvancedInsights.useQuery(
+    rangeInput,
+    {
+      staleTime: 30_000,
+      enabled: Boolean(rangeInput),
+    },
+  );
+
+  const insights = insightsQuery.data;
+
+  const topBrands = useMemo(
+    () => (insights?.revenueByBrand ?? []).slice(0, 10),
+    [insights?.revenueByBrand],
+  );
+
+  const pipelineData = useMemo(() => {
+    const source = insights?.dealPipeline;
+    if (!source) {
+      return [];
+    }
+
+    return [
+      { stage: "Inbound", value: source.inbound },
+      { stage: "Negotiating", value: source.negotiating },
+      { stage: "Won", value: source.won },
+      { stage: "Lost", value: source.lost },
+    ];
+  }, [insights?.dealPipeline]);
+
+  const hasRevenueTrend = (insights?.revenueByMonth.length ?? 0) > 0;
+  const hasPlatformData = (insights?.revenueByPlatform.length ?? 0) > 0;
+  const hasBrandData = topBrands.length > 0;
+  const hasPipelineData = pipelineData.some((item) => item.value > 0);
+
+  const exportCsv = () => {
+    if (!insights) {
+      return;
+    }
+
+    const rows: string[][] = [
+      ["section", "label", "value", "secondary_value"],
+      ["meta", "start_date", insights.range.startDate, ""],
+      ["meta", "end_date", insights.range.endDate, ""],
+      ["summary", "average_deal_size", insights.averageDealSize.toString(), ""],
+      [
+        "summary",
+        "average_response_time_hours",
+        insights.averageResponseTimeHours.toString(),
+        "",
+      ],
+      [
+        "summary",
+        "on_time_delivery_rate",
+        insights.onTimeDeliveryRate.toString(),
+        "",
+      ],
+      [
+        "summary",
+        "average_revision_count",
+        insights.averageRevisionCount.toString(),
+        "",
+      ],
+      ["summary", "deals_won", insights.dealsWonVsLost.won.toString(), ""],
+      ["summary", "deals_lost", insights.dealsWonVsLost.lost.toString(), ""],
+    ];
+
+    for (const point of insights.revenueByMonth) {
+      rows.push([
+        "revenue_by_month",
+        point.monthKey,
+        point.revenue.toString(),
+        point.label,
+      ]);
+    }
+
+    for (const point of insights.revenueByPlatform) {
+      rows.push([
+        "revenue_by_platform",
+        point.platform,
+        point.revenue.toString(),
+        "",
+      ]);
+    }
+
+    for (const point of insights.revenueByBrand) {
+      rows.push([
+        "revenue_by_brand",
+        point.brandName,
+        point.revenue.toString(),
+        point.brandId,
+      ]);
+    }
+
+    for (const point of pipelineData) {
+      rows.push(["deal_pipeline", point.stage, point.value.toString(), ""]);
+    }
+
+    const csv = rows
+      .map((row) => row.map((field) => escapeCsvField(field)).join(","))
+      .join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `analytics_${startDate}_to_${endDate}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
-        <p className="text-gray-500">
-          Performance and feedback patterns across your deals.
-        </p>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
+          <p className="text-slate-500">
+            Revenue, pipeline, and brand performance across your selected range.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div>
+              <label
+                htmlFor="analytics-start-date"
+                className="text-xs text-slate-600"
+              >
+                Start date
+              </label>
+              <Input
+                id="analytics-start-date"
+                type="date"
+                value={startDate}
+                onChange={(event) => setStartDate(event.target.value)}
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="analytics-end-date"
+                className="text-xs text-slate-600"
+              >
+                End date
+              </label>
+              <Input
+                id="analytics-end-date"
+                type="date"
+                value={endDate}
+                onChange={(event) => setEndDate(event.target.value)}
+              />
+            </div>
+          </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            onClick={exportCsv}
+            disabled={!insights || insightsQuery.isLoading}
+            className="gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </Button>
+        </div>
       </div>
 
-      <Card className="rounded-2xl border bg-white/80 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-        <CardHeader className="flex flex-row items-center justify-between gap-2">
-          <CardTitle className="text-base">Feedback Insights</CardTitle>
-          <BarChart3 className="h-4 w-4 text-gray-500" />
+      {rangeInput === undefined ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          <Filter className="mr-1 inline h-4 w-4" />
+          Date range is invalid. Ensure start date is before end date.
+        </div>
+      ) : null}
+
+      {insightsQuery.isError ? (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+          Failed to load analytics. Try adjusting the date range.
+        </div>
+      ) : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Key Insights</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {feedbackInsightsQuery.isLoading ? (
-            <p className="text-sm text-gray-500">Loading feedback insights...</p>
-          ) : feedbackInsightsQuery.isError ? (
-            <p className="text-sm text-rose-600">
-              Could not load feedback insights.
+        <CardContent>
+          {insightsQuery.isLoading ? (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {[
+                "insight-loading-1",
+                "insight-loading-2",
+                "insight-loading-3",
+                "insight-loading-4",
+              ].map((key) => (
+                <div
+                  key={key}
+                  className="h-20 animate-pulse rounded-lg bg-slate-100"
+                  aria-hidden="true"
+                />
+              ))}
+            </div>
+          ) : (insights?.insights.length ?? 0) === 0 ? (
+            <p className="text-sm text-slate-500">
+              No statistically significant insights yet for this date range.
             </p>
           ) : (
-            <>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div className="rounded-xl border border-gray-200 p-3 dark:border-gray-800">
-                  <p className="text-xs uppercase tracking-[0.1em] text-muted-foreground">
-                    Total feedback
-                  </p>
-                  <p className="mt-1 text-xl font-semibold">
-                    {data?.totalFeedbackItems ?? 0}
-                  </p>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {insights?.insights.map((insight) => (
+                <div
+                  key={insight}
+                  className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700"
+                >
+                  {insight}
                 </div>
-                <div className="rounded-xl border border-gray-200 p-3 dark:border-gray-800">
-                  <p className="text-xs uppercase tracking-[0.1em] text-muted-foreground">
-                    Most common type
-                  </p>
-                  {data?.topFeedbackType ? (
-                    <div className="mt-1 flex items-center gap-2">
-                      <Badge className={feedbackTypeTone(data.topFeedbackType.feedbackType)}>
-                        {data.topFeedbackType.feedbackType.replaceAll("_", " ")}
-                      </Badge>
-                      <span className="text-sm text-gray-600">
-                        {data.topFeedbackType.count}
-                      </span>
-                    </div>
-                  ) : (
-                    <p className="mt-1 text-sm text-gray-500">No data</p>
-                  )}
-                </div>
-                <div className="rounded-xl border border-gray-200 p-3 dark:border-gray-800">
-                  <p className="text-xs uppercase tracking-[0.1em] text-muted-foreground">
-                    Demanding clients
-                  </p>
-                  <p className="mt-1 text-xl font-semibold text-rose-700 dark:text-rose-300">
-                    {data?.demandingClients.length ?? 0}
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Patterns</p>
-                {(data?.patternInsights.length ?? 0) === 0 ? (
-                  <p className="text-sm text-gray-500">
-                    No strong feedback pattern detected yet.
-                  </p>
-                ) : (
-                  <ul className="space-y-2">
-                    {data?.patternInsights.map((insight) => (
-                      <li
-                        key={insight}
-                        className="rounded-lg border border-gray-200 bg-gray-50 p-2 text-sm dark:border-gray-800 dark:bg-gray-900/40"
-                      >
-                        {insight}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Brands Giving Most Feedback</p>
-                {(data?.brandFeedbackStats.length ?? 0) === 0 ? (
-                  <p className="text-sm text-gray-500">No feedback activity yet.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {data?.brandFeedbackStats.map((brand) => {
-                      const isDemanding = brand.highSeverityCount > 3;
-                      return (
-                        <div
-                          key={brand.brandId}
-                          className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950"
-                        >
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm font-medium">{brand.brandName}</p>
-                            {isDemanding ? (
-                              <Badge className="border-transparent bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">
-                                <AlertTriangle className="mr-1 h-3.5 w-3.5" />
-                                Demanding Client
-                              </Badge>
-                            ) : null}
-                          </div>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {brand.feedbackCount} feedback items • Avg severity{" "}
-                            {brand.avgSeverity.toFixed(1)} • High severity ({">"}7):{" "}
-                            {brand.highSeverityCount}
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </>
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Recommendations</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {insightsQuery.isLoading ? (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {[
+                "recommendation-loading-1",
+                "recommendation-loading-2",
+                "recommendation-loading-3",
+              ].map((key) => (
+                <div
+                  key={key}
+                  className="h-20 animate-pulse rounded-lg bg-slate-100"
+                  aria-hidden="true"
+                />
+              ))}
+            </div>
+          ) : (insights?.recommendations.length ?? 0) === 0 ? (
+            <p className="text-sm text-slate-500">
+              No recommendations generated for this date range.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {insights?.recommendations.map((recommendation) => (
+                <div
+                  key={recommendation}
+                  className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900"
+                >
+                  {recommendation}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-slate-600">
+              Average Deal Size
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-2xl font-semibold">
+            {insightsQuery.isLoading
+              ? "..."
+              : formatCurrency(insights?.averageDealSize ?? 0)}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-slate-600">
+              Won vs Lost
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm">
+            {insightsQuery.isLoading ? (
+              "..."
+            ) : (
+              <span>
+                Won <strong>{insights?.dealsWonVsLost.won ?? 0}</strong> • Lost{" "}
+                <strong>{insights?.dealsWonVsLost.lost ?? 0}</strong>
+              </span>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-slate-600">
+              Avg Response Time
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-2xl font-semibold">
+            {insightsQuery.isLoading
+              ? "..."
+              : `${(insights?.averageResponseTimeHours ?? 0).toFixed(1)}h`}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-slate-600">
+              On-Time Delivery Rate
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-2xl font-semibold">
+            {insightsQuery.isLoading
+              ? "..."
+              : `${((insights?.onTimeDeliveryRate ?? 0) * 100).toFixed(1)}%`}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <TrendingUp className="h-4 w-4" />
+              Revenue Trend (12 Months)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {insightsQuery.isLoading ? (
+              <LoadingChartState />
+            ) : !hasRevenueTrend ? (
+              <EmptyChartState message="No revenue records for this date range." />
+            ) : (
+              <div className="h-[280px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={insights?.revenueByMonth}>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke={CHART_COLORS.grid}
+                    />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fill: CHART_COLORS.text, fontSize: 12 }}
+                    />
+                    <YAxis
+                      tick={{ fill: CHART_COLORS.text, fontSize: 12 }}
+                      tickFormatter={(value) => compactCurrency(Number(value))}
+                    />
+                    <Tooltip
+                      formatter={(value) => [
+                        formatCurrency(Number(value ?? 0)),
+                        "Revenue",
+                      ]}
+                      labelFormatter={(label) => `Month: ${label}`}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="revenue"
+                      stroke={CHART_COLORS.revenue}
+                      strokeWidth={3}
+                      dot={{ r: 3, fill: CHART_COLORS.revenueFill }}
+                      activeDot={{ r: 5 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Platform Breakdown</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {insightsQuery.isLoading ? (
+              <LoadingChartState />
+            ) : !hasPlatformData ? (
+              <EmptyChartState message="No platform revenue data for this range." />
+            ) : (
+              <div className="h-[280px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={insights?.revenueByPlatform}
+                      dataKey="revenue"
+                      nameKey="platform"
+                      innerRadius={52}
+                      outerRadius={90}
+                      paddingAngle={2}
+                    >
+                      {insights?.revenueByPlatform.map((entry, index) => (
+                        <Cell
+                          key={`${entry.platform}-${entry.revenue}`}
+                          fill={
+                            CHART_COLORS.platform[
+                              index % CHART_COLORS.platform.length
+                            ]
+                          }
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value) => [
+                        formatCurrency(Number(value ?? 0)),
+                        "Revenue",
+                      ]}
+                    />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Top Brands (Top 10)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {insightsQuery.isLoading ? (
+              <LoadingChartState />
+            ) : !hasBrandData ? (
+              <EmptyChartState message="No brand revenue data for this range." />
+            ) : (
+              <div className="h-[320px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={topBrands}
+                    layout="vertical"
+                    margin={{ left: 16, right: 16 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke={CHART_COLORS.grid}
+                    />
+                    <XAxis
+                      type="number"
+                      tick={{ fill: CHART_COLORS.text, fontSize: 12 }}
+                      tickFormatter={(value) => compactCurrency(Number(value))}
+                    />
+                    <YAxis
+                      dataKey="brandName"
+                      type="category"
+                      width={100}
+                      tick={{ fill: CHART_COLORS.text, fontSize: 12 }}
+                    />
+                    <Tooltip
+                      formatter={(value) => [
+                        formatCurrency(Number(value ?? 0)),
+                        "Revenue",
+                      ]}
+                    />
+                    <Bar
+                      dataKey="revenue"
+                      fill={CHART_COLORS.brands}
+                      radius={[6, 6, 6, 6]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Deal Pipeline</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {insightsQuery.isLoading ? (
+              <LoadingChartState />
+            ) : !hasPipelineData ? (
+              <EmptyChartState message="No deal pipeline activity for this range." />
+            ) : (
+              <div className="h-[320px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <FunnelChart>
+                    <Tooltip
+                      formatter={(value) => [Number(value ?? 0), "Deals"]}
+                    />
+                    <Funnel
+                      data={pipelineData}
+                      dataKey="value"
+                      nameKey="stage"
+                      isAnimationActive
+                    >
+                      {pipelineData.map((entry, index) => (
+                        <Cell
+                          key={`${entry.stage}-${entry.value}`}
+                          fill={
+                            CHART_COLORS.funnel[
+                              index % CHART_COLORS.funnel.length
+                            ]
+                          }
+                        />
+                      ))}
+                    </Funnel>
+                  </FunnelChart>
+                </ResponsiveContainer>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600 sm:grid-cols-4">
+                  {pipelineData.map((item, index) => (
+                    <div key={item.stage} className="rounded border p-2">
+                      <span
+                        className="mr-1 inline-block h-2 w-2 rounded-full"
+                        style={{
+                          backgroundColor:
+                            CHART_COLORS.funnel[
+                              index % CHART_COLORS.funnel.length
+                            ],
+                        }}
+                      />
+                      {item.stage}: <strong>{item.value}</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

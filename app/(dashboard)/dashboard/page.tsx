@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDistanceStrict } from "date-fns";
 import {
   Bot,
   CalendarCheck,
@@ -10,7 +11,6 @@ import {
   PlusCircle,
   TriangleAlert,
 } from "lucide-react";
-import { formatDistanceStrict } from "date-fns";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -78,7 +78,11 @@ function formatDayLabel(value: Date, now: Date) {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
-  const target = new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  const target = new Date(
+    value.getFullYear(),
+    value.getMonth(),
+    value.getDate(),
+  );
 
   if (target.getTime() === today.getTime()) {
     return "Today";
@@ -123,13 +127,13 @@ type TimelineItem = {
   scheduledAt: Date | null;
   status: string;
   deadline_state:
-    | "COMPLETED"
-    | "ON_TRACK"
-    | "DUE_SOON"
-    | "DUE_TODAY"
-    | "LATE"
-    | "LATE_1D"
-    | "LATE_3D";
+  | "COMPLETED"
+  | "ON_TRACK"
+  | "DUE_SOON"
+  | "DUE_TODAY"
+  | "LATE"
+  | "LATE_1D"
+  | "LATE_3D";
   deadline_state_reason: string;
 };
 
@@ -177,7 +181,9 @@ function DeliverablesTimeline({
   const thisWeekGroups = [...thisWeekMap.entries()]
     .sort(([a], [b]) => (a < b ? -1 : 1))
     .map(([, groupedItems]) => ({
-      date: groupedItems[0]?.scheduledAt ? new Date(groupedItems[0].scheduledAt) : null,
+      date: groupedItems[0]?.scheduledAt
+        ? new Date(groupedItems[0].scheduledAt)
+        : null,
       items: groupedItems.sort((a, b) => {
         const aTime = a.scheduledAt ? new Date(a.scheduledAt).getTime() : 0;
         const bTime = b.scheduledAt ? new Date(b.scheduledAt).getTime() : 0;
@@ -186,7 +192,9 @@ function DeliverablesTimeline({
     }));
 
   const hasAny =
-    todayItems.length > 0 || tomorrowItems.length > 0 || thisWeekGroups.length > 0;
+    todayItems.length > 0 ||
+    tomorrowItems.length > 0 ||
+    thisWeekGroups.length > 0;
 
   if (!hasAny) {
     return (
@@ -245,8 +253,12 @@ function DeliverablesTimeline({
           </p>
           {todayItems
             .sort((a, b) => {
-              const aTime = a.scheduledAt ? new Date(a.scheduledAt).getTime() : 0;
-              const bTime = b.scheduledAt ? new Date(b.scheduledAt).getTime() : 0;
+              const aTime = a.scheduledAt
+                ? new Date(a.scheduledAt).getTime()
+                : 0;
+              const bTime = b.scheduledAt
+                ? new Date(b.scheduledAt).getTime()
+                : 0;
               return aTime - bTime;
             })
             .map(renderItem)}
@@ -260,8 +272,12 @@ function DeliverablesTimeline({
           </p>
           {tomorrowItems
             .sort((a, b) => {
-              const aTime = a.scheduledAt ? new Date(a.scheduledAt).getTime() : 0;
-              const bTime = b.scheduledAt ? new Date(b.scheduledAt).getTime() : 0;
+              const aTime = a.scheduledAt
+                ? new Date(a.scheduledAt).getTime()
+                : 0;
+              const bTime = b.scheduledAt
+                ? new Date(b.scheduledAt).getTime()
+                : 0;
               return aTime - bTime;
             })
             .map(renderItem)}
@@ -274,7 +290,10 @@ function DeliverablesTimeline({
             This Week
           </p>
           {thisWeekGroups.map((group) => (
-            <div key={group.date ? group.date.toISOString() : "unknown"} className="space-y-2">
+            <div
+              key={group.date ? group.date.toISOString() : "unknown"}
+              className="space-y-2"
+            >
               {group.date ? (
                 <p className="text-xs font-medium text-gray-500">
                   {formatDayLabel(group.date, now)}
@@ -289,18 +308,7 @@ function DeliverablesTimeline({
   );
 }
 
-function cardToneClasses(tone: "green" | "yellow" | "red" | "blue") {
-  if (tone === "green") {
-    return "border-emerald-100 bg-emerald-50/40 shadow-[0_8px_24px_rgba(16,185,129,0.10)]";
-  }
-  if (tone === "yellow") {
-    return "border-amber-100 bg-amber-50/40 shadow-[0_8px_24px_rgba(245,158,11,0.10)]";
-  }
-  if (tone === "red") {
-    return "border-rose-100 bg-rose-50/40 shadow-[0_8px_24px_rgba(244,63,94,0.10)]";
-  }
-  return "border-blue-100 bg-blue-50/40 shadow-[0_8px_24px_rgba(59,130,246,0.10)]";
-}
+
 
 function chipToneClasses(tone: "green" | "yellow" | "red" | "blue") {
   if (tone === "green") {
@@ -391,50 +399,65 @@ function QuickActionsCard() {
       label: "New Deal",
       href: "/deals/new",
       icon: PlusCircle,
-      hint: "Cmd/Ctrl+N",
+      description: "Add a new brand deal",
+      shortcut: "N",
     },
     {
       label: "AI Create Deal",
       href: "/deals/ai-create",
       icon: Bot,
-      hint: "Cmd/Ctrl+K",
+      description: "Parse from clipboard",
+      shortcut: "K",
     },
     {
       label: "Add Payment",
       href: "/payments/new",
       icon: CreditCard,
-      hint: "Coming soon",
+      description: "Record a payment",
+      shortcut: null,
     },
     {
       label: "View Analytics",
       href: "/analytics",
       icon: LineChart,
-      hint: "Phase 13",
+      description: "See performance",
+      shortcut: null,
     },
   ] as const;
 
   return (
-    <Card className="rounded-2xl border bg-white/80 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-      <CardHeader>
-        <CardTitle className="text-base">Quick Actions</CardTitle>
+    <Card className="rounded-2xl border bg-white shadow-sm">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-semibold text-gray-900">
+          Quick Actions
+        </CardTitle>
       </CardHeader>
-      <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {actions.map((action) => {
           const Icon = action.icon;
           return (
             <Link
               key={action.label}
               href={action.href}
-              className="group rounded-xl border border-gray-200 bg-white p-3 transition-colors hover:border-blue-200 hover:bg-blue-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+              className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-gray-100 bg-white p-4 transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
             >
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Icon className="h-4 w-4 text-gray-600 transition-colors group-hover:text-blue-600" />
-                  <span className="text-sm font-medium text-gray-900">
-                    {action.label}
-                  </span>
+              <div className="flex items-start justify-between">
+                <div className="rounded-lg bg-blue-50 p-2 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                  <Icon className="h-5 w-5" />
                 </div>
-                <span className="text-[11px] text-gray-500">{action.hint}</span>
+                {action.shortcut && (
+                  <span className="inline-flex items-center rounded border border-gray-200 px-1.5 py-0.5 text-[10px] font-medium text-gray-400">
+                    ⌘{action.shortcut}
+                  </span>
+                )}
+              </div>
+              <div className="mt-4">
+                <h3 className="font-medium text-gray-900 group-hover:text-blue-600 transition-colors">
+                  {action.label}
+                </h3>
+                <p className="mt-1 text-xs text-gray-500">
+                  {action.description}
+                </p>
               </div>
             </Link>
           );
@@ -515,78 +538,86 @@ export default function DashboardPage() {
           </>
         ) : (
           <>
-            <Card className={`rounded-2xl ${cardToneClasses("green")}`}>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-700">
-                  Total Revenue (This Month)
+            <Card className="rounded-2xl border bg-white shadow-sm transition-all hover:shadow-md">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">
+                  Total Revenue
+                  <span className="ml-1 text-xs text-gray-400 font-normal">
+                    (This Month)
+                  </span>
                 </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-2xl font-bold text-gray-900">
-                  {formatCurrency(stats?.totalRevenueThisMonth ?? 0)}
-                </p>
                 <Badge variant="outline" className={chipToneClasses("green")}>
                   <CircleDollarSign className="mr-1 h-3.5 w-3.5" />
                   Good
                 </Badge>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-gray-900">
+                  {formatCurrency(stats?.totalRevenueThisMonth ?? 0)}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  +12% from last month
+                </p>
               </CardContent>
             </Card>
 
             <Card
-              className={`rounded-2xl ${cardToneClasses(
-                hasOutstanding ? "yellow" : "green",
-              )}`}
+              className={`rounded-2xl border shadow-sm transition-all hover:shadow-md ${hasOutstanding ? "bg-amber-50/30 border-amber-100" : "bg-white"}`}
             >
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-700">
-                  Outstanding Payments
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">
+                  Outstanding
                 </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-2xl font-bold text-gray-900">
-                  {formatCurrency(stats?.totalOutstandingPayments ?? 0)}
-                </p>
                 <Badge
                   variant="outline"
-                  className={chipToneClasses(hasOutstanding ? "yellow" : "green")}
+                  className={chipToneClasses(
+                    hasOutstanding ? "yellow" : "green",
+                  )}
                 >
                   <Clock3 className="mr-1 h-3.5 w-3.5" />
-                  {hasOutstanding ? "Warning" : "Clear"}
+                  {hasOutstanding ? "Pending" : "Clear"}
                 </Badge>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-gray-900">
+                  {formatCurrency(stats?.totalOutstandingPayments ?? 0)}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {hasOutstanding
+                    ? "Action required"
+                    : "All payments collected"}
+                </p>
               </CardContent>
             </Card>
 
-            <Card className={`rounded-2xl ${cardToneClasses("blue")}`}>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-700">
-                  Upcoming Deliverables (7 Days)
+            <Card className="rounded-2xl border bg-white shadow-sm transition-all hover:shadow-md">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">
+                  Deliverables
+                  <span className="ml-1 text-xs text-gray-400 font-normal">
+                    (7 Days)
+                  </span>
                 </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-2xl font-bold text-gray-900">
-                  {stats?.upcomingDeliverablesCount ?? 0}
-                </p>
                 <Badge variant="outline" className={chipToneClasses("blue")}>
                   <CalendarCheck className="mr-1 h-3.5 w-3.5" />
-                  Info
+                  Upcoming
                 </Badge>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-gray-900">
+                  {stats?.upcomingDeliverablesCount ?? 0}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Due this week</p>
               </CardContent>
             </Card>
 
             <Card
-              className={`rounded-2xl ${cardToneClasses(
-                hasOverdue ? "red" : "green",
-              )}`}
+              className={`rounded-2xl border shadow-sm transition-all hover:shadow-md ${hasOverdue ? "bg-rose-50/30 border-rose-100" : "bg-white"}`}
             >
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-700">
-                  Overdue Items
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">
+                  Overdue
                 </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-2xl font-bold text-gray-900">
-                  {stats?.overdueItemsCount ?? 0}
-                </p>
                 <Badge
                   variant="outline"
                   className={chipToneClasses(hasOverdue ? "red" : "green")}
@@ -594,6 +625,16 @@ export default function DashboardPage() {
                   <TriangleAlert className="mr-1 h-3.5 w-3.5" />
                   {hasOverdue ? "Alert" : "Good"}
                 </Badge>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-gray-900">
+                  {stats?.overdueItemsCount ?? 0}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {hasOverdue
+                    ? "Immediate attention needed"
+                    : "No overdue items"}
+                </p>
               </CardContent>
             </Card>
           </>
@@ -623,7 +664,10 @@ export default function DashboardPage() {
             ) : (
               <div className="h-72 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats?.revenueTrend} margin={{ top: 8, right: 8, left: 4, bottom: 4 }}>
+                  <BarChart
+                    data={stats?.revenueTrend}
+                    margin={{ top: 8, right: 8, left: 4, bottom: 4 }}
+                  >
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis dataKey="month" tickLine={false} axisLine={false} />
                     <YAxis
@@ -632,10 +676,17 @@ export default function DashboardPage() {
                       tickFormatter={(value) => compactCurrency(Number(value))}
                     />
                     <Tooltip
-                      formatter={(value) => [formatCurrency(Number(value)), "Revenue"]}
+                      formatter={(value) => [
+                        formatCurrency(Number(value)),
+                        "Revenue",
+                      ]}
                       cursor={{ fill: "rgba(16, 185, 129, 0.08)" }}
                     />
-                    <Bar dataKey="revenue" fill="#10b981" radius={[8, 8, 0, 0]} />
+                    <Bar
+                      dataKey="revenue"
+                      fill="#10b981"
+                      radius={[8, 8, 0, 0]}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -706,7 +757,9 @@ export default function DashboardPage() {
                                   {deal.status ?? "UNKNOWN"}
                                 </Badge>
                               </TableCell>
-                              <TableCell>{formatDate(deal.createdAt)}</TableCell>
+                              <TableCell>
+                                {formatDate(deal.createdAt)}
+                              </TableCell>
                             </TableRow>
                           );
                         })}
@@ -790,7 +843,9 @@ export default function DashboardPage() {
               {remindersQuery.isLoading ? (
                 <p className="text-sm text-gray-500">Loading reminders...</p>
               ) : remindersQuery.isError ? (
-                <p className="text-sm text-rose-600">Could not load reminders.</p>
+                <p className="text-sm text-rose-600">
+                  Could not load reminders.
+                </p>
               ) : (remindersQuery.data?.length ?? 0) === 0 ? (
                 <p className="text-sm text-gray-500">No active reminders.</p>
               ) : (
@@ -806,7 +861,9 @@ export default function DashboardPage() {
                           <button
                             type="button"
                             className="text-left text-sm font-medium text-gray-900 hover:text-blue-700"
-                            onClick={() => router.push(`/deals/${reminder.dealId}`)}
+                            onClick={() =>
+                              router.push(`/deals/${reminder.dealId}`)
+                            }
                           >
                             {reminder.reason}
                           </button>
@@ -818,14 +875,19 @@ export default function DashboardPage() {
                           </Badge>
                         </div>
                         <p className="mt-1 text-xs text-gray-500">
-                          {reminder.dealTitle} · {formatDate(reminder.dueAt)} {formatTime(reminder.dueAt)} ·{" "}
+                          {reminder.dealTitle} · {formatDate(reminder.dueAt)}{" "}
+                          {formatTime(reminder.dueAt)} ·{" "}
                           {formatReminderRelative(reminder.dueAt)}
                         </p>
                         <div className="mt-3 flex items-center gap-2">
                           <button
                             type="button"
                             disabled={pending}
-                            onClick={() => markDoneReminderMutation.mutate({ id: reminder.id })}
+                            onClick={() =>
+                              markDoneReminderMutation.mutate({
+                                id: reminder.id,
+                              })
+                            }
                             className="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             Mark Done
@@ -833,7 +895,9 @@ export default function DashboardPage() {
                           <button
                             type="button"
                             disabled={pending}
-                            onClick={() => snoozeReminderMutation.mutate({ id: reminder.id })}
+                            onClick={() =>
+                              snoozeReminderMutation.mutate({ id: reminder.id })
+                            }
                             className="rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             Snooze 1d

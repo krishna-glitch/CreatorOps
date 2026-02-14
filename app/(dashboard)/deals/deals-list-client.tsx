@@ -5,12 +5,12 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { buttonVariants } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc/client";
+import type { AppRouter } from "@/server/api/root";
 import {
   formatDealCurrency,
   formatDealDate,
   StatusBadge,
 } from "@/src/components/deals/StatusBadge";
-import type { AppRouter } from "@/server/api/root";
 
 type DealsListResponse = inferRouterOutputs<AppRouter>["deals"]["list"];
 type DealItem = DealsListResponse["items"][number];
@@ -23,11 +23,45 @@ type DealsListClientProps = {
 
 function DealCardSkeleton() {
   return (
-    <div className="animate-pulse rounded-xl border border-gray-200 p-4 dark:border-gray-800">
-      <div className="h-4 w-28 rounded bg-gray-200 dark:bg-gray-800" />
-      <div className="mt-3 h-5 w-2/3 rounded bg-gray-200 dark:bg-gray-800" />
-      <div className="mt-4 h-4 w-32 rounded bg-gray-200 dark:bg-gray-800" />
-      <div className="mt-3 h-6 w-24 rounded-full bg-gray-200 dark:bg-gray-800" />
+    <div className="flex items-center gap-4 rounded-xl border border-gray-100 bg-white p-4">
+      <div className="h-10 w-10 shrink-0 rounded-full bg-gray-100" />
+      <div className="flex-1 space-y-2">
+        <div className="h-4 w-1/3 rounded bg-gray-100" />
+        <div className="h-3 w-1/4 rounded bg-gray-100" />
+      </div>
+      <div className="h-8 w-20 rounded bg-gray-100" />
+    </div>
+  );
+}
+
+function BrandAvatar({ name }: { name: string }) {
+  const initial = (name || "?").charAt(0).toUpperCase();
+  const colors = [
+    "bg-red-100 text-red-700",
+    "bg-orange-100 text-orange-700",
+    "bg-amber-100 text-amber-700",
+    "bg-green-100 text-green-700",
+    "bg-emerald-100 text-emerald-700",
+    "bg-teal-100 text-teal-700",
+    "bg-cyan-100 text-cyan-700",
+    "bg-blue-100 text-blue-700",
+    "bg-indigo-100 text-indigo-700",
+    "bg-violet-100 text-violet-700",
+    "bg-purple-100 text-purple-700",
+    "bg-fuchsia-100 text-fuchsia-700",
+    "bg-pink-100 text-pink-700",
+    "bg-rose-100 text-rose-700",
+  ];
+
+  // Deterministic color based on name length
+  const colorIndex = name ? name.length % colors.length : 7;
+  const colorClass = colors[colorIndex];
+
+  return (
+    <div
+      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${colorClass}`}
+    >
+      {initial}
     </div>
   );
 }
@@ -70,10 +104,13 @@ export function DealsListClient({
     },
   );
 
-  const aiAvailabilityQuery = trpc.ai.extractionAvailability.useQuery(undefined, {
-    refetchOnWindowFocus: true,
-    refetchInterval: 60_000,
-  });
+  const aiAvailabilityQuery = trpc.ai.extractionAvailability.useQuery(
+    undefined,
+    {
+      refetchOnWindowFocus: true,
+      refetchInterval: 60_000,
+    },
+  );
 
   useEffect(() => {
     if (!initialQuery.data) {
@@ -172,22 +209,32 @@ export function DealsListClient({
               <Link
                 key={deal.id}
                 href={`/deals/${deal.id}`}
-                className="block rounded-xl border border-gray-200 p-4 transition-colors hover:border-gray-300 hover:bg-gray-50/70 dark:border-gray-800 dark:hover:border-gray-700 dark:hover:bg-gray-900"
+                className="group relative flex items-center gap-4 rounded-xl border border-gray-100 bg-white p-4 transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
               >
-                <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
-                  {deal.brand?.name ?? "Unknown brand"}
-                </p>
-                <p className="mt-2 text-base font-semibold">{deal.title}</p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {formatDealCurrency(deal.totalValue, {
-                    currency: deal.currency,
-                  })}
-                </p>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <StatusBadge status={deal.status} />
-                  <span className="text-xs text-muted-foreground">
-                    Created {formatDealDate(deal.createdAt)}
-                  </span>
+                <BrandAvatar name={deal.brand?.name ?? "?"} />
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="truncate font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+                      {deal.title}
+                    </h3>
+                    <StatusBadge status={deal.status} />
+                  </div>
+                  <div className="mt-1 flex items-center gap-2 text-sm text-gray-500">
+                    <span className="font-medium text-gray-700">
+                      {deal.brand?.name ?? "Unknown brand"}
+                    </span>
+                    <span>·</span>
+                    <span>Created {formatDealDate(deal.createdAt)}</span>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <p className="font-mono font-medium text-gray-900">
+                    {formatDealCurrency(deal.totalValue, {
+                      currency: deal.currency,
+                    })}
+                  </p>
                 </div>
               </Link>
             ))
