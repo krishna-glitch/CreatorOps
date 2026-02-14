@@ -1,6 +1,15 @@
 "use client";
 
-import { Bot, CreditCard, LineChart, PlusCircle } from "lucide-react";
+import {
+  Bot,
+  CalendarCheck,
+  CircleDollarSign,
+  Clock3,
+  CreditCard,
+  LineChart,
+  PlusCircle,
+  TriangleAlert,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -459,7 +468,8 @@ export default function DashboardPage() {
                   {formatCurrency(stats?.totalRevenueThisMonth ?? 0)}
                 </p>
                 <Badge variant="outline" className={chipToneClasses("green")}>
-                  [Icon: CurrencyDollar] Good
+                  <CircleDollarSign className="mr-1 h-3.5 w-3.5" />
+                  Good
                 </Badge>
               </CardContent>
             </Card>
@@ -482,7 +492,8 @@ export default function DashboardPage() {
                   variant="outline"
                   className={chipToneClasses(hasOutstanding ? "yellow" : "green")}
                 >
-                  [Icon: Clock] {hasOutstanding ? "Warning" : "Clear"}
+                  <Clock3 className="mr-1 h-3.5 w-3.5" />
+                  {hasOutstanding ? "Warning" : "Clear"}
                 </Badge>
               </CardContent>
             </Card>
@@ -498,7 +509,8 @@ export default function DashboardPage() {
                   {stats?.upcomingDeliverablesCount ?? 0}
                 </p>
                 <Badge variant="outline" className={chipToneClasses("blue")}>
-                  [Icon: CalendarCheck] Info
+                  <CalendarCheck className="mr-1 h-3.5 w-3.5" />
+                  Info
                 </Badge>
               </CardContent>
             </Card>
@@ -521,7 +533,8 @@ export default function DashboardPage() {
                   variant="outline"
                   className={chipToneClasses(hasOverdue ? "red" : "green")}
                 >
-                  [Icon: WarningCircle] {hasOverdue ? "Alert" : "Good"}
+                  <TriangleAlert className="mr-1 h-3.5 w-3.5" />
+                  {hasOverdue ? "Alert" : "Good"}
                 </Badge>
               </CardContent>
             </Card>

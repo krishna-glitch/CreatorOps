@@ -24,6 +24,7 @@ type Deliverable = {
 type Currency = "USD" | "INR";
 type DealStatus = "INBOUND" | "NEGOTIATING" | "AGREED" | "PAID";
 type BrandItem = { id: string; name: string };
+type ParseMode = "smart" | "ai";
 type BrandMatchResult =
   | { kind: "exact"; brand: BrandItem; score: number }
   | { kind: "fuzzy"; brand: BrandItem; score: number }
@@ -165,6 +166,7 @@ export default function AICreateDealPage() {
   });
 
   const parseMessageMutation = trpc.deals.parseMessage.useMutation();
+  const smartParseMutation = trpc.deals.smartParse.useMutation();
   const createDealMutation = trpc.deals.create.useMutation({
     onSuccess: () => {
       toast.success("Deal created successfully.", { duration: 3000 });
@@ -175,13 +177,14 @@ export default function AICreateDealPage() {
     },
   });
 
+  const [parseMode, setParseMode] = useState<ParseMode>("smart");
   const [message, setMessage] = useState("");
   const [detectedBrandName, setDetectedBrandName] = useState("");
   const [confidence, setConfidence] = useState<number | null>(null);
   const [brandId, setBrandId] = useState("");
   const [title, setTitle] = useState("");
   const [totalValue, setTotalValue] = useState("");
-  const [currency, setCurrency] = useState<Currency>("USD");
+  const [currency, setCurrency] = useState<Currency | "">("");
   const [status, setStatus] = useState<DealStatus>("INBOUND");
   const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
   const [hasExtraction, setHasExtraction] = useState(false);
@@ -223,24 +226,17 @@ export default function AICreateDealPage() {
     }
 
     hasRedirectedForQuotaRef.current = true;
-    toast.error(
-      "AI extraction is temporarily disabled due to quota. Redirecting to manual form.",
-      {
-        duration: 3000,
-      },
-    );
-    router.replace("/deals/new");
-  }, [isAIExtractionDisabled, router]);
+    // Auto-switch to smart parse instead of navigating away
+    if (parseMode === "ai") {
+      setParseMode("smart");
+      toast.info(
+        "AI extraction is temporarily disabled due to quota. Switched to Smart Parse.",
+        { duration: 3000 },
+      );
+    }
+  }, [isAIExtractionDisabled, parseMode]);
 
   const handleExtract = () => {
-    if (isAIExtractionDisabled) {
-      toast.error("AI extraction is disabled due to quota. Use manual form.", {
-        duration: 3000,
-      });
-      router.push("/deals/new");
-      return;
-    }
-
     const normalizedMessage = message.trim();
     if (!normalizedMessage) {
       toast.error("Please paste a message before extracting.", {
@@ -249,44 +245,100 @@ export default function AICreateDealPage() {
       return;
     }
 
-    parseMessageMutation.mutate(
-      { message: normalizedMessage },
-      {
-        onSuccess: (result) => {
-          setHasExtraction(true);
-          setBrandId("");
-          setIsBrandSelectionManual(false);
-          setDetectedBrandName(result.brand_name ?? "");
-          setConfidence(result.confidence);
-          setDeliverables(result.deliverables);
-          setTotalValue(result.total_value?.toString() ?? "");
-          setCurrency(result.currency ?? "USD");
-          setStatus(result.status);
+    const onExtractionSuccess = (result: {
+      brand_name: string | null;
+      total_value: number | null;
+      currency: "USD" | "INR" | null;
+      deliverables: Deliverable[];
+      status: "INBOUND" | "NEGOTIATING" | "AGREED";
+      confidence: number;
+    }) => {
+      setHasExtraction(true);
+      setBrandId("");
+      setIsBrandSelectionManual(false);
+      setDetectedBrandName(result.brand_name ?? "");
+      setConfidence(result.confidence);
+      setDeliverables(result.deliverables);
+      setTotalValue(result.total_value?.toString() ?? "");
+      setCurrency(result.currency ?? "");
+      setStatus(result.status);
 
-          setTitle((previous) => {
-            if (previous.trim().length > 0) {
-              return previous;
+      if (result.total_value !== null && result.currency === null) {
+        toast.info("Amount found but currency was not detected. Please select it.", {
+          duration: 3000,
+        });
+      }
+
+      setTitle((previous) => {
+        if (previous.trim().length > 0) {
+          return previous;
+        }
+
+        if (result.brand_name) {
+          return `${result.brand_name} Deal`;
+        }
+
+        return "New Deal";
+      });
+    };
+
+    if (parseMode === "smart") {
+      smartParseMutation.mutate(
+        { message: normalizedMessage },
+        {
+          onSuccess: onExtractionSuccess,
+          onError: (error) => {
+            if (!isAIExtractionDisabled) {
+              toast.info("Smart Parse failed. Falling back to AI Parse.", {
+                duration: 3000,
+              });
+              setParseMode("ai");
+              parseMessageMutation.mutate(
+                { message: normalizedMessage },
+                {
+                  onSuccess: onExtractionSuccess,
+                  onError: () => {
+                    toast.error("Both Smart Parse and AI Parse failed.", {
+                      duration: 3000,
+                    });
+                  },
+                },
+              );
+              return;
             }
 
-            if (result.brand_name) {
-              return `${result.brand_name} Deal`;
-            }
-
-            return "New Deal";
-          });
-        },
-        onError: (error) => {
-          toast.error(
-            "AI unavailable right now. You can still create this deal manually.",
-            {
+            toast.error("Smart parse failed. Please edit fields manually.", {
               duration: 3000,
-            },
-          );
-          console.warn("deals.parseMessage failed", error);
-          router.push("/deals/new");
+            });
+            console.warn("deals.smartParse failed", error);
+          },
         },
-      },
-    );
+      );
+    } else {
+      if (isAIExtractionDisabled) {
+        toast.error(
+          "AI extraction is disabled due to quota. Switching to Smart Parse.",
+          { duration: 3000 },
+        );
+        setParseMode("smart");
+        return;
+      }
+
+      parseMessageMutation.mutate(
+        { message: normalizedMessage },
+        {
+          onSuccess: onExtractionSuccess,
+          onError: (error) => {
+            toast.error(
+              "AI unavailable right now. Switching to Smart Parse.",
+              { duration: 3000 },
+            );
+            console.warn("deals.parseMessage failed", error);
+            setParseMode("smart");
+          },
+        },
+      );
+    }
   };
 
   const handleConfirmCreate = () => {
@@ -305,6 +357,13 @@ export default function AICreateDealPage() {
     const parsedTotalValue = Number(totalValue);
     if (!Number.isFinite(parsedTotalValue) || parsedTotalValue <= 0) {
       toast.error("Please enter a valid total value greater than 0.", {
+        duration: 3000,
+      });
+      return;
+    }
+
+    if (!currency) {
+      toast.error("Please select a currency before creating the deal.", {
         duration: 3000,
       });
       return;
@@ -362,7 +421,7 @@ export default function AICreateDealPage() {
     );
   };
 
-  const isExtracting = parseMessageMutation.isPending;
+  const isExtracting = parseMessageMutation.isPending || smartParseMutation.isPending;
   const isCreating = createDealMutation.isPending;
 
   return (
@@ -370,23 +429,57 @@ export default function AICreateDealPage() {
       <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-950">
         <div className="border-b border-gray-200 px-5 py-5 sm:px-8 dark:border-gray-800">
           <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-            AI Deal Intake
+            Smart Deal Intake
           </p>
           <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
               Create Deal From Message
             </h1>
-            <Button asChild type="button" variant="outline" size="sm">
+            <Button asChild variant="outline" size="sm">
               <Link href="/deals/new">Create Manually</Link>
             </Button>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            AI pre-fills fields for speed. Manual create always works.
+            Parse messages instantly with Smart Parse, or use AI for complex messages.
           </p>
         </div>
 
         <div className="space-y-6 px-5 py-6 sm:px-8 sm:py-8">
           <div className="rounded-xl border border-gray-200 p-4 sm:p-5 dark:border-gray-800">
+            <div className="mb-4 flex rounded-lg border border-gray-200 p-1 dark:border-gray-800">
+              <button
+                type="button"
+                onClick={() => setParseMode("smart")}
+                className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${parseMode === "smart"
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                  }`}
+              >
+                ⚡ Smart Parse
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (isAIExtractionDisabled) {
+                    toast.error(
+                      "AI extraction is temporarily disabled due to quota.",
+                      { duration: 3000 },
+                    );
+                    return;
+                  }
+                  setParseMode("ai");
+                }}
+                className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${parseMode === "ai"
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : isAIExtractionDisabled
+                      ? "cursor-not-allowed text-muted-foreground/50"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+              >
+                🤖 AI Parse{isAIExtractionDisabled ? " (Quota)" : ""}
+              </button>
+            </div>
+
             <label
               htmlFor="deal-message"
               className="text-sm font-medium text-foreground"
@@ -394,8 +487,17 @@ export default function AICreateDealPage() {
               Message
             </label>
             <p className="mt-1 text-xs text-muted-foreground">
-              Example: Nike wants 2 reels for $1500
+              {parseMode === "smart"
+                ? "Instant extraction using pattern matching — no API quota used."
+                : "Uses Groq AI for complex or ambiguous messages."}
             </p>
+            {hasExtraction &&
+            (confidence === null || confidence < 0.6 || !detectedBrandName) ? (
+              <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                Low-confidence parse. Review brand, amount, currency, and status
+                before creating.
+              </p>
+            ) : null}
             <textarea
               id="deal-message"
               placeholder="Paste the message here..."
@@ -407,13 +509,13 @@ export default function AICreateDealPage() {
               <Button
                 type="button"
                 onClick={handleExtract}
-                disabled={isExtracting || isAIExtractionDisabled}
+                disabled={isExtracting}
               >
                 {isExtracting
                   ? "Extracting..."
-                  : isAIExtractionDisabled
-                    ? "AI Disabled (Quota)"
-                    : "Extract Deal Info"}
+                  : parseMode === "smart"
+                    ? "⚡ Smart Parse"
+                    : "🤖 AI Parse"}
               </Button>
             </div>
           </div>
@@ -442,7 +544,7 @@ export default function AICreateDealPage() {
                     <span className="font-medium">Amount:</span>{" "}
                     {formatAmount(
                       totalValue ? Number(totalValue) : null,
-                      currency ?? null,
+                      currency || null,
                     )}
                   </p>
                   <div className="sm:col-span-2">

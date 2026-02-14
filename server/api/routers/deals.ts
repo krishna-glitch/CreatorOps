@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { and, desc, eq, gte, lt, or } from "drizzle-orm";
 import { z } from "zod";
 import { extractDealFromMessage } from "@/src/server/services/ai/extractDeal";
+import { parseDealFromMessage } from "@/src/server/services/parser/dealParser";
 import { getAIExtractionAvailability } from "@/src/server/services/ai/quotaFlag";
 import { brands } from "@/server/infrastructure/database/schema/brands";
 import { deals } from "@/server/infrastructure/database/schema/deals";
@@ -31,6 +32,10 @@ const getDealByIdInputSchema = z.object({
 });
 
 const parseDealMessageInputSchema = z.object({
+  message: z.string().trim().min(1).max(5000),
+});
+
+const smartParseInputSchema = z.object({
   message: z.string().trim().min(1).max(5000),
 });
 
@@ -158,9 +163,9 @@ export const dealsRouter = createTRPCRouter({
           error instanceof ExternalServiceError
             ? error
             : new ExternalServiceError(
-                "Groq",
-                error instanceof Error ? error : undefined,
-              );
+              "Groq",
+              error instanceof Error ? error : undefined,
+            );
 
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
@@ -168,6 +173,17 @@ export const dealsRouter = createTRPCRouter({
           cause: wrappedError,
         });
       }
+    }),
+  smartParse: protectedProcedure
+    .input(smartParseInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const userBrands = await ctx.db.query.brands.findMany({
+        where: eq(brands.userId, ctx.user.id),
+        columns: { name: true },
+      });
+
+      const brandNames = userBrands.map((b) => b.name);
+      return parseDealFromMessage(input.message, brandNames);
     }),
   create: protectedProcedure
     .input(createDealInputSchema)
