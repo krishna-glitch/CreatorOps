@@ -40,4 +40,12 @@ jobs:
         run: npm run type-check
 
       - name: Build
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/creatorops
+          DIRECT_URL: postgresql://postgres:postgres@127.0.0.1:5432/creatorops
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: test-service-role-key
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+          GROQ_API_KEY: test-groq-key
         run: npm run build
