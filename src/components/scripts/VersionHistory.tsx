@@ -118,7 +118,7 @@ function diffCellClass(type: DiffRow["leftType"]) {
     return "bg-rose-500/15 text-rose-200";
   }
   if (type === "same") {
-    return "bg-slate-500/10 text-slate-300";
+    return "dash-bg-card text-slate-300";
   }
   return "bg-black/40 text-slate-500";
 }
@@ -239,7 +239,7 @@ export function VersionHistory({
                       "rounded-lg border p-3 transition-all duration-200",
                       selected
                         ? "border-cyan-400/60 bg-cyan-500/10 shadow-[0_0_0_1px_rgba(34,211,238,0.15)]"
-                        : "border-white/10 bg-white/[0.03] hover:bg-white/[0.05]",
+                        : "border-white/10 dash-bg-card",
                     )}
                     onClick={() => setActiveIndex(index)}
                   >
@@ -276,7 +276,7 @@ export function VersionHistory({
                         type="button"
                         size="sm"
                         variant="outline"
-                        className="h-8 border-white/20 bg-transparent text-slate-200 hover:bg-white/10"
+                        className="h-8 border-white/20 bg-transparent text-slate-200 dash-bg-card"
                         onClick={(event) => {
                           event.stopPropagation();
                           setCompareLeftVersion(version.version);
@@ -345,7 +345,7 @@ export function VersionHistory({
                 Pick a version and press Compare to see side-by-side diff.
               </div>
             ) : (
-              <div className="grid min-h-0 flex-1 grid-cols-2 gap-px overflow-hidden bg-white/10">
+              <div className="grid min-h-0 flex-1 grid-cols-2 gap-px overflow-hidden dash-bg-card">
                 <div className="flex min-h-0 flex-col bg-[#0d1118]">
                   <div className="border-b border-white/10 px-3 py-2 text-xs font-medium text-slate-300">
                     Left: Version {leftVersion.version}
@@ -399,7 +399,7 @@ export function VersionHistory({
                 type="button"
                 size="sm"
                 variant="outline"
-                className="border-white/25 bg-transparent text-white hover:bg-white/10"
+                className="border-white/25 bg-transparent text-white dash-bg-card"
                 onClick={() => setConfirmRestoreVersion(null)}
               >
                 Cancel
@@ -428,4 +428,3 @@ export function VersionHistory({
     </Dialog>
   );
 }
-

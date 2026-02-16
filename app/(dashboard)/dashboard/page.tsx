@@ -10,21 +10,33 @@ import {
   LineChart,
   PlusCircle,
   TriangleAlert,
+  Wallet,
+  Zap,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+
+const ResponsiveContainer = dynamic(
+  () => import("recharts").then((mod) => mod.ResponsiveContainer),
+  { ssr: false },
+);
+const AreaChart = dynamic(
+  () => import("recharts").then((mod) => mod.AreaChart),
+  {
+    ssr: false,
+  },
+);
+const Area = dynamic(() => import("recharts").then((mod) => mod.Area), {
+  ssr: false,
+});
+const Tooltip = dynamic(() => import("recharts").then((mod) => mod.Tooltip), {
+  ssr: false,
+});
+
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PillowyCard } from "@/components/ui/pillowy-card";
 import {
   Table,
   TableBody,
@@ -34,88 +46,21 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { trpc } from "@/lib/trpc/client";
+import { cn } from "@/lib/utils";
 import { DeadlineStateBadge } from "@/src/components/deliverables/DeadlineStateBadge";
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2,
-  }).format(value);
-}
+import {
+  formatDayLabel,
+  formatDealCurrency,
+  formatDealDate,
+  formatTime,
+} from "@/src/lib/utils/format-utils";
+import {
+  getDealStatusTone,
+  getStatusBadgeClasses,
+} from "@/src/lib/utils/status-utils";
 
 function compactCurrency(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    notation: "compact",
-    maximumFractionDigits: 1,
-  }).format(value);
-}
-
-function formatCurrencyWithCode(value: number, currency: string | null) {
-  if (currency === "INR") {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 2,
-    }).format(value);
-  }
-
-  return formatCurrency(value);
-}
-
-function formatDate(value: Date | string) {
-  const date = value instanceof Date ? value : new Date(value);
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(date);
-}
-
-function formatDayLabel(value: Date, now: Date) {
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const target = new Date(
-    value.getFullYear(),
-    value.getMonth(),
-    value.getDate(),
-  );
-
-  if (target.getTime() === today.getTime()) {
-    return "Today";
-  }
-  if (target.getTime() === tomorrow.getTime()) {
-    return "Tomorrow";
-  }
-
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-  }).format(value);
-}
-
-function formatTime(value: Date | string) {
-  const date = value instanceof Date ? value : new Date(value);
-  return new Intl.DateTimeFormat("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(date);
-}
-
-function dealStatusTone(status: string | null) {
-  if (status === "PAID" || status === "AGREED") {
-    return "green" as const;
-  }
-  if (status === "NEGOTIATING") {
-    return "yellow" as const;
-  }
-  if (status === "INBOUND") {
-    return "blue" as const;
-  }
-  return "blue" as const;
+  return formatDealCurrency(value, { currency: "USD", compact: true });
 }
 
 type TimelineItem = {
@@ -127,13 +72,13 @@ type TimelineItem = {
   scheduledAt: Date | null;
   status: string;
   deadline_state:
-  | "COMPLETED"
-  | "ON_TRACK"
-  | "DUE_SOON"
-  | "DUE_TODAY"
-  | "LATE"
-  | "LATE_1D"
-  | "LATE_3D";
+    | "COMPLETED"
+    | "ON_TRACK"
+    | "DUE_SOON"
+    | "DUE_TODAY"
+    | "LATE"
+    | "LATE_1D"
+    | "LATE_3D";
   deadline_state_reason: string;
 };
 
@@ -198,7 +143,7 @@ function DeliverablesTimeline({
 
   if (!hasAny) {
     return (
-      <p className="text-sm text-gray-500">
+      <p className="text-sm dash-text-muted">
         No deliverables scheduled in the next 7 days.
       </p>
     );
@@ -214,30 +159,34 @@ function DeliverablesTimeline({
       item.deadline_state === "LATE_1D" ||
       item.deadline_state === "LATE_3D";
     const isDueToday = item.deadline_state === "DUE_TODAY";
-    const cardClassName = isLate
-      ? "border-rose-200 bg-rose-50/40"
+
+    // Use standard border logic for timeline items inside the pillowy card
+    const borderClass = isLate
+      ? "dash-inline-card dash-card-danger"
       : isDueToday
-        ? "border-orange-200 bg-orange-50/40"
-        : "border-gray-100 bg-white";
+        ? "dash-inline-card dash-card-warn"
+        : "dash-inline-card";
 
     return (
       <button
         key={item.id}
         type="button"
         onClick={() => onOpenDeal(item.dealId)}
-        className={`w-full rounded-xl border p-3 text-left ${cardClassName}`}
+        className={`w-full rounded-xl border p-3 text-left transition-opacity hover:opacity-95 ${borderClass}`}
       >
         <div className="flex items-center justify-between gap-3">
-          <p className="font-medium text-gray-900">{item.dealTitle}</p>
+          <p className="font-medium dash-text">{item.dealTitle}</p>
           <DeadlineStateBadge
             state={item.deadline_state}
             reason={item.deadline_state_reason}
           />
         </div>
-        <p className="mt-1 text-sm text-gray-600">
+        <p className="mt-1 text-sm dash-text-muted">
           {item.platform} · {item.type}
         </p>
-        <p className={`text-xs ${isLate ? "text-rose-700" : "text-gray-500"}`}>
+        <p
+          className={`text-xs ${isLate ? "dash-text-danger" : "dash-text-muted"}`}
+        >
           {item.deadline_state_reason} · {formatTime(item.scheduledAt)}
         </p>
       </button>
@@ -248,45 +197,25 @@ function DeliverablesTimeline({
     <div className="space-y-4">
       {todayItems.length > 0 ? (
         <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+          <p className="text-xs font-semibold uppercase tracking-wide dash-text-muted">
             Today
           </p>
-          {todayItems
-            .sort((a, b) => {
-              const aTime = a.scheduledAt
-                ? new Date(a.scheduledAt).getTime()
-                : 0;
-              const bTime = b.scheduledAt
-                ? new Date(b.scheduledAt).getTime()
-                : 0;
-              return aTime - bTime;
-            })
-            .map(renderItem)}
+          {todayItems.map(renderItem)}
         </div>
       ) : null}
 
       {tomorrowItems.length > 0 ? (
         <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+          <p className="text-xs font-semibold uppercase tracking-wide dash-text-muted">
             Tomorrow
           </p>
-          {tomorrowItems
-            .sort((a, b) => {
-              const aTime = a.scheduledAt
-                ? new Date(a.scheduledAt).getTime()
-                : 0;
-              const bTime = b.scheduledAt
-                ? new Date(b.scheduledAt).getTime()
-                : 0;
-              return aTime - bTime;
-            })
-            .map(renderItem)}
+          {tomorrowItems.map(renderItem)}
         </div>
       ) : null}
 
       {thisWeekGroups.length > 0 ? (
         <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+          <p className="text-xs font-semibold uppercase tracking-wide dash-text-muted">
             This Week
           </p>
           {thisWeekGroups.map((group) => (
@@ -295,7 +224,7 @@ function DeliverablesTimeline({
               className="space-y-2"
             >
               {group.date ? (
-                <p className="text-xs font-medium text-gray-500">
+                <p className="text-xs font-medium dash-text-muted">
                   {formatDayLabel(group.date, now)}
                 </p>
               ) : null}
@@ -308,32 +237,30 @@ function DeliverablesTimeline({
   );
 }
 
-
-
 function chipToneClasses(tone: "green" | "yellow" | "red" | "blue") {
   if (tone === "green") {
-    return "border-emerald-200 bg-emerald-100 text-emerald-700";
+    return "dash-chip-tone-green";
   }
   if (tone === "yellow") {
-    return "border-amber-200 bg-amber-100 text-amber-700";
+    return "dash-chip-tone-yellow";
   }
   if (tone === "red") {
-    return "border-rose-200 bg-rose-100 text-rose-700";
+    return "dash-chip-tone-red";
   }
-  return "border-blue-200 bg-blue-100 text-blue-700";
+  return "dash-chip-tone-blue";
 }
 
 function reminderPriorityTone(priority: "LOW" | "MED" | "HIGH" | "CRITICAL") {
   if (priority === "CRITICAL") {
-    return "border-rose-300 bg-rose-100 text-rose-800";
+    return "dash-chip-tone-red";
   }
   if (priority === "HIGH") {
-    return "border-orange-300 bg-orange-100 text-orange-800";
+    return "dash-chip-tone-yellow";
   }
   if (priority === "MED") {
-    return "border-amber-200 bg-amber-100 text-amber-700";
+    return "dash-chip-tone-yellow";
   }
-  return "border-blue-200 bg-blue-100 text-blue-700";
+  return "dash-chip-tone-blue";
 }
 
 function formatReminderRelative(dueAt: Date | string) {
@@ -350,46 +277,40 @@ function formatReminderRelative(dueAt: Date | string) {
 
 function StatCardSkeleton() {
   return (
-    <Card className="rounded-2xl border bg-white/80 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-      <CardHeader className="pb-2">
-        <div className="h-4 w-32 animate-pulse rounded bg-gray-200" />
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="h-8 w-28 animate-pulse rounded bg-gray-200" />
-        <div className="h-5 w-24 animate-pulse rounded-full bg-gray-200" />
-      </CardContent>
-    </Card>
+    <PillowyCard className="p-6 h-40 flex flex-col justify-between">
+      <div className="flex justify-between items-start">
+        <div className="h-8 w-8 rounded-full animate-pulse dash-skeleton" />
+      </div>
+      <div>
+        <div className="h-3 w-16 mb-2 animate-pulse rounded dash-skeleton" />
+        <div className="h-6 w-24 animate-pulse rounded dash-skeleton" />
+      </div>
+    </PillowyCard>
   );
 }
 
 function SectionCardSkeleton({ rows = 4 }: { rows?: number }) {
+  const rowIds = Array.from({ length: rows }, (_, rowNumber) => rowNumber + 1);
   return (
-    <Card className="rounded-2xl border bg-white/80 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-      <CardHeader>
-        <div className="h-5 w-40 animate-pulse rounded bg-gray-200" />
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {Array.from({ length: rows }).map((_, index) => (
+    <PillowyCard className="p-6">
+      <div className="h-5 w-40 animate-pulse rounded dash-skeleton mb-6" />
+      <div className="space-y-3">
+        {rowIds.map((rowId) => (
           <div
-            key={`row-${index}`}
-            className="h-12 w-full animate-pulse rounded-xl bg-gray-200"
+            key={`row-${rowId}`}
+            className="h-12 w-full animate-pulse rounded-xl dash-skeleton"
           />
         ))}
-      </CardContent>
-    </Card>
+      </div>
+    </PillowyCard>
   );
 }
 
 function RevenueChartSkeleton() {
   return (
-    <Card className="rounded-2xl border bg-white/80 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-      <CardHeader>
-        <div className="h-5 w-36 animate-pulse rounded bg-gray-200" />
-      </CardHeader>
-      <CardContent>
-        <div className="h-72 w-full animate-pulse rounded-xl bg-gray-200" />
-      </CardContent>
-    </Card>
+    <PillowyCard className="p-6 h-64">
+      <div className="h-full w-full animate-pulse rounded-xl dash-skeleton" />
+    </PillowyCard>
   );
 }
 
@@ -400,72 +321,68 @@ function QuickActionsCard() {
       label: "New Deal",
       href: "/deals/new",
       icon: PlusCircle,
-      description: "Add a new brand deal",
+      highlight: true,
       shortcut: "N",
     },
     {
-      label: "AI Create Deal",
+      label: "AI Script",
       href: "/deals/ai-create",
       icon: Bot,
-      description: "Parse from clipboard",
+      highlight: false,
       shortcut: "K",
     },
     {
-      label: "Add Payment",
+      label: "Invoice",
       href: "/payments/new",
       icon: CreditCard,
-      description: "Record a payment",
+      highlight: false,
       shortcut: null,
     },
     {
-      label: "View Analytics",
+      label: "Pitch",
       href: "/analytics",
-      icon: LineChart,
-      description: "See performance",
+      icon: LineChart, // Using LineChart as proxy for Pitch/Analytics
+      highlight: true,
       shortcut: null,
     },
   ] as const;
 
   return (
-    <Card className="rounded-2xl border bg-white shadow-sm">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base font-semibold text-gray-900">
-          Quick Actions
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <section>
+      <h3 className="font-serif text-xl dash-text mb-4">Tactile Actions</h3>
+      <div className="grid grid-cols-4 gap-4">
         {actions.map((action) => {
+          const isHighlight = action.highlight;
           const Icon = action.icon;
           return (
-            <Link
-              key={action.label}
-              href={action.href}
-              onClick={() => router.push(action.href)}
-              className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-gray-100 bg-white p-4 transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
-            >
-              <div className="flex items-start justify-between">
-                <div className="rounded-lg bg-blue-50 p-2 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                  <Icon className="h-5 w-5" />
-                </div>
-                {action.shortcut && (
-                  <span className="inline-flex items-center rounded border border-gray-200 px-1.5 py-0.5 text-[10px] font-medium text-gray-400">
-                    ⌘{action.shortcut}
-                  </span>
-                )}
-              </div>
-              <div className="mt-4">
-                <h3 className="font-medium text-gray-900 group-hover:text-blue-600 transition-colors">
-                  {action.label}
-                </h3>
-                <p className="mt-1 text-xs text-gray-500">
-                  {action.description}
-                </p>
-              </div>
-            </Link>
+            <div key={action.href} className="flex flex-col items-center gap-2">
+              <button
+                type="button"
+                onClick={() => router.push(action.href)}
+                className="pillowy-card w-full aspect-square flex items-center justify-center transition-transform hover:scale-105 active:scale-95"
+              >
+                <span
+                  className={cn(
+                    "material-symbols-outlined text-2xl",
+                    isHighlight ? "icon-3d-gold" : "dash-text-soft",
+                  )}
+                >
+                  <Icon
+                    className={cn(
+                      "w-6 h-6",
+                      isHighlight ? "dash-link" : "dash-text-muted",
+                    )}
+                  />
+                </span>
+              </button>
+              <span className="text-[10px] font-semibold dash-text-muted">
+                {action.label}
+              </span>
+            </div>
           );
         })}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
 
@@ -473,20 +390,18 @@ export default function DashboardPage() {
   const router = useRouter();
   const utils = trpc.useUtils();
   const statsQuery = trpc.analytics.getDashboardStats.useQuery(undefined, {
-    staleTime: 30_000,
+    staleTime: 60_000,
+    gcTime: 10 * 60_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    placeholderData: (previous) => previous,
   });
   const remindersQuery = trpc.reminders.listOpen.useQuery(undefined, {
-    staleTime: 15_000,
-  });
-  const markDoneReminderMutation = trpc.reminders.markDone.useMutation({
-    onSuccess: async () => {
-      await utils.reminders.listOpen.invalidate();
-    },
-  });
-  const snoozeReminderMutation = trpc.reminders.snooze.useMutation({
-    onSuccess: async () => {
-      await utils.reminders.listOpen.invalidate();
-    },
+    staleTime: 60_000,
+    gcTime: 10 * 60_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    placeholderData: (previous) => previous,
   });
 
   const stats = statsQuery.data;
@@ -495,17 +410,31 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      // Prevent conflict with Browser New Window (Cmd+N)
+      // Only trigger if Shift is also pressed or just 'n' without meta
       const isMeta = event.metaKey || event.ctrlKey;
-      if (!isMeta) {
+      const isShift = event.shiftKey;
+
+      // Don't trigger if user is typing in an input
+      if (
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLTextAreaElement
+      ) {
         return;
       }
 
-      if (event.key.toLowerCase() === "n") {
+      if (event.key.toLowerCase() === "n" && !isMeta) {
         event.preventDefault();
         router.push("/deals/new");
       }
 
-      if (event.key.toLowerCase() === "k") {
+      // Shift + N for power users who might hold shift
+      if (event.key.toLowerCase() === "n" && isShift) {
+        event.preventDefault();
+        router.push("/deals/new");
+      }
+
+      if (event.key.toLowerCase() === "k" && !isMeta) {
         event.preventDefault();
         router.push("/deals/ai-create");
       }
@@ -515,22 +444,18 @@ export default function DashboardPage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [router]);
 
-  const isReminderActionPending = (reminderId: string) =>
-    (markDoneReminderMutation.isPending &&
-      markDoneReminderMutation.variables?.id === reminderId) ||
-    (snoozeReminderMutation.isPending &&
-      snoozeReminderMutation.variables?.id === reminderId);
-
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-gray-500">
-          Snapshot of revenue, payments, deliverables, and urgent actions.
+    <div className="space-y-8">
+      <section>
+        <h2 className="font-serif text-3xl dash-text">
+          Welcome, <span className="gold-text italic">Creator</span>
+        </h2>
+        <p className="dash-text-muted text-sm mt-1">
+          Your midnight vault is secure and thriving.
         </p>
-      </div>
+      </section>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {statsQuery.isLoading ? (
           <>
             <StatCardSkeleton />
@@ -540,284 +465,208 @@ export default function DashboardPage() {
           </>
         ) : (
           <>
-            <Card className="rounded-2xl border bg-white shadow-sm transition-all hover:shadow-md">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">
+            <PillowyCard className="p-5 flex flex-col justify-between h-40">
+              <div className="flex justify-between items-start">
+                <span className="icon-3d-gold text-3xl">
+                  <Wallet className="w-8 h-8 dash-link" />
+                </span>
+                <span className="dash-stat-chip text-[10px] font-bold px-2 py-0.5 rounded-full border">
+                  +12%
+                </span>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider dash-text-muted font-semibold mb-1">
                   Total Revenue
-                  <span className="ml-1 text-xs text-gray-400 font-normal">
-                    (This Month)
-                  </span>
-                </CardTitle>
-                <Badge variant="outline" className={chipToneClasses("green")}>
-                  <CircleDollarSign className="mr-1 h-3.5 w-3.5" />
-                  Good
-                </Badge>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-gray-900">
-                  {formatCurrency(stats?.totalRevenueThisMonth ?? 0)}
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  +12% from last month
                 </p>
-              </CardContent>
-            </Card>
+                <p className="text-xl font-bold dash-text tracking-tight">
+                  {compactCurrency(stats?.totalRevenueThisMonth ?? 0)}
+                </p>
+              </div>
+            </PillowyCard>
 
-            <Card
-              className={`rounded-2xl border shadow-sm transition-all hover:shadow-md ${hasOutstanding ? "bg-amber-50/30 border-amber-100" : "bg-white"}`}
-            >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">
+            <PillowyCard className="p-5 flex flex-col justify-between h-40">
+              <div className="flex justify-between items-start">
+                <span className="icon-3d-gold text-3xl">
+                  <Clock3 className="w-8 h-8 dash-link" />
+                </span>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider dash-text-muted font-semibold mb-1">
                   Outstanding
-                </CardTitle>
-                <Badge
-                  variant="outline"
-                  className={chipToneClasses(
-                    hasOutstanding ? "yellow" : "green",
-                  )}
-                >
-                  <Clock3 className="mr-1 h-3.5 w-3.5" />
-                  {hasOutstanding ? "Pending" : "Clear"}
-                </Badge>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-gray-900">
-                  {formatCurrency(stats?.totalOutstandingPayments ?? 0)}
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  {hasOutstanding
-                    ? "Action required"
-                    : "All payments collected"}
                 </p>
-              </CardContent>
-            </Card>
+                <p className="text-xl font-bold dash-text tracking-tight">
+                  {compactCurrency(stats?.totalOutstandingPayments ?? 0)}
+                </p>
+              </div>
+            </PillowyCard>
 
-            <Card className="rounded-2xl border bg-white shadow-sm transition-all hover:shadow-md">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">
-                  Deliverables
-                  <span className="ml-1 text-xs text-gray-400 font-normal">
-                    (7 Days)
-                  </span>
-                </CardTitle>
-                <Badge variant="outline" className={chipToneClasses("blue")}>
-                  <CalendarCheck className="mr-1 h-3.5 w-3.5" />
-                  Upcoming
-                </Badge>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-gray-900">
+            <PillowyCard className="p-5 flex flex-col justify-between h-40">
+              <div className="flex justify-between items-start">
+                <span className="icon-3d-gold text-3xl">
+                  <Zap className="w-8 h-8 dash-link" />
+                </span>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider dash-text-muted font-semibold mb-1">
+                  Active Deals
+                </p>
+                <p className="text-xl font-bold dash-text tracking-tight">
                   {stats?.upcomingDeliverablesCount ?? 0}
-                </div>
-                <p className="text-xs text-gray-500 mt-1">Due this week</p>
-              </CardContent>
-            </Card>
-
-            <Card
-              className={`rounded-2xl border shadow-sm transition-all hover:shadow-md ${hasOverdue ? "bg-rose-50/30 border-rose-100" : "bg-white"}`}
-            >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">
-                  Overdue
-                </CardTitle>
-                <Badge
-                  variant="outline"
-                  className={chipToneClasses(hasOverdue ? "red" : "green")}
-                >
-                  <TriangleAlert className="mr-1 h-3.5 w-3.5" />
-                  {hasOverdue ? "Alert" : "Good"}
-                </Badge>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-gray-900">
-                  {stats?.overdueItemsCount ?? 0}
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  {hasOverdue
-                    ? "Immediate attention needed"
-                    : "No overdue items"}
                 </p>
-              </CardContent>
-            </Card>
+              </div>
+            </PillowyCard>
+
+            <PillowyCard className="p-5 flex flex-col justify-between h-40">
+              <div className="flex justify-between items-start">
+                <span className="icon-3d-gold text-3xl">
+                  <Bot className="w-8 h-8 dash-link" />
+                </span>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider dash-text-muted font-semibold mb-1">
+                  Overdue
+                </p>
+                <p className="text-xl font-bold dash-text tracking-tight">
+                  {stats?.overdueItemsCount ?? 0}
+                </p>
+              </div>
+            </PillowyCard>
           </>
         )}
       </div>
 
-      {statsQuery.isError ? (
-        <Card className="rounded-2xl border-rose-100 bg-rose-50/40">
-          <CardContent className="p-6 text-sm text-rose-700">
-            Could not load dashboard analytics right now.
-          </CardContent>
-        </Card>
-      ) : null}
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-serif text-xl dash-text">Revenue Flow</h3>
+        </div>
+        {statsQuery.isLoading ? (
+          <RevenueChartSkeleton />
+        ) : (
+          <PillowyCard className="p-6 h-64 min-h-[16rem] relative overflow-hidden">
+            {/* Decorative background grid from design */}
+            <div className="dash-chart-dots absolute inset-0 opacity-10"></div>
+
+            <div className="relative h-full w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={stats?.revenueTrend}>
+                  <defs>
+                    <linearGradient
+                      id="goldGradient"
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="1"
+                    >
+                      <stop
+                        offset="5%"
+                        stopColor="var(--shell-gold)"
+                        stopOpacity={0.4}
+                      />
+                      <stop
+                        offset="95%"
+                        stopColor="var(--shell-gold)"
+                        stopOpacity={0}
+                      />
+                    </linearGradient>
+                  </defs>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "var(--shell-panel-hover)",
+                      borderRadius: "12px",
+                      border: "1px solid var(--shell-border)",
+                    }}
+                    itemStyle={{ color: "var(--shell-gold)" }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="revenue"
+                    stroke="var(--shell-gold)"
+                    strokeWidth={3}
+                    fillOpacity={1}
+                    fill="url(#goldGradient)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </PillowyCard>
+        )}
+      </section>
 
       <QuickActionsCard />
 
-      {statsQuery.isLoading ? <RevenueChartSkeleton /> : null}
-
-      {!statsQuery.isLoading && !statsQuery.isError ? (
-        <Card className="rounded-2xl border bg-white/80 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-          <CardHeader>
-            <CardTitle className="text-base">Revenue Trend</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {(stats?.revenueTrend.length ?? 0) === 0 ? (
-              <p className="text-sm text-gray-500">No revenue data yet.</p>
-            ) : (
-              <div className="h-72 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={stats?.revenueTrend}
-                    margin={{ top: 8, right: 8, left: 4, bottom: 4 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis dataKey="month" tickLine={false} axisLine={false} />
-                    <YAxis
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(value) => compactCurrency(Number(value))}
-                    />
-                    <Tooltip
-                      formatter={(value) => [
-                        formatCurrency(Number(value)),
-                        "Revenue",
-                      ]}
-                      cursor={{ fill: "rgba(16, 185, 129, 0.08)" }}
-                    />
-                    <Bar
-                      dataKey="revenue"
-                      fill="#10b981"
-                      radius={[8, 8, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {statsQuery.isLoading ? (
-        <>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {statsQuery.isLoading ? (
           <SectionCardSkeleton rows={4} />
-          <SectionCardSkeleton rows={4} />
-        </>
-      ) : null}
-
-      {!statsQuery.isLoading && !statsQuery.isError ? (
-        <>
-          <Card className="rounded-2xl border bg-white/80 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-            <CardHeader className="flex flex-row items-center justify-between gap-2">
-              <CardTitle className="text-base">Recent Deals</CardTitle>
+        ) : !statsQuery.isError ? (
+          <PillowyCard className="p-0">
+            <div className="p-6 border-b border-border flex items-center justify-between">
+              <h3 className="font-serif text-xl dash-text">Ongoing Affairs</h3>
               <Link
                 href="/deals"
-                className="text-sm font-medium text-blue-600 hover:text-blue-700"
+                className="text-[10px] font-bold gold-text uppercase tracking-widest"
               >
                 View All
               </Link>
-            </CardHeader>
-            <CardContent>
+            </div>
+            <div className="p-4 space-y-2">
               {(stats?.recentDeals.length ?? 0) === 0 ? (
-                <p className="text-sm text-gray-500">No recent deals yet.</p>
+                <p className="text-sm dash-text-muted p-4">No recent deals.</p>
               ) : (
-                <>
-                  <div className="hidden md:block">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Brand</TableHead>
-                          <TableHead>Deal</TableHead>
-                          <TableHead>Amount</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Created</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {stats?.recentDeals.map((deal) => {
-                          const tone = dealStatusTone(deal.status);
-                          return (
-                            <TableRow
-                              key={deal.id}
-                              className="cursor-pointer"
-                              onClick={() => router.push(`/deals/${deal.id}`)}
-                            >
-                              <TableCell className="font-medium">
-                                {deal.brandName}
-                              </TableCell>
-                              <TableCell>{deal.title}</TableCell>
-                              <TableCell>
-                                {formatCurrencyWithCode(
-                                  Number(deal.totalValue ?? 0),
-                                  deal.currency,
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                <Badge
-                                  variant="outline"
-                                  className={chipToneClasses(tone)}
-                                >
-                                  {deal.status ?? "UNKNOWN"}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                {formatDate(deal.createdAt)}
-                              </TableCell>
-                            </TableRow>
-                          );
+                stats?.recentDeals.map((deal) => (
+                  <button
+                    key={deal.id}
+                    type="button"
+                    className="dash-inline-card flex items-center justify-between p-4 rounded-2xl border transition-colors hover:opacity-95 cursor-pointer"
+                    onClick={() => router.push(`/deals/${deal.id}`)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl pillowy-card flex items-center justify-center">
+                        <span className="icon-3d-gold">
+                          <Wallet className="w-5 h-5 dash-link" />
+                        </span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold dash-text">
+                          {deal.title}
+                        </p>
+                        <p className="text-[10px] dash-text-muted">
+                          {deal.brandName}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold gold-text">
+                        {formatDealCurrency(Number(deal.totalValue ?? 0), {
+                          currency: deal.currency,
                         })}
-                      </TableBody>
-                    </Table>
-                  </div>
-
-                  <div className="space-y-3 md:hidden">
-                    {stats?.recentDeals.map((deal) => {
-                      const tone = dealStatusTone(deal.status);
-                      return (
-                        <button
-                          key={deal.id}
-                          type="button"
-                          onClick={() => router.push(`/deals/${deal.id}`)}
-                          className="w-full rounded-xl border border-gray-100 bg-white p-3 text-left"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="font-medium text-gray-900">
-                                {deal.title}
-                              </p>
-                              <p className="text-sm text-gray-500">
-                                {deal.brandName}
-                              </p>
-                            </div>
-                            <Badge
-                              variant="outline"
-                              className={chipToneClasses(tone)}
-                            >
-                              {deal.status ?? "UNKNOWN"}
-                            </Badge>
-                          </div>
-                          <p className="mt-2 text-sm text-gray-700">
-                            {formatCurrencyWithCode(
-                              Number(deal.totalValue ?? 0),
-                              deal.currency,
-                            )}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            Created {formatDate(deal.createdAt)}
-                          </p>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </>
+                      </p>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "text-[10px]",
+                          getStatusBadgeClasses(getDealStatusTone(deal.status)),
+                        )}
+                      >
+                        {deal.status}
+                      </Badge>
+                    </div>
+                  </button>
+                ))
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </PillowyCard>
+        ) : null}
 
-          <Card className="rounded-2xl border bg-white/80 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-            <CardHeader>
-              <CardTitle className="text-base">Upcoming Deliverables</CardTitle>
-            </CardHeader>
-            <CardContent>
+        {statsQuery.isLoading ? (
+          <SectionCardSkeleton rows={3} />
+        ) : (
+          <PillowyCard className="p-0">
+            <div className="p-6 border-b border-border">
+              <h3 className="font-serif text-xl dash-text">
+                Upcoming Deliverables
+              </h3>
+            </div>
+            <div className="p-6">
               <DeliverablesTimeline
                 items={
                   stats?.upcomingDeliverables.map((deliverable) => ({
@@ -834,86 +683,10 @@ export default function DashboardPage() {
                 }
                 onOpenDeal={(dealId) => router.push(`/deals/${dealId}`)}
               />
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-2xl border bg-white/80 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-            <CardHeader>
-              <CardTitle className="text-base">Active Reminders</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {remindersQuery.isLoading ? (
-                <p className="text-sm text-gray-500">Loading reminders...</p>
-              ) : remindersQuery.isError ? (
-                <p className="text-sm text-rose-600">
-                  Could not load reminders.
-                </p>
-              ) : (remindersQuery.data?.length ?? 0) === 0 ? (
-                <p className="text-sm text-gray-500">No active reminders.</p>
-              ) : (
-                <div className="space-y-3">
-                  {remindersQuery.data?.map((reminder) => {
-                    const pending = isReminderActionPending(reminder.id);
-                    return (
-                      <div
-                        key={reminder.id}
-                        className="rounded-xl border border-gray-100 bg-white p-3"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <button
-                            type="button"
-                            className="text-left text-sm font-medium text-gray-900 hover:text-blue-700"
-                            onClick={() =>
-                              router.push(`/deals/${reminder.dealId}`)
-                            }
-                          >
-                            {reminder.reason}
-                          </button>
-                          <Badge
-                            variant="outline"
-                            className={reminderPriorityTone(reminder.priority)}
-                          >
-                            {reminder.priority}
-                          </Badge>
-                        </div>
-                        <p className="mt-1 text-xs text-gray-500">
-                          {reminder.dealTitle} · {formatDate(reminder.dueAt)}{" "}
-                          {formatTime(reminder.dueAt)} ·{" "}
-                          {formatReminderRelative(reminder.dueAt)}
-                        </p>
-                        <div className="mt-3 flex items-center gap-2">
-                          <button
-                            type="button"
-                            disabled={pending}
-                            onClick={() =>
-                              markDoneReminderMutation.mutate({
-                                id: reminder.id,
-                              })
-                            }
-                            className="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            Mark Done
-                          </button>
-                          <button
-                            type="button"
-                            disabled={pending}
-                            onClick={() =>
-                              snoozeReminderMutation.mutate({ id: reminder.id })
-                            }
-                            className="rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            Snooze 1d
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </>
-      ) : null}
+            </div>
+          </PillowyCard>
+        )}
+      </div>
     </div>
   );
 }

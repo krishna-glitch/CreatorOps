@@ -37,10 +37,54 @@ export const conflictsRouter = createTRPCRouter({
   list: protectedProcedure
     .input(listConflictsInputSchema)
     .query(async ({ ctx, input }) => {
-      const status = input?.status ?? "ACTIVE";
-      const rows = await ctx.db.query.conflicts.findMany({
-        with: {
-          conflictingRule: {
+      try {
+        const status = input?.status ?? "ACTIVE";
+        const rows = await ctx.db.query.conflicts.findMany({
+          with: {
+            conflictingRule: {
+              with: {
+                deal: {
+                  columns: {
+                    id: true,
+                    userId: true,
+                    title: true,
+                  },
+                  with: {
+                    brand: {
+                      columns: {
+                        id: true,
+                        name: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        const [relatedDeals, relatedDeliverables] = await Promise.all([
+          ctx.db.query.deals.findMany({
+            where: eq(deals.userId, ctx.user.id),
+            columns: {
+              id: true,
+              title: true,
+              userId: true,
+            },
+            with: {
+              brand: {
+                columns: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          }),
+          ctx.db.query.deliverables.findMany({
+            columns: {
+              id: true,
+              dealId: true,
+            },
             with: {
               deal: {
                 columns: {
@@ -58,105 +102,69 @@ export const conflictsRouter = createTRPCRouter({
                 },
               },
             },
-          },
-        },
-      });
+          }),
+        ]);
 
-      const [relatedDeals, relatedDeliverables] = await Promise.all([
-        ctx.db.query.deals.findMany({
-          where: eq(deals.userId, ctx.user.id),
-          columns: {
-            id: true,
-            title: true,
-            userId: true,
-          },
-          with: {
-            brand: {
-              columns: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        }),
-        ctx.db.query.deliverables.findMany({
-          columns: {
-            id: true,
-            dealId: true,
-          },
-          with: {
-            deal: {
-              columns: {
-                id: true,
-                userId: true,
-                title: true,
-              },
-              with: {
-                brand: {
-                  columns: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-        }),
-      ]);
+        const dealMap = new Map(relatedDeals.map((deal) => [deal.id, deal]));
+        const deliverableMap = new Map(
+          relatedDeliverables
+            .filter((item) => item.deal.userId === ctx.user.id)
+            .map((item) => [item.id, item]),
+        );
 
-      const dealMap = new Map(relatedDeals.map((deal) => [deal.id, deal]));
-      const deliverableMap = new Map(
-        relatedDeliverables
-          .filter((item) => item.deal.userId === ctx.user.id)
-          .map((item) => [item.id, item]),
-      );
+        const result: ConflictListItem[] = rows
+          .filter((row) => {
+            if (status === "ACTIVE" && row.autoResolved) {
+              return false;
+            }
+            if (status === "RESOLVED" && !row.autoResolved) {
+              return false;
+            }
 
-      const result: ConflictListItem[] = rows
-        .filter((row) => {
-          if (status === "ACTIVE" && row.autoResolved) {
-            return false;
-          }
-          if (status === "RESOLVED" && !row.autoResolved) {
-            return false;
-          }
+            const ruleDeal = row.conflictingRule?.deal;
+            if (ruleDeal?.userId === ctx.user.id) {
+              return true;
+            }
 
-          const ruleDeal = row.conflictingRule?.deal;
-          if (ruleDeal?.userId === ctx.user.id) {
-            return true;
-          }
+            const maybeDeal = dealMap.get(row.newDealOrDeliverableId);
+            if (maybeDeal?.userId === ctx.user.id) {
+              return true;
+            }
 
-          const maybeDeal = dealMap.get(row.newDealOrDeliverableId);
-          if (maybeDeal?.userId === ctx.user.id) {
-            return true;
-          }
+            const maybeDeliverable = deliverableMap.get(row.newDealOrDeliverableId);
+            return maybeDeliverable?.deal.userId === ctx.user.id;
+          })
+          .map((row) => {
+            const maybeDeal = dealMap.get(row.newDealOrDeliverableId);
+            const maybeDeliverable = deliverableMap.get(row.newDealOrDeliverableId);
+            const targetDeal = maybeDeal ?? maybeDeliverable?.deal ?? null;
 
-          const maybeDeliverable = deliverableMap.get(row.newDealOrDeliverableId);
-          return maybeDeliverable?.deal.userId === ctx.user.id;
-        })
-        .map((row) => {
-          const maybeDeal = dealMap.get(row.newDealOrDeliverableId);
-          const maybeDeliverable = deliverableMap.get(row.newDealOrDeliverableId);
-          const targetDeal = maybeDeal ?? maybeDeliverable?.deal ?? null;
+            return {
+              id: row.id,
+              type: row.type,
+              severity: row.severity,
+              overlap: (row.overlap as Record<string, unknown>) ?? {},
+              suggested_resolutions: row.suggestedResolutions,
+              auto_resolved: row.autoResolved,
+              target_deal_id: targetDeal?.id ?? null,
+              target_deal_title: targetDeal?.title ?? null,
+              target_brand_name: targetDeal?.brand?.name ?? null,
+              target_deliverable_id: maybeDeliverable?.id ?? null,
+              conflicting_rule_id: row.conflictingRuleId ?? null,
+              conflicting_rule_deal_id: row.conflictingRule?.deal?.id ?? null,
+              conflicting_rule_deal_title: row.conflictingRule?.deal?.title ?? null,
+              conflicting_rule_brand_name: row.conflictingRule?.deal?.brand?.name ?? null,
+            };
+          });
 
-          return {
-            id: row.id,
-            type: row.type,
-            severity: row.severity,
-            overlap: (row.overlap as Record<string, unknown>) ?? {},
-            suggested_resolutions: row.suggestedResolutions,
-            auto_resolved: row.autoResolved,
-            target_deal_id: targetDeal?.id ?? null,
-            target_deal_title: targetDeal?.title ?? null,
-            target_brand_name: targetDeal?.brand?.name ?? null,
-            target_deliverable_id: maybeDeliverable?.id ?? null,
-            conflicting_rule_id: row.conflictingRuleId ?? null,
-            conflicting_rule_deal_id: row.conflictingRule?.deal?.id ?? null,
-            conflicting_rule_deal_title: row.conflictingRule?.deal?.title ?? null,
-            conflicting_rule_brand_name: row.conflictingRule?.deal?.brand?.name ?? null,
-          };
+        return result;
+      } catch (error) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Database error while loading conflicts.",
+          cause: error,
         });
-
-      return result;
+      }
     }),
   markResolved: protectedProcedure
     .input(markResolvedInputSchema)

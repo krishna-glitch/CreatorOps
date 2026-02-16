@@ -350,13 +350,13 @@ export function FileUploader({
   });
 
   return (
-    <div className="space-y-4 rounded-lg border border-gray-200 p-4 dark:border-gray-800">
+    <div className="space-y-4 rounded-lg border dash-border p-4 dash-border">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-medium">Upload Content File</p>
         <select
           value={assetType}
           onChange={(event) => setAssetType(event.target.value as MediaAssetType)}
-          className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
+          className="rounded-md border dash-border dash-bg-card px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
           disabled={isUploading}
         >
           {ASSET_OPTIONS.map((option) => (
@@ -372,7 +372,7 @@ export function FileUploader({
         className={`cursor-pointer rounded-md border border-dashed p-6 text-center transition ${
           isDragActive
             ? "border-blue-500 bg-blue-50 dark:bg-blue-950/20"
-            : "border-gray-300 hover:border-gray-400 dark:border-gray-700"
+            : "dash-border hover:border-gray-400 dark:border-gray-700"
         }`}
       >
         <input {...getInputProps()} />
@@ -428,7 +428,7 @@ export function FileUploader({
           ) : null}
 
           {preview.scriptPreview ? (
-            <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded-md border border-green-200 bg-white p-2 text-xs text-gray-700 dark:border-green-900/60 dark:bg-gray-950 dark:text-gray-200">
+            <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded-md border border-green-200 dash-bg-card p-2 text-xs text-gray-700 dark:border-green-900/60 dash-bg-panel dark:text-gray-200">
               {preview.scriptPreview}
             </pre>
           ) : null}

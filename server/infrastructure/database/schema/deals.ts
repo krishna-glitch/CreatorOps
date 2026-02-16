@@ -1,5 +1,4 @@
-import { sql } from "drizzle-orm";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   check,
   decimal,
@@ -42,6 +41,14 @@ export const deals = pgTable(
       userIdIdx: index("deals_user_id_idx").on(table.userId),
       brandIdIdx: index("deals_brand_id_idx").on(table.brandId),
       statusIdx: index("deals_status_idx").on(table.status),
+      userStatusCreatedIdx: index("deals_user_status_created_idx").on(
+        table.userId,
+        table.status,
+        table.createdAt,
+      ),
+      userCreatedIdPaginationIdx: index(
+        "deals_user_created_id_pagination_idx",
+      ).on(table.userId, table.createdAt.desc(), table.id.desc()),
       revisionLimitPositiveCheck: check(
         "deals_revision_limit_positive_check",
         sql`${table.revisionLimit} >= 1`,

@@ -1,10 +1,17 @@
-import { Package2, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { DashboardSidebar } from "@/components/dashboard-sidebar";
 import { LogoutButton } from "@/components/logout-button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/server";
+import { MobileNav } from "@/components/mobile-nav";
+import { MobileHeader } from "@/components/mobile-header";
+import { NotificationPopover } from "@/components/notification-popover";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { NotificationPrompt } from "@/src/components/notifications/NotificationPrompt";
+
+import { NotificationMessageHandler } from "@/src/components/notifications/NotificationMessageHandler";
 
 export default async function DashboardLayout({
   children,
@@ -21,39 +28,53 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
+    <div className="dashboard-shell flex min-h-screen w-full flex-col md:flex-row bg-background transition-colors duration-300">
       <DashboardSidebar />
-      <div className="flex flex-col">
-        <header className="flex h-14 items-center gap-4 border-b bg-gray-100/40 px-4 lg:h-[60px] lg:px-6 dark:bg-gray-800/40">
-          <Link
-            href="/dashboard"
-            className="flex items-center gap-2 font-semibold md:hidden"
-          >
-            <Package2 className="h-6 w-6" />
-            <span className="sr-only">CreatorOps</span>
-          </Link>
-          <div className="w-full flex-1">
-            <form>
+      <div className="flex flex-1 flex-col relative">
+        <MobileHeader userEmail={user.email} />
+
+        <header className="dash-shell-header hidden h-20 items-center justify-between border-b px-8 md:flex">
+          <div className="flex items-center">
+            <h1 className="font-serif text-2xl font-bold gold-text leading-tight">CreatorOps</h1>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="hidden lg:block w-96">
               <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Search className="dash-shell-search-icon absolute left-3 top-3 h-4 w-4" />
                 <Input
-                  type="search"
-                  placeholder="Search..."
-                  className="w-full appearance-none bg-background pl-8 shadow-none md:w-2/3 lg:w-1/3"
+                  placeholder="Search deals, brands..."
+                  className="pl-10 h-10 pillowy-card-pressed border-none bg-transparent shadow-inner"
                 />
               </div>
-            </form>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-500 hidden md:inline-block">
-              {user.email}
-            </span>
-            <LogoutButton />
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full pillowy-card flex items-center justify-center">
+                <ThemeToggle />
+              </div>
+              <div className="w-10 h-10 rounded-full pillowy-card flex items-center justify-center">
+                <NotificationPopover />
+              </div>
+              <div className="dash-shell-avatar-ring w-10 h-10 rounded-full border p-0.5 shadow-lg overflow-hidden">
+                <div className="dash-shell-avatar-inner w-full h-full rounded-full flex items-center justify-center">
+                  <span className="dash-shell-avatar-text text-xs font-bold">
+                    {user.email?.substring(0, 2).toUpperCase()}
+                  </span>
+                </div>
+              </div>
+              <LogoutButton />
+            </div>
           </div>
         </header>
-        <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">
+
+        <main className="flex-1 p-4 pb-32 md:pb-8 lg:p-8">
           {children}
         </main>
+
+        <MobileNav />
+        <NotificationPrompt />
+        <NotificationMessageHandler />
       </div>
     </div>
   );

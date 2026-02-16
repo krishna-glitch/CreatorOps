@@ -60,6 +60,10 @@ const listByDealInputSchema = z.object({
   deal_id: z.string().uuid(),
 });
 
+type DbTx = Parameters<
+  Parameters<typeof import("@/db")["db"]["transaction"]>[0]
+>[0];
+
 type PaymentStatus = z.infer<typeof paymentStatusSchema>;
 
 function getTodayStart() {
@@ -81,12 +85,90 @@ function calculatePaymentStatus(params: {
         ? params.expectedDate
         : new Date(params.expectedDate);
 
-    if (!Number.isNaN(expectedDate.getTime()) && expectedDate < getTodayStart()) {
+    if (
+      !Number.isNaN(expectedDate.getTime()) &&
+      expectedDate < getTodayStart()
+    ) {
       return "OVERDUE";
     }
   }
 
   return "EXPECTED";
+}
+
+async function syncDealStatusFromPayments(params: {
+  tx: DbTx;
+  dealId: string;
+}) {
+  const { tx, dealId } = params;
+  type PaymentSyncRow = {
+    amount: string;
+    currency: string;
+    status: string | null;
+    paidAt: Date | null;
+  };
+
+  const deal = await tx.query.deals.findFirst({
+    where: eq(deals.id, dealId),
+    columns: {
+      id: true,
+      status: true,
+      totalValue: true,
+      currency: true,
+    },
+  });
+
+  if (!deal) {
+    return;
+  }
+
+  const paymentRows: PaymentSyncRow[] = await tx.query.payments.findMany({
+    where: eq(payments.dealId, dealId),
+    columns: {
+      amount: true,
+      currency: true,
+      status: true,
+      paidAt: true,
+    },
+  });
+
+  // Calculate total paid amount
+  const totalPaid = paymentRows.reduce((sum, payment) => {
+    if (payment.status === "PAID" || payment.paidAt !== null) {
+      // Simple currency check - assuming same currency for now or ignoring mismatch
+      if (payment.currency === deal.currency) {
+        return sum + parseFloat(payment.amount);
+      }
+    }
+    return sum;
+  }, 0);
+
+  const dealTotal = parseFloat(deal.totalValue ?? "0");
+
+  // Floating point comparison tolerance
+  const isFullyPaid = Math.abs(totalPaid - dealTotal) < 0.01 || (dealTotal > 0 && totalPaid >= dealTotal);
+
+  if (isFullyPaid && deal.status !== "PAID") {
+    await tx
+      .update(deals)
+      .set({
+        status: "PAID",
+        updatedAt: new Date(),
+      })
+      .where(eq(deals.id, dealId));
+    return;
+  }
+
+  // If not fully paid but was marked PAID, revert to AGREED (or previous status if known, but AGREED is safe drawback)
+  if (!isFullyPaid && deal.status === "PAID") {
+    await tx
+      .update(deals)
+      .set({
+        status: "AGREED",
+        updatedAt: new Date(),
+      })
+      .where(eq(deals.id, dealId));
+  }
 }
 
 export const paymentsRouter = createTRPCRouter({
@@ -143,50 +225,75 @@ export const paymentsRouter = createTRPCRouter({
         );
       }
 
-      return normalizedWithMeta.map(({ originalStatus: _originalStatus, ...payment }) => payment);
+      return normalizedWithMeta.map(
+        ({ originalStatus: _originalStatus, ...payment }) => payment,
+      );
     }),
 
   create: protectedProcedure
     .input(createPaymentInputSchema)
     .mutation(async ({ ctx, input }) => {
       try {
-        const deal = await ctx.db.query.deals.findFirst({
-          where: and(eq(deals.id, input.deal_id), eq(deals.userId, ctx.user.id)),
-          columns: {
-            id: true,
-          },
-        });
-
-        if (!deal) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Deal not found",
+        const created = await ctx.db.transaction(async (tx) => {
+          const deal = await tx.query.deals.findFirst({
+            where: and(
+              eq(deals.id, input.deal_id),
+              eq(deals.userId, ctx.user.id),
+            ),
+            columns: {
+              id: true,
+            },
           });
-        }
 
-        const [created] = await ctx.db
-          .insert(payments)
-          .values({
+          if (!deal) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "Deal not found",
+            });
+          }
+
+          const explicitPaidAt =
+            input.paid_at !== undefined && input.paid_at !== null
+              ? new Date(input.paid_at)
+              : null;
+          const paidAt =
+            explicitPaidAt ?? (input.status === "PAID" ? new Date() : null);
+          const expectedDate =
+            input.expected_date !== undefined && input.expected_date !== null
+              ? new Date(input.expected_date)
+              : null;
+
+          const [newPayment] = await tx
+            .insert(payments)
+            .values({
+              dealId: input.deal_id,
+              amount: input.amount.toString(),
+              currency: input.currency,
+              kind: input.kind,
+              status: calculatePaymentStatus({
+                paidAt,
+                expectedDate,
+              }),
+              expectedDate,
+              paidAt,
+              paymentMethod: input.payment_method ?? null,
+            })
+            .returning();
+
+          if (!newPayment) {
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: "Failed to create payment",
+            });
+          }
+
+          await syncDealStatusFromPayments({
+            tx,
             dealId: input.deal_id,
-            amount: input.amount.toString(),
-            currency: input.currency,
-            kind: input.kind,
-            status: calculatePaymentStatus({
-              paidAt: input.paid_at ? new Date(input.paid_at) : null,
-              expectedDate: input.expected_date ? new Date(input.expected_date) : null,
-            }),
-            expectedDate: input.expected_date ? new Date(input.expected_date) : null,
-            paidAt: input.paid_at ? new Date(input.paid_at) : null,
-            paymentMethod: input.payment_method ?? null,
-          })
-          .returning();
-
-        if (!created) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Failed to create payment",
           });
-        }
+
+          return newPayment;
+        });
 
         return created;
       } catch (error) {
@@ -206,48 +313,57 @@ export const paymentsRouter = createTRPCRouter({
     .input(markPaidInputSchema)
     .mutation(async ({ ctx, input }) => {
       try {
-        const existing = await ctx.db.query.payments.findFirst({
-          where: eq(payments.id, input.id),
-          with: {
-            deal: {
-              columns: {
-                id: true,
-                userId: true,
+        const updated = await ctx.db.transaction(async (tx) => {
+          const existing = await tx.query.payments.findFirst({
+            where: eq(payments.id, input.id),
+            with: {
+              deal: {
+                columns: {
+                  id: true,
+                  userId: true,
+                },
               },
             },
-          },
-        });
-
-        if (!existing || existing.deal.userId !== ctx.user.id) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Payment not found",
           });
-        }
 
-        const [updated] = await ctx.db
-          .update(payments)
-          .set({
-            status: calculatePaymentStatus({
+          if (!existing || existing.deal.userId !== ctx.user.id) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "Payment not found",
+            });
+          }
+
+          const [nextPayment] = await tx
+            .update(payments)
+            .set({
+              status: calculatePaymentStatus({
+                paidAt: input.paid_at ? new Date(input.paid_at) : new Date(),
+                expectedDate: existing.expectedDate,
+              }),
               paidAt: input.paid_at ? new Date(input.paid_at) : new Date(),
-              expectedDate: existing.expectedDate,
-            }),
-            paidAt: input.paid_at ? new Date(input.paid_at) : new Date(),
-            paymentMethod:
-              input.payment_method !== undefined
-                ? input.payment_method
-                : existing.paymentMethod,
-            updatedAt: new Date(),
-          })
-          .where(eq(payments.id, input.id))
-          .returning();
+              paymentMethod:
+                input.payment_method !== undefined
+                  ? input.payment_method
+                  : existing.paymentMethod,
+              updatedAt: new Date(),
+            })
+            .where(eq(payments.id, input.id))
+            .returning();
 
-        if (!updated) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Payment not found",
+          if (!nextPayment) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "Payment not found",
+            });
+          }
+
+          await syncDealStatusFromPayments({
+            tx,
+            dealId: existing.deal.id,
           });
-        }
+
+          return nextPayment;
+        });
 
         return updated;
       } catch (error) {
@@ -267,83 +383,101 @@ export const paymentsRouter = createTRPCRouter({
     .input(updatePaymentInputSchema)
     .mutation(async ({ ctx, input }) => {
       try {
-        const existing = await ctx.db.query.payments.findFirst({
-          where: eq(payments.id, input.id),
-          with: {
-            deal: {
-              columns: {
-                id: true,
-                userId: true,
+        const updated = await ctx.db.transaction(async (tx) => {
+          const existing = await tx.query.payments.findFirst({
+            where: eq(payments.id, input.id),
+            with: {
+              deal: {
+                columns: {
+                  id: true,
+                  userId: true,
+                },
               },
             },
-          },
-        });
-
-        if (!existing || existing.deal.userId !== ctx.user.id) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Payment not found",
           });
-        }
 
-        const updateData: {
-          amount?: string;
-          currency?: z.infer<typeof paymentCurrencySchema>;
-          kind?: z.infer<typeof paymentKindSchema>;
-          status?: z.infer<typeof paymentStatusSchema>;
-          expectedDate?: Date | null;
-          paidAt?: Date | null;
-          paymentMethod?: z.infer<typeof paymentMethodSchema> | null;
-          updatedAt: Date;
-        } = {
-          updatedAt: new Date(),
-        };
+          if (!existing || existing.deal.userId !== ctx.user.id) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "Payment not found",
+            });
+          }
 
-        if (input.amount !== undefined) {
-          updateData.amount = input.amount.toString();
-        }
-        if (input.currency !== undefined) {
-          updateData.currency = input.currency;
-        }
-        if (input.kind !== undefined) {
-          updateData.kind = input.kind;
-        }
-        if (input.expected_date !== undefined) {
-          updateData.expectedDate = input.expected_date
-            ? new Date(input.expected_date)
-            : null;
-        }
-        if (input.paid_at !== undefined) {
-          updateData.paidAt = input.paid_at ? new Date(input.paid_at) : null;
-        }
-        if (input.payment_method !== undefined) {
-          updateData.paymentMethod = input.payment_method;
-        }
+          const updateData: {
+            amount?: string;
+            currency?: z.infer<typeof paymentCurrencySchema>;
+            kind?: z.infer<typeof paymentKindSchema>;
+            status?: z.infer<typeof paymentStatusSchema>;
+            expectedDate?: Date | null;
+            paidAt?: Date | null;
+            paymentMethod?: z.infer<typeof paymentMethodSchema> | null;
+            updatedAt: Date;
+          } = {
+            updatedAt: new Date(),
+          };
 
-        const nextPaidAt =
-          updateData.paidAt !== undefined ? updateData.paidAt : existing.paidAt;
-        const nextExpectedDate =
-          updateData.expectedDate !== undefined
-            ? updateData.expectedDate
-            : existing.expectedDate;
+          if (input.amount !== undefined) {
+            updateData.amount = input.amount.toString();
+          }
+          if (input.currency !== undefined) {
+            updateData.currency = input.currency;
+          }
+          if (input.kind !== undefined) {
+            updateData.kind = input.kind;
+          }
+          if (input.expected_date !== undefined) {
+            updateData.expectedDate = input.expected_date
+              ? new Date(input.expected_date)
+              : null;
+          }
+          if (input.paid_at !== undefined) {
+            updateData.paidAt = input.paid_at ? new Date(input.paid_at) : null;
+          }
+          if (input.status !== undefined && input.paid_at === undefined) {
+            if (input.status === "PAID") {
+              updateData.paidAt = existing.paidAt ?? new Date();
+            } else {
+              updateData.paidAt = null;
+            }
+          }
+          if (input.payment_method !== undefined) {
+            updateData.paymentMethod = input.payment_method;
+          }
 
-        updateData.status = calculatePaymentStatus({
-          paidAt: nextPaidAt,
-          expectedDate: nextExpectedDate,
-        });
+          const nextPaidAt =
+            updateData.paidAt !== undefined
+              ? updateData.paidAt
+              : existing.paidAt;
+          const nextExpectedDate =
+            updateData.expectedDate !== undefined
+              ? updateData.expectedDate
+              : existing.expectedDate;
 
-        const [updated] = await ctx.db
-          .update(payments)
-          .set(updateData)
-          .where(eq(payments.id, input.id))
-          .returning();
-
-        if (!updated) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Payment not found",
+          updateData.status = calculatePaymentStatus({
+            paidAt: nextPaidAt,
+            expectedDate: nextExpectedDate,
           });
-        }
+
+          const [nextPayment] = await tx
+            .update(payments)
+            .set(updateData)
+            .where(eq(payments.id, input.id))
+            .returning();
+
+          if (!nextPayment) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "Payment not found",
+            });
+          }
+
+          await syncDealStatusFromPayments({
+            tx,
+            dealId: existing.deal.id,
+          });
+
+          return nextPayment;
+        });
 
         return updated;
       } catch (error) {

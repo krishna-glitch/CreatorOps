@@ -25,13 +25,13 @@ import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc/client";
 
 const CHART_COLORS = {
-  revenue: "#0f766e",
-  revenueFill: "#14b8a6",
-  grid: "#e5e7eb",
-  text: "#475569",
-  platform: ["#0ea5e9", "#14b8a6", "#f59e0b", "#8b5cf6", "#ef4444"],
-  brands: "#2563eb",
-  funnel: ["#94a3b8", "#60a5fa", "#10b981", "#f97316"],
+  revenue: "var(--shell-gold)",
+  revenueFill: "var(--shell-gold)",
+  grid: "var(--shell-chart-grid)",
+  text: "var(--shell-text-muted)",
+  platform: ["#d4af37", "#be9124", "#8a6d3b", "#f9e29c", "#947428"],
+  brands: "var(--shell-gold)",
+  funnel: ["#f9e29c", "#d4af37", "#be9124", "#8a6d3b"],
 };
 
 function formatCurrency(value: number) {
@@ -83,11 +83,11 @@ function escapeCsvField(value: string | number) {
 
 function EmptyChartState({ message }: { message: string }) {
   return (
-    <div className="flex h-[280px] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 bg-gradient-to-br from-slate-50/80 to-white px-6 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-        <BarChart3 className="h-5 w-5 text-slate-400" />
+    <div className="dash-bg-card flex h-[280px] flex-col items-center justify-center gap-3 rounded-xl border border-dashed dash-border px-6 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full dash-bg-card">
+        <BarChart3 className="h-5 w-5 dash-text-muted" />
       </div>
-      <p className="max-w-[260px] text-sm leading-relaxed text-slate-500">
+      <p className="max-w-[260px] text-sm leading-relaxed dash-text-muted">
         {message}
       </p>
     </div>
@@ -97,11 +97,11 @@ function EmptyChartState({ message }: { message: string }) {
 function LoadingChartState() {
   return (
     <div className="space-y-3">
-      <div className="h-[260px] animate-pulse rounded-xl bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100" aria-hidden="true" />
+      <div className="h-[260px] animate-pulse rounded-xl dash-bg-card" aria-hidden="true" />
       <div className="flex gap-4">
-        <div className="h-3 w-20 animate-pulse rounded bg-slate-100" />
-        <div className="h-3 w-16 animate-pulse rounded bg-slate-100" />
-        <div className="h-3 w-24 animate-pulse rounded bg-slate-100" />
+        <div className="h-3 w-20 animate-pulse rounded dash-bg-card" />
+        <div className="h-3 w-16 animate-pulse rounded dash-bg-card" />
+        <div className="h-3 w-24 animate-pulse rounded dash-bg-card" />
       </div>
     </div>
   );
@@ -235,8 +235,8 @@ export default function AnalyticsPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
-          <p className="text-slate-500">
+          <h1 className="font-serif text-3xl font-bold tracking-tight dash-text">Analytics</h1>
+          <p className="dash-text-muted">
             Revenue, pipeline, and brand performance across your selected range.
           </p>
         </div>
@@ -246,7 +246,7 @@ export default function AnalyticsPage() {
             <div>
               <label
                 htmlFor="analytics-start-date"
-                className="text-xs text-slate-600"
+                className="text-xs dash-text-muted"
               >
                 Start date
               </label>
@@ -260,7 +260,7 @@ export default function AnalyticsPage() {
             <div>
               <label
                 htmlFor="analytics-end-date"
-                className="text-xs text-slate-600"
+                className="text-xs dash-text-muted"
               >
                 End date
               </label>
@@ -287,21 +287,21 @@ export default function AnalyticsPage() {
       </div>
 
       {rangeInput === undefined ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+        <div className="dash-inline-card dash-chip-tone-yellow rounded-xl border p-3 text-sm">
           <Filter className="mr-1 inline h-4 w-4" />
           Date range is invalid. Ensure start date is before end date.
         </div>
       ) : null}
 
       {insightsQuery.isError ? (
-        <div className="flex items-center justify-between rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
+        <div className="dash-card-danger flex items-center justify-between rounded-xl border px-4 py-3">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-rose-100">
-              <Filter className="h-4 w-4 text-rose-600" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-full dash-bg-card">
+              <Filter className="h-4 w-4 dash-text-danger" />
             </div>
             <div>
-              <p className="text-sm font-medium text-rose-800">Failed to load analytics</p>
-              <p className="text-xs text-rose-600">
+              <p className="text-sm font-medium dash-text">Failed to load analytics</p>
+              <p className="text-xs dash-text-muted">
                 {insightsQuery.error?.message || "Try adjusting the date range or refreshing."}
               </p>
             </div>
@@ -310,7 +310,7 @@ export default function AnalyticsPage() {
             variant="outline"
             size="sm"
             onClick={() => insightsQuery.refetch()}
-            className="shrink-0 border-rose-200 text-rose-700 hover:bg-rose-100"
+            className="shrink-0"
           >
             <RefreshCcw className="mr-1.5 h-3.5 w-3.5" />
             Retry
@@ -318,9 +318,9 @@ export default function AnalyticsPage() {
         </div>
       ) : null}
 
-      <Card>
+      <Card className="dash-card border dash-border">
         <CardHeader>
-          <CardTitle className="text-base">Key Insights</CardTitle>
+          <CardTitle className="text-base dash-text">Key Insights</CardTitle>
         </CardHeader>
         <CardContent>
           {insightsQuery.isLoading ? (
@@ -333,13 +333,13 @@ export default function AnalyticsPage() {
               ].map((key) => (
                 <div
                   key={key}
-                  className="h-20 animate-pulse rounded-lg bg-slate-100"
+                  className="h-20 animate-pulse rounded-lg dash-bg-card"
                   aria-hidden="true"
                 />
               ))}
             </div>
           ) : (insights?.insights.length ?? 0) === 0 ? (
-            <p className="text-sm text-slate-500">
+            <p className="text-sm dash-text-muted">
               No statistically significant insights yet for this date range.
             </p>
           ) : (
@@ -347,7 +347,7 @@ export default function AnalyticsPage() {
               {insights?.insights.map((insight) => (
                 <div
                   key={insight}
-                  className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700"
+                  className="rounded-lg border dash-border dash-bg-card p-3 text-sm dash-text"
                 >
                   {insight}
                 </div>
@@ -357,9 +357,9 @@ export default function AnalyticsPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="dash-card border dash-border">
         <CardHeader>
-          <CardTitle className="text-base">Recommendations</CardTitle>
+          <CardTitle className="text-base dash-text">Recommendations</CardTitle>
         </CardHeader>
         <CardContent>
           {insightsQuery.isLoading ? (
@@ -371,13 +371,13 @@ export default function AnalyticsPage() {
               ].map((key) => (
                 <div
                   key={key}
-                  className="h-20 animate-pulse rounded-lg bg-slate-100"
+                  className="h-20 animate-pulse rounded-lg dash-bg-card"
                   aria-hidden="true"
                 />
               ))}
             </div>
           ) : (insights?.recommendations.length ?? 0) === 0 ? (
-            <p className="text-sm text-slate-500">
+            <p className="text-sm dash-text-muted">
               No recommendations generated for this date range.
             </p>
           ) : (
@@ -385,7 +385,7 @@ export default function AnalyticsPage() {
               {insights?.recommendations.map((recommendation) => (
                 <div
                   key={recommendation}
-                  className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900"
+                  className="dash-chip-tone-green rounded-lg border p-3 text-sm"
                 >
                   {recommendation}
                 </div>
@@ -396,9 +396,9 @@ export default function AnalyticsPage() {
       </Card>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card>
+        <Card className="dash-card border dash-border">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600">
+            <CardTitle className="text-sm dash-text-muted">
               Average Deal Size
             </CardTitle>
           </CardHeader>
@@ -409,9 +409,9 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="dash-card border dash-border">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600">
+            <CardTitle className="text-sm dash-text-muted">
               Won vs Lost
             </CardTitle>
           </CardHeader>
@@ -427,9 +427,9 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="dash-card border dash-border">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600">
+            <CardTitle className="text-sm dash-text-muted">
               Avg Response Time
             </CardTitle>
           </CardHeader>
@@ -440,9 +440,9 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="dash-card border dash-border">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600">
+            <CardTitle className="text-sm dash-text-muted">
               On-Time Delivery Rate
             </CardTitle>
           </CardHeader>
@@ -455,9 +455,9 @@ export default function AnalyticsPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <Card>
+        <Card className="dash-card border dash-border">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
+            <CardTitle className="flex items-center gap-2 text-base dash-text">
               <TrendingUp className="h-4 w-4" />
               Revenue Trend (12 Months)
             </CardTitle>
@@ -505,9 +505,9 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="dash-card border dash-border">
           <CardHeader>
-            <CardTitle className="text-base">Platform Breakdown</CardTitle>
+            <CardTitle className="text-base dash-text">Platform Breakdown</CardTitle>
           </CardHeader>
           <CardContent>
             {insightsQuery.isLoading ? (
@@ -551,9 +551,9 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="dash-card border dash-border">
           <CardHeader>
-            <CardTitle className="text-base">Top Brands (Top 10)</CardTitle>
+            <CardTitle className="text-base dash-text">Top Brands (Top 10)</CardTitle>
           </CardHeader>
           <CardContent>
             {insightsQuery.isLoading ? (
@@ -601,9 +601,9 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="dash-card border dash-border">
           <CardHeader>
-            <CardTitle className="text-base">Deal Pipeline</CardTitle>
+            <CardTitle className="text-base dash-text">Deal Pipeline</CardTitle>
           </CardHeader>
           <CardContent>
             {insightsQuery.isLoading ? (
@@ -636,7 +636,7 @@ export default function AnalyticsPage() {
                     </Funnel>
                   </FunnelChart>
                 </ResponsiveContainer>
-                <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600 sm:grid-cols-4">
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs dash-text-muted sm:grid-cols-4">
                   {pipelineData.map((item, index) => (
                     <div key={item.stage} className="rounded border p-2">
                       <span

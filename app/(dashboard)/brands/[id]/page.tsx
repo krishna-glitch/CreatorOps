@@ -49,6 +49,8 @@ export default function BrandDetailPage() {
       await Promise.all([
         trpcUtils.brands.getById.invalidate({ id: updatedBrand.id }),
         trpcUtils.brands.list.invalidate(),
+        trpcUtils.deals.list.invalidate(),
+        trpcUtils.analytics.getDashboardStats.invalidate(),
       ]);
       toast.success("Brand updated.", { duration: 3000 });
     },
@@ -96,7 +98,7 @@ export default function BrandDetailPage() {
 
   return (
     <div className="mx-auto w-full max-w-4xl px-3 py-4 sm:px-6 sm:py-6">
-      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-950 sm:p-8">
+      <div className="rounded-2xl border dash-border dash-bg-card p-6 shadow-sm dash-border dash-bg-panel sm:p-8">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
@@ -166,7 +168,7 @@ export default function BrandDetailPage() {
         </div>
 
         {brand ? (
-          <section className="mt-6 rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+          <section className="mt-6 rounded-xl border dash-border p-4 dash-border">
             <h2 className="text-sm font-medium">Brand Details</h2>
             <dl className="mt-4 space-y-3">
               <div className="flex items-center justify-between gap-3">
@@ -176,20 +178,20 @@ export default function BrandDetailPage() {
               <div className="flex items-center justify-between gap-3">
                 <dt className="text-sm text-muted-foreground">Created</dt>
                 <dd className="text-sm font-medium">
-                  {formatDealDate(brand.createdAt, undefined, true)}
+                  {formatDealDate(brand.createdAt, { includeTime: true })}
                 </dd>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <dt className="text-sm text-muted-foreground">Updated</dt>
                 <dd className="text-sm font-medium">
-                  {formatDealDate(brand.updatedAt, undefined, true)}
+                  {formatDealDate(brand.updatedAt, { includeTime: true })}
                 </dd>
               </div>
             </dl>
           </section>
         ) : null}
 
-        <section className="mt-6 rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+        <section className="mt-6 rounded-xl border dash-border p-4 dash-border">
           <h2 className="text-sm font-medium">Associated Deals</h2>
 
           {dealsQuery.isLoading ? (
@@ -208,7 +210,7 @@ export default function BrandDetailPage() {
                 <li key={deal.id}>
                   <Link
                     href={`/deals/${deal.id}`}
-                    className="block rounded-lg border border-gray-200 px-3 py-3 transition-colors hover:border-gray-300 hover:bg-gray-50/70 dark:border-gray-800 dark:hover:border-gray-700 dark:hover:bg-gray-900"
+                    className="block rounded-lg border dash-border px-3 py-3 transition-colors dash-border dash-bg-card dash-border dark:hover:border-gray-700 dark:hover:bg-gray-900"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="text-sm font-medium">{deal.title}</p>

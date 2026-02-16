@@ -157,6 +157,10 @@ export const analyticsRouter = createTRPCRouter({
       0,
       0,
     );
+    const nowIso = now.toISOString();
+    const next7DaysIso = next7Days.toISOString();
+    const monthStartIso = monthStart.toISOString();
+    const nextMonthStartIso = nextMonthStart.toISOString();
     const emptyRevenueTrend = Array.from({ length: 6 }).map((_, index) => {
       const offset = 5 - index;
       const monthDate = new Date(
@@ -189,8 +193,8 @@ export const analyticsRouter = createTRPCRouter({
                 sum(
                   case
                     when ${payments.status} = 'PAID'
-                      and ${payments.paidAt} >= ${monthStart}
-                      and ${payments.paidAt} < ${nextMonthStart}
+                      and ${payments.paidAt} >= ${monthStartIso}
+                      and ${payments.paidAt} < ${nextMonthStartIso}
                     then ${payments.amount}
                     else 0
                   end
@@ -217,7 +221,7 @@ export const analyticsRouter = createTRPCRouter({
                   case
                     when ${payments.paidAt} is null
                       and ${payments.expectedDate} is not null
-                      and ${payments.expectedDate} < ${now}
+                      and ${payments.expectedDate} < ${nowIso}
                     then 1
                     else 0
                   end
@@ -237,8 +241,8 @@ export const analyticsRouter = createTRPCRouter({
                 sum(
                   case
                     when ${deliverables.scheduledAt} is not null
-                      and ${deliverables.scheduledAt} >= ${now}
-                      and ${deliverables.scheduledAt} < ${next7Days}
+                      and ${deliverables.scheduledAt} >= ${nowIso}
+                      and ${deliverables.scheduledAt} < ${next7DaysIso}
                       and ${deliverables.status} not in ('POSTED', 'CANCELLED')
                     then 1
                     else 0
@@ -252,7 +256,7 @@ export const analyticsRouter = createTRPCRouter({
                 sum(
                   case
                     when ${deliverables.scheduledAt} is not null
-                      and ${deliverables.scheduledAt} < ${now}
+                      and ${deliverables.scheduledAt} < ${nowIso}
                       and ${deliverables.postedAt} is null
                       and ${deliverables.status} <> 'CANCELLED'
                     then 1
@@ -475,9 +479,9 @@ export const analyticsRouter = createTRPCRouter({
       totalFeedbackItems,
       topFeedbackType: topFeedbackType
         ? {
-          feedbackType: topFeedbackType.feedbackType,
-          count: topFeedbackType.count,
-        }
+            feedbackType: topFeedbackType.feedbackType,
+            count: topFeedbackType.count,
+          }
         : null,
       feedbackTypeCounts,
       brandFeedbackStats,
@@ -504,20 +508,18 @@ export const analyticsRouter = createTRPCRouter({
           0,
           0,
         );
-
-        const platformByDeal = ctx.db
-          .select({
-            dealId: deliverables.dealId,
-            platform: sql<string>`min(${deliverables.platform})`,
-          })
-          .from(deliverables)
-          .groupBy(deliverables.dealId)
-          .as("platform_by_deal");
+        const startIso = start.toISOString();
+        const endIso = end.toISOString();
+        const currentQuarterStartIso = currentQuarterStart.toISOString();
+        const nextQuarterStartIso = nextQuarterStart.toISOString();
+        const previousQuarterStartIso = previousQuarterStart.toISOString();
 
         const categoryByDeal = ctx.db
           .select({
             dealId: exclusivityRules.dealId,
-            category: sql<string>`min(${exclusivityRules.categoryPath})`,
+            category: sql<string>`min(${exclusivityRules.categoryPath})`.as(
+              "category",
+            ),
           })
           .from(exclusivityRules)
           .groupBy(exclusivityRules.dealId)
@@ -526,7 +528,7 @@ export const analyticsRouter = createTRPCRouter({
         const revisionCountByDeliverable = ctx.db
           .select({
             deliverableId: reworkCycles.deliverableId,
-            revisionCount: sql<number>`count(*)::int`,
+            revisionCount: sql<number>`count(*)::int`.as("revision_count"),
           })
           .from(reworkCycles)
           .groupBy(reworkCycles.deliverableId)
@@ -566,12 +568,21 @@ export const analyticsRouter = createTRPCRouter({
 
           ctx.db
             .select({
-              platform: sql<string>`coalesce(${platformByDeal.platform}, 'UNSPECIFIED')`,
+              platform: sql<string>`coalesce(platform_by_deal.platform, 'UNSPECIFIED')`,
               revenue: sql<string>`coalesce(sum(${payments.amount}), 0)`,
             })
             .from(payments)
             .innerJoin(deals, eq(payments.dealId, deals.id))
-            .leftJoin(platformByDeal, eq(platformByDeal.dealId, deals.id))
+            .leftJoin(
+              sql`(
+                select
+                  ${deliverables.dealId} as deal_id,
+                  coalesce(min(${deliverables.platform}), 'UNSPECIFIED') as platform
+                from ${deliverables}
+                group by ${deliverables.dealId}
+              ) as platform_by_deal`,
+              sql`platform_by_deal.deal_id = ${payments.dealId}`,
+            )
             .where(
               and(
                 eq(deals.userId, userId),
@@ -580,7 +591,7 @@ export const analyticsRouter = createTRPCRouter({
                 lt(payments.paidAt, end),
               ),
             )
-            .groupBy(sql`coalesce(${platformByDeal.platform}, 'UNSPECIFIED')`)
+            .groupBy(sql`coalesce(platform_by_deal.platform, 'UNSPECIFIED')`)
             .orderBy(desc(sql`sum(${payments.amount})`)),
 
           ctx.db
@@ -688,7 +699,7 @@ export const analyticsRouter = createTRPCRouter({
               brandName: brands.name,
               stalledDays: sql<number>`
               floor(
-                extract(epoch from (${end} - max(${deals.createdAt}))) / 86400
+                extract(epoch from (${endIso}::timestamp - max(${deals.createdAt}))) / 86400
               )::int
             `,
               openDeals: sql<number>`count(*)::int`,
@@ -729,8 +740,8 @@ export const analyticsRouter = createTRPCRouter({
               coalesce(
                 avg(
                   case
-                    when ${deals.createdAt} >= ${currentQuarterStart}
-                      and ${deals.createdAt} < ${nextQuarterStart}
+                    when ${deals.createdAt} >= ${currentQuarterStartIso}
+                      and ${deals.createdAt} < ${nextQuarterStartIso}
                     then ${deals.totalValue}
                     else null
                   end
@@ -742,8 +753,8 @@ export const analyticsRouter = createTRPCRouter({
               coalesce(
                 avg(
                   case
-                    when ${deals.createdAt} >= ${previousQuarterStart}
-                      and ${deals.createdAt} < ${currentQuarterStart}
+                    when ${deals.createdAt} >= ${previousQuarterStartIso}
+                      and ${deals.createdAt} < ${currentQuarterStartIso}
                     then ${deals.totalValue}
                     else null
                   end
@@ -755,8 +766,8 @@ export const analyticsRouter = createTRPCRouter({
               coalesce(
                 sum(
                   case
-                    when ${deals.createdAt} >= ${currentQuarterStart}
-                      and ${deals.createdAt} < ${nextQuarterStart}
+                    when ${deals.createdAt} >= ${currentQuarterStartIso}
+                      and ${deals.createdAt} < ${nextQuarterStartIso}
                     then 1
                     else 0
                   end
@@ -768,8 +779,8 @@ export const analyticsRouter = createTRPCRouter({
               coalesce(
                 sum(
                   case
-                    when ${deals.createdAt} >= ${previousQuarterStart}
-                      and ${deals.createdAt} < ${currentQuarterStart}
+                    when ${deals.createdAt} >= ${previousQuarterStartIso}
+                      and ${deals.createdAt} < ${currentQuarterStartIso}
                     then 1
                     else 0
                   end
@@ -906,8 +917,8 @@ export const analyticsRouter = createTRPCRouter({
             .where(
               and(
                 eq(deals.userId, userId),
-                sql`coalesce(${deliverables.postedAt}, ${deliverables.scheduledAt}, ${deliverables.createdAt}) >= ${start}`,
-                sql`coalesce(${deliverables.postedAt}, ${deliverables.scheduledAt}, ${deliverables.createdAt}) < ${end}`,
+                sql`coalesce(${deliverables.postedAt}, ${deliverables.scheduledAt}, ${deliverables.createdAt}) >= ${startIso}`,
+                sql`coalesce(${deliverables.postedAt}, ${deliverables.scheduledAt}, ${deliverables.createdAt}) < ${endIso}`,
               ),
             ),
 
@@ -978,6 +989,10 @@ export const analyticsRouter = createTRPCRouter({
           category: row.category,
           revenue: Number(row.revenue),
         }));
+        const revenueByPlatform = revenueByPlatformRaw.map((row) => ({
+          platform: row.platform,
+          revenue: Number(row.revenue),
+        }));
         const paymentDelaysByBrand = paymentDelaysByBrandRaw.map((row) => ({
           brandId: row.brandId,
           brandName: row.brandName,
@@ -1018,7 +1033,7 @@ export const analyticsRouter = createTRPCRouter({
         const onTimeDeliveryRate =
           (deliveryMetrics?.totalTrackedDeliveries ?? 0) > 0
             ? (deliveryMetrics?.onTimeDeliveries ?? 0) /
-            (deliveryMetrics?.totalTrackedDeliveries ?? 1)
+              (deliveryMetrics?.totalTrackedDeliveries ?? 1)
             : 0;
         const recommendations = generateRecommendations({
           insights,
@@ -1037,10 +1052,7 @@ export const analyticsRouter = createTRPCRouter({
             lostStatuses: LOST_STATUSES,
           },
           revenueByMonth,
-          revenueByPlatform: revenueByPlatformRaw.map((row) => ({
-            platform: row.platform,
-            revenue: Number(row.revenue),
-          })),
+          revenueByPlatform,
           revenueByCategory,
           revenueByBrand: revenueByBrandRaw.map((row) => ({
             brandId: row.brandId,
@@ -1114,4 +1126,3 @@ export const analyticsRouter = createTRPCRouter({
       }
     }),
 });
-

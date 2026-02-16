@@ -14,8 +14,10 @@ import { deliverablesRouter } from "./routers/deliverables";
 import { feedbackRouter } from "./routers/feedback";
 import { jobsRouter } from "./routers/jobs";
 import { mediaAssetsRouter } from "./routers/mediaAssets";
+import { notificationsRouter } from "./routers/notifications";
 import { paymentsRouter } from "./routers/payments";
 import { remindersRouter } from "./routers/reminders";
+import { calendarRouter } from "./routers/calendar";
 import { createTRPCRouter } from "./trpc";
 
 export const appRouter = createTRPCRouter({
@@ -23,12 +25,14 @@ export const appRouter = createTRPCRouter({
   analytics: analyticsRouter,
   brand: brandsRouter,
   brands: brandsRouter,
+  calendar: calendarRouter,
   conflicts: conflictsRouter,
   deals: dealsRouter,
   deliverables: deliverablesRouter,
   feedback: feedbackRouter,
   jobs: jobsRouter,
   mediaAssets: mediaAssetsRouter,
+  notifications: notificationsRouter,
   payments: paymentsRouter,
   reminders: remindersRouter,
 });

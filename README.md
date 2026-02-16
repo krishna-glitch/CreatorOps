@@ -1,58 +1,131 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CreatorOps
 
-## Getting Started
+CreatorOps is a Next.js app for managing brand deals, deliverables, payments, reminders, and creator-side operations from one dashboard.
 
-First, run the development server:
+## Stack
+
+- Next.js App Router
+- TypeScript
+- tRPC
+- Drizzle ORM
+- Supabase (Auth + Postgres)
+- Upstash Redis / BullMQ (optional queue-based reminder worker)
+- Resend (email reminders)
+- Web Push notifications (VAPID)
+
+## Local setup
+
+1. Install dependencies:
+
+```bash
+npm ci
+```
+
+2. Copy environment template and fill in values:
+
+```bash
+cp .env.example .env.local
+```
+
+3. Run the app:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+4. Open `http://localhost:3000`.
 
-## Reminder Jobs + Email Requirements
+## Environment variables
 
-Set these environment variables before running reminder jobs:
+Use `.env.example` as the source of truth. Main groups:
 
-- `UPSTASH_REDIS_URL` (or `REDIS_URL`) for BullMQ
-- `RESEND_API_KEY` for email delivery
-- `RESEND_FROM_EMAIL` (verified sender domain in Resend)
-- `SUPABASE_SERVICE_ROLE_KEY` and `NEXT_PUBLIC_SUPABASE_URL` (resolve user emails in background jobs)
-- Optional test override: `REMINDER_TEST_RECIPIENT_EMAIL`
+- Supabase:
+`NEXT_PUBLIC_SUPABASE_URL`
+`NEXT_PUBLIC_SUPABASE_ANON_KEY`
+`SUPABASE_SERVICE_ROLE_KEY`
+- Database:
+`DATABASE_URL` for app runtime (pooler/transaction mode)
+`DIRECT_URL` for migrations (direct/session mode)
+- AI:
+`GROQ_API_KEY`
+- Reminders and notifications:
+`UPSTASH_REDIS_URL` or `REDIS_URL`
+`RESEND_API_KEY`
+`RESEND_FROM_EMAIL`
+`VAPID_PUBLIC_KEY`
+`VAPID_PRIVATE_KEY`
+`NEXT_PUBLIC_VAPID_PUBLIC_KEY`
+`VAPID_SUBJECT`
+- App URL:
+`NEXT_PUBLIC_APP_URL`
+- Cron protection:
+`CRON_SECRET`
 
-Run reminder worker (hourly cron + queue worker):
+## Common commands
 
-```bash
-npm run jobs:reminders:worker
-```
+- `npm run dev` - start local dev server
+- `npm run type-check` - TypeScript checks
+- `npm run build` - production build
+- `npm run lint` - Biome checks
+- `npm run db:migrate` - run Drizzle SQL migrations using `DIRECT_URL`
+- `npm run jobs:reminders:run` - run reminder job once (manual test)
+- `npm run jobs:reminders:worker` - start BullMQ queue worker + scheduler
 
-Run reminder scan manually (MVP testing):
+## Migrations
 
-```bash
-npm run jobs:reminders:run
-```
+This repo commits SQL migrations under `drizzle/`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Generate migration SQL: `npm run db:generate`
+- Apply migrations: `npm run db:migrate`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Do not auto-run schema migrations during Vercel build. Run them from CI or manually before promoting production.
 
-## Learn More
+## Reminders: two runtime modes
 
-To learn more about Next.js, take a look at the following resources:
+1. Vercel Cron mode (current deployment default)
+- `vercel.json` schedules `/api/cron/reminders` hourly.
+- Route validates `Authorization: Bearer <CRON_SECRET>`.
+- The route executes `runCheckRemindersJob()` directly.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+2. Queue worker mode (long-running worker)
+- Uses BullMQ with Redis.
+- Start with `npm run jobs:reminders:worker`.
+- Recommended only when running on infrastructure that supports persistent workers.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deployment
 
-## Deploy on Vercel
+### Vercel project config
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Set all required env vars in Vercel (Preview + Production as needed), including:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `CRON_SECRET` (must match cron route auth check)
+- Supabase keys
+- DB connection strings
+- Provider keys (Groq, Resend, VAPID, Redis if used)
+
+### GitHub Actions
+
+Workflow file: `.github/workflows/vercel-deploy.yml`
+
+- PR to `main` -> preview deployment
+- Push to `main` -> production deployment
+- Manual trigger supported
+
+Required repository secrets:
+
+- `VERCEL_TOKEN`
+- `VERCEL_ORG_ID`
+- `VERCEL_PROJECT_ID`
+
+## Operational checks after deploy
+
+1. Validate auth flows (login/signup/forgot-password).
+2. Validate one deal create/update flow and one payment flow.
+3. Trigger reminder run and confirm email/push behavior in logs.
+4. Confirm cron execution in Vercel Cron logs.
+5. Confirm no production endpoint is using development-only behavior.
+
+## Notes
+
+- `.env*` files are ignored by git, except `.env.example`.
+- Keep `drizzle/` migrations committed to avoid schema drift across environments.

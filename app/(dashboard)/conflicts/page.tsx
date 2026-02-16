@@ -10,6 +10,20 @@ import { trpc } from "@/lib/trpc/client";
 
 type ConflictFilter = "ACTIVE" | "RESOLVED";
 
+function getConflictsLoadErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    if (error.message.includes("UNAUTHORIZED")) {
+      return "Your session expired. Please sign in again.";
+    }
+
+    if (error.message.includes("Database error")) {
+      return "Database error while loading conflicts.";
+    }
+  }
+
+  return "Failed to load conflicts.";
+}
+
 function getSeverityClassName(severity: "WARN" | "BLOCK") {
   if (severity === "BLOCK") {
     return "border-transparent bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300";
@@ -53,7 +67,7 @@ export default function ConflictsPage() {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-3 py-4 sm:px-6 sm:py-6">
-      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-950 sm:p-8">
+      <div className="rounded-2xl border dash-border dash-bg-card p-6 shadow-sm dash-border dash-bg-panel sm:p-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
@@ -69,18 +83,18 @@ export default function ConflictsPage() {
           <Badge variant="outline">{items.length} shown</Badge>
         </div>
 
-        <div className="mt-6 inline-flex rounded-lg border border-gray-200 p-1 dark:border-gray-800">
+        <div className="mt-6 inline-flex rounded-lg border dash-border p-1 dash-border">
           <button
             type="button"
             onClick={() => setFilter("ACTIVE")}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium ${filter === "ACTIVE" ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900" : "text-muted-foreground"}`}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium ${filter === "ACTIVE" ? "bg-gray-900 text-white dash-bg-card dark:text-gray-900" : "text-muted-foreground"}`}
           >
             Active
           </button>
           <button
             type="button"
             onClick={() => setFilter("RESOLVED")}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium ${filter === "RESOLVED" ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900" : "text-muted-foreground"}`}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium ${filter === "RESOLVED" ? "bg-gray-900 text-white dash-bg-card dark:text-gray-900" : "text-muted-foreground"}`}
           >
             Resolved
           </button>
@@ -89,7 +103,9 @@ export default function ConflictsPage() {
         {conflictsQuery.isLoading ? (
           <p className="mt-6 text-sm text-muted-foreground">Loading conflicts...</p>
         ) : conflictsQuery.error ? (
-          <p className="mt-6 text-sm text-red-600">Could not load conflicts.</p>
+          <p className="mt-6 text-sm text-red-600">
+            {getConflictsLoadErrorMessage(conflictsQuery.error)}
+          </p>
         ) : items.length === 0 ? (
           <p className="mt-6 text-sm text-muted-foreground">
             No {filter.toLowerCase()} conflicts found.
@@ -102,9 +118,19 @@ export default function ConflictsPage() {
               return (
                 <article
                   key={conflict.id}
-                  className="cursor-pointer rounded-xl border border-gray-200 p-4 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-900/40"
+                  className="cursor-pointer rounded-xl border dash-border p-4 transition-colors dash-bg-card dash-border dark:hover:bg-gray-900/40"
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open conflict ${conflict.id}`}
                   onClick={() => {
                     if (targetDealId) {
+                      router.push(`/deals/${targetDealId}`);
+                    }
+                  }}
+                  onKeyDown={(event) => {
+                    if (!targetDealId) return;
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
                       router.push(`/deals/${targetDealId}`);
                     }
                   }}
@@ -161,7 +187,7 @@ export default function ConflictsPage() {
                     </div>
                   </div>
 
-                  <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-900/30">
+                  <div className="mt-4 rounded-lg border dash-border dash-bg-card p-3 dash-border dark:bg-gray-900/30">
                     <div className="flex items-center gap-2">
                       <AlertTriangle className="h-4 w-4 text-amber-600" />
                       <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">

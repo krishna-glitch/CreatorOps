@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -38,6 +39,8 @@ import {
 } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
+import { VoiceCommandButton } from "@/src/components/voice/VoiceCommandButton";
+import type { ParsedCommand } from "@/src/lib/voice/commandParser";
 
 const exclusivityRuleFormSchema = z
   .object({
@@ -80,7 +83,7 @@ const createDealFormSchema = z.object({
   currency: z.enum(["USD", "INR"], {
     message: "Please select a currency",
   }),
-  status: z.enum(["INBOUND", "NEGOTIATING", "AGREED", "PAID"], {
+  status: z.enum(["INBOUND", "NEGOTIATING", "AGREED", "PAID", "CANCELLED"], {
     message: "Please select a status",
   }),
   exclusivity_rules: z.array(exclusivityRuleFormSchema).default([]),
@@ -89,28 +92,109 @@ const createDealFormSchema = z.object({
 type CreateDealFormValues = z.input<typeof createDealFormSchema>;
 
 function getCreateDealErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    if (error.message.includes("Brand not found")) {
-      return "Selected brand was not found. Please refresh and try again.";
-    }
+  const trpcLikeError =
+    typeof error === "object" && error !== null ? error : null;
+  const trpcMessage =
+    trpcLikeError &&
+    "message" in trpcLikeError &&
+    typeof trpcLikeError.message === "string"
+      ? trpcLikeError.message
+      : null;
+  const zodError =
+    trpcLikeError &&
+    "data" in trpcLikeError &&
+    typeof trpcLikeError.data === "object" &&
+    trpcLikeError.data !== null &&
+    "zodError" in trpcLikeError.data &&
+    typeof trpcLikeError.data.zodError === "object" &&
+    trpcLikeError.data.zodError !== null
+      ? trpcLikeError.data.zodError
+      : null;
 
-    if (error.message.includes("UNAUTHORIZED")) {
-      return "Your session expired. Please sign in again.";
+  if (
+    zodError &&
+    "fieldErrors" in zodError &&
+    typeof zodError.fieldErrors === "object" &&
+    zodError.fieldErrors !== null
+  ) {
+    const firstFieldError = Object.values(
+      zodError.fieldErrors as Record<string, unknown>,
+    ).find((value) => Array.isArray(value) && typeof value[0] === "string") as
+      | string[]
+      | undefined;
+
+    if (firstFieldError?.[0]) {
+      return firstFieldError[0];
     }
+  }
+
+  if (trpcMessage?.includes("Brand not found")) {
+    return "Selected brand was not found. Please refresh and try again.";
+  }
+
+  if (trpcMessage?.includes("UNAUTHORIZED")) {
+    return "Your session expired. Please sign in again.";
+  }
+
+  if (
+    trpcMessage?.includes("Failed query:") ||
+    trpcMessage?.includes("Could not create deal:")
+  ) {
+    return "Could not create deal right now. Please try again in a moment.";
+  }
+
+  if (trpcMessage && trpcMessage.trim().length > 0) {
+    return trpcMessage;
   }
 
   return "Could not create the deal. Please check your inputs and try again.";
 }
 
+function getCreateBrandErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.includes("UNAUTHORIZED")) {
+    return "Your session expired. Please sign in again.";
+  }
+
+  return "Could not create brand. Please try again.";
+}
+
 export default function NewDealPage() {
   const router = useRouter();
+  const trpcUtils = trpc.useUtils();
   const platformOptions = ["INSTAGRAM", "YOUTUBE", "TIKTOK"] as const;
+  const [brandPopoverOpen, setBrandPopoverOpen] = useState(false);
+  const [newBrandName, setNewBrandName] = useState("");
+  const [selectedBrandFallbackName, setSelectedBrandFallbackName] = useState<
+    string | null
+  >(null);
 
   const { data: brands, isLoading: isLoadingBrands } =
     trpc.brands.list.useQuery({ limit: 100 });
 
+  const createBrandMutation = trpc.brands.create.useMutation({
+    onSuccess: async (createdBrand) => {
+      setSelectedBrandFallbackName(createdBrand.name);
+      setNewBrandName("");
+      setBrandPopoverOpen(false);
+      form.setValue("brand_id", createdBrand.id, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+
+      await trpcUtils.brands.list.invalidate();
+      toast.success("Brand created and selected.", { duration: 3000 });
+    },
+    onError: (error) => {
+      toast.error(getCreateBrandErrorMessage(error), { duration: 3000 });
+    },
+  });
+
   const createDealMutation = trpc.deals.create.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
+      await Promise.all([
+        trpcUtils.deals.list.invalidate(),
+        trpcUtils.analytics.getDashboardStats.invalidate(),
+      ]);
       toast.success("Deal created successfully.", { duration: 3000 });
       router.push("/deals");
     },
@@ -172,11 +256,82 @@ export default function NewDealPage() {
   const isSubmitting = createDealMutation.isPending;
   const brandItems = brands?.items ?? [];
   const hasBrands = brandItems.length > 0;
+  const canCreateBrand =
+    newBrandName.trim().length > 0 && !createBrandMutation.isPending;
+  const brandNames = brandItems.map((brand) => brand.name);
+
+  const executeVoiceCommand = async (command: ParsedCommand) => {
+    if (command.intent === "CREATE_DEAL") {
+      if (command.entities.brand) {
+        const matchedBrand =
+          brandItems.find(
+            (brand) =>
+              brand.name.toLowerCase() ===
+              command.entities.brand?.toLowerCase(),
+          ) ?? null;
+
+        if (matchedBrand) {
+          form.setValue("brand_id", matchedBrand.id, {
+            shouldDirty: true,
+            shouldValidate: true,
+          });
+          setSelectedBrandFallbackName(matchedBrand.name);
+        } else {
+          await createBrandMutation.mutateAsync({
+            name: command.entities.brand,
+          });
+        }
+      }
+
+      if (command.entities.amount && command.entities.amount > 0) {
+        form.setValue("total_value", command.entities.amount, {
+          shouldDirty: true,
+        });
+      }
+      if (command.entities.currency) {
+        form.setValue("currency", command.entities.currency, {
+          shouldDirty: true,
+        });
+      }
+      if (command.entities.brand) {
+        form.setValue("title", `${command.entities.brand} collab`, {
+          shouldDirty: true,
+        });
+      }
+
+      toast.success("Voice command applied to deal form.", {
+        duration: 2200,
+      });
+      return;
+    }
+
+    if (command.intent === "MARK_PAID") {
+      form.setValue("status", "PAID", {
+        shouldDirty: true,
+      });
+      toast.success("Deal status set to PAID.", { duration: 2200 });
+      return;
+    }
+
+    if (command.intent === "OPEN_NEW_DEAL_FORM") {
+      toast.info("You are already on the new deal form.", { duration: 2200 });
+      return;
+    }
+
+    toast.error("This voice command isn't supported on this page.", {
+      duration: 2800,
+    });
+  };
 
   return (
     <div className="mx-auto w-full max-w-4xl px-3 py-4 sm:px-6 sm:py-6">
-      <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-950">
-        <div className="border-b border-gray-200 px-5 py-5 sm:px-8 dark:border-gray-800">
+      <VoiceCommandButton
+        brandVocabulary={brandNames}
+        disabled={isSubmitting || createBrandMutation.isPending}
+        onExecuteCommand={executeVoiceCommand}
+      />
+      <div className="rounded-2xl border dash-border dash-bg-card shadow-sm dash-border dash-bg-panel">
+        <div className="border-b dash-border px-5 py-5 sm:px-8 dash-border">
           <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
             Deal Management
           </p>
@@ -186,6 +341,9 @@ export default function NewDealPage() {
           <p className="mt-1 text-sm text-muted-foreground">
             Add core details to create and track a brand deal.
           </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Tip: Tap the floating mic button to use voice commands.
+          </p>
         </div>
 
         <Form {...form}>
@@ -194,7 +352,7 @@ export default function NewDealPage() {
             className="space-y-7 px-5 py-6 sm:px-8 sm:py-8"
           >
             <div className="grid grid-cols-1 gap-5">
-              <div className="rounded-xl border border-gray-200 p-4 sm:p-5 dark:border-gray-800">
+              <div className="rounded-xl border dash-border p-4 sm:p-5 dash-border">
                 <p className="text-sm font-medium">Basics</p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Start with brand and a short deal title.
@@ -209,21 +367,24 @@ export default function NewDealPage() {
                         <FormLabel className="text-sm font-medium">
                           Brand
                         </FormLabel>
-                        <Popover>
+                        <Popover
+                          open={brandPopoverOpen}
+                          onOpenChange={setBrandPopoverOpen}
+                        >
                           <PopoverTrigger asChild>
                             <FormControl>
                               <Button
                                 variant="outline"
                                 role="combobox"
                                 className={cn(
-                                  "w-full justify-between pl-3 text-left font-normal hover:bg-white focus:ring-emerald-500/30",
+                                  "w-full justify-between pl-3 text-left font-normal dash-bg-card focus:ring-emerald-500/30",
                                   !field.value && "text-muted-foreground",
                                 )}
                               >
                                 {field.value
-                                  ? brandItems.find(
+                                  ? (brandItems.find(
                                       (brand) => brand.id === field.value,
-                                    )?.name
+                                    )?.name ?? selectedBrandFallbackName)
                                   : "Select brand"}
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                               </Button>
@@ -236,13 +397,17 @@ export default function NewDealPage() {
                             <Command>
                               <CommandInput placeholder="Search brand..." />
                               <CommandList>
-                                <CommandEmpty>No brand found.</CommandEmpty>
+                                <CommandEmpty>
+                                  No brand found. Create one below.
+                                </CommandEmpty>
                                 <CommandGroup>
                                   {brandItems.map((brand) => (
                                     <CommandItem
                                       value={brand.name}
                                       key={brand.id}
                                       onSelect={() => {
+                                        setSelectedBrandFallbackName(null);
+                                        setBrandPopoverOpen(false);
                                         form.setValue("brand_id", brand.id, {
                                           shouldValidate: true,
                                         });
@@ -262,8 +427,42 @@ export default function NewDealPage() {
                                 </CommandGroup>
                               </CommandList>
                             </Command>
+                            <div className="border-t p-3">
+                              <p className="mb-2 text-xs text-muted-foreground">
+                                Brand missing? Add it now.
+                              </p>
+                              <div className="flex gap-2">
+                                <Input
+                                  value={newBrandName}
+                                  onChange={(event) =>
+                                    setNewBrandName(event.target.value)
+                                  }
+                                  placeholder="New brand name"
+                                  className="h-9"
+                                />
+                                <Button
+                                  type="button"
+                                  onClick={() =>
+                                    createBrandMutation.mutate({
+                                      name: newBrandName.trim(),
+                                    })
+                                  }
+                                  disabled={!canCreateBrand}
+                                  className="h-9"
+                                >
+                                  {createBrandMutation.isPending
+                                    ? "Adding..."
+                                    : "Add"}
+                                </Button>
+                              </div>
+                            </div>
                           </PopoverContent>
                         </Popover>
+                        {!hasBrands && !isLoadingBrands && (
+                          <p className="text-xs text-muted-foreground">
+                            No brands yet. Add one from the dropdown.
+                          </p>
+                        )}
                         <FormMessage />
                       </FormItem>
                     )}
@@ -291,7 +490,7 @@ export default function NewDealPage() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-gray-200 p-4 sm:p-5 dark:border-gray-800">
+              <div className="rounded-xl border dash-border p-4 sm:p-5 dash-border">
                 <p className="text-sm font-medium">Commercial Terms</p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Enter value, currency, and current status.
@@ -387,6 +586,7 @@ export default function NewDealPage() {
                           </SelectItem>
                           <SelectItem value="AGREED">AGREED</SelectItem>
                           <SelectItem value="PAID">PAID</SelectItem>
+                          <SelectItem value="CANCELLED">CANCELLED</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -395,7 +595,7 @@ export default function NewDealPage() {
                 />
               </div>
 
-              <div className="rounded-xl border border-gray-200 p-4 sm:p-5 dark:border-gray-800">
+              <div className="rounded-xl border dash-border p-4 sm:p-5 dash-border">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <p className="text-sm font-medium">Exclusivity Rules</p>
@@ -426,7 +626,7 @@ export default function NewDealPage() {
                       return (
                         <div
                           key={field.id}
-                          className="rounded-lg border border-gray-200 p-4 dark:border-gray-800"
+                          className="rounded-lg border dash-border p-4 dash-border"
                         >
                           <div className="mb-3 flex items-center justify-between gap-2">
                             <p className="text-sm font-medium">
@@ -578,7 +778,7 @@ export default function NewDealPage() {
               </div>
             </div>
 
-            <div className="flex flex-col-reverse gap-3 border-t border-gray-200 pt-5 sm:flex-row sm:items-center sm:justify-end dark:border-gray-800">
+            <div className="flex flex-col-reverse gap-3 border-t dash-border pt-5 sm:flex-row sm:items-center sm:justify-end dash-border">
               <Button
                 type="button"
                 variant="outline"
@@ -589,7 +789,7 @@ export default function NewDealPage() {
               </Button>
               <Button
                 type="submit"
-                disabled={isSubmitting || !hasBrands}
+                disabled={isSubmitting}
                 className="w-full sm:w-auto sm:min-w-40"
               >
                 {isSubmitting ? "Creating deal..." : "Create deal"}

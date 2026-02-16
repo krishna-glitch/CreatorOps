@@ -1,29 +1,17 @@
-/**
- * tRPC Server Initialization
- *
- * This file contains:
- * 1. Context creation (access to database, session, etc.)
- * 2. tRPC initialization with SuperJSON transformer
- * 3. Reusable procedures (public, protected, etc.)
- * 4. Error formatting with Zod support
- */
-
 import { initTRPC, TRPCError } from "@trpc/server";
 import type { FetchCreateContextFnOptions } from "@trpc/server/adapters/fetch";
 import superjson from "superjson";
 import { ZodError } from "zod";
 import { db } from "@/db";
 import { createClient } from "@/lib/supabase/server";
+import { idempotencyKeys } from "@/server/infrastructure/database/schema/idempotencyKeys";
+import { and, eq } from "drizzle-orm";
+import crypto from "node:crypto";
 
 /**
  * 1. CONTEXT
- *
- * This section defines the "context" that is available in your API.
- * This allows you to access things like the database, session, etc.
- * when processing a request.
  */
 export const createTRPCContext = async (opts: FetchCreateContextFnOptions) => {
-  // Get the session from the request
   const supabase = await createClient();
   const {
     data: { user },
@@ -38,8 +26,6 @@ export const createTRPCContext = async (opts: FetchCreateContextFnOptions) => {
 
 /**
  * 2. INITIALIZATION
- *
- * This is where the tRPC API is initialized, connecting the context and transformer.
  */
 const t = initTRPC.context<typeof createTRPCContext>().create({
   transformer: superjson,
@@ -56,22 +42,10 @@ const t = initTRPC.context<typeof createTRPCContext>().create({
 });
 
 /**
- * 3. ROUTER & PROCEDURE HELPERS
- *
- * These are helper functions you can use throughout your API.
- */
-
-/**
- * Create a server-side router
- */
-export const createTRPCRouter = t.router;
-
-/**
  * Middleware for timing API requests
  */
 const timingMiddleware = t.middleware(async ({ next, path }) => {
   const start = Date.now();
-
   const result = await next();
 
   if (t._config.isDev) {
@@ -83,20 +57,112 @@ const timingMiddleware = t.middleware(async ({ next, path }) => {
 });
 
 /**
- * Public (unauthenticated) procedure
- *
- * This is the base piece you use to build new queries and mutations on your tRPC API.
- * It does not guarantee that a user querying is authorized, but you can still access
- * user session data if they are logged in.
+ * Middleware for idempotency
  */
-export const publicProcedure = t.procedure.use(timingMiddleware);
+const idempotencyMiddleware = t.middleware(async ({ ctx, next, path, type, input }) => {
+  const key = ctx.headers.get("x-idempotency-key");
+
+  // Only apply to mutations that provide a key
+  if (type !== "mutation" || !key || !ctx.user) {
+    return next();
+  }
+
+  const userId = ctx.user.id;
+  const requestHash = crypto
+    .createHash("sha256")
+    .update(JSON.stringify(input))
+    .digest("hex");
+
+  // 1. Check if key exists
+  const existing = await ctx.db.query.idempotencyKeys.findFirst({
+    where: and(
+      eq(idempotencyKeys.userId, userId),
+      eq(idempotencyKeys.endpoint, path),
+      eq(idempotencyKeys.key, key)
+    ),
+  });
+
+  if (existing) {
+    if (existing.state === "COMPLETED" && existing.responseBody) {
+      // tRPC middleware must return a result from next() or throw
+      // To return a cached result, we'd ideally throw a custom error or 
+      // handle it at the procedure level. For now, we'll throw a specific error
+      // that the client can handle, or just let it through if it's already done
+      // but that risks double-execution if not careful.
+      // High-quality way: throw a TRPCError with metadata
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: "IDEMPOTENT_REPLAY",
+      });
+    }
+    
+    if (existing.state === "IN_PROGRESS") {
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: "Request is already being processed",
+      });
+    }
+  }
+
+  // 2. Register key as IN_PROGRESS
+  await ctx.db.insert(idempotencyKeys).values({
+    userId,
+    endpoint: path,
+    key,
+    requestHash,
+    state: "IN_PROGRESS",
+  });
+
+  try {
+    const result = await next();
+    
+    if (result.ok) {
+      // 3. Update to COMPLETED
+      await ctx.db
+        .update(idempotencyKeys)
+        .set({
+          state: "COMPLETED",
+          responseStatus: 200,
+          responseBody: JSON.stringify(result.data),
+        })
+        .where(and(
+          eq(idempotencyKeys.userId, userId),
+          eq(idempotencyKeys.endpoint, path),
+          eq(idempotencyKeys.key, key)
+        ));
+    } else {
+      // If result is not ok, cleanup
+      await ctx.db
+        .delete(idempotencyKeys)
+        .where(and(
+          eq(idempotencyKeys.userId, userId),
+          eq(idempotencyKeys.endpoint, path),
+          eq(idempotencyKeys.key, key)
+        ));
+    }
+
+    return result;
+  } catch (error) {
+    // 4. Cleanup on failure so user can try again
+    await ctx.db
+      .delete(idempotencyKeys)
+      .where(and(
+        eq(idempotencyKeys.userId, userId),
+        eq(idempotencyKeys.endpoint, path),
+        eq(idempotencyKeys.key, key)
+      ));
+    throw error;
+  }
+});
 
 /**
- * Protected (authenticated) procedure
- *
- * If you want a query or mutation to ONLY be accessible to logged in users, use this.
- * It verifies the session is valid and guarantees `ctx.user` is not null.
+ * 3. ROUTER & PROCEDURE HELPERS
  */
+
+export const createTRPCRouter = t.router;
+
+export const publicProcedure = t.procedure.use(timingMiddleware);
+
 export const protectedProcedure = t.procedure
   .use(timingMiddleware)
   .use(async ({ ctx, next }) => {
@@ -110,4 +176,5 @@ export const protectedProcedure = t.procedure
         user: ctx.user,
       },
     });
-  });
+  })
+  .use(idempotencyMiddleware);

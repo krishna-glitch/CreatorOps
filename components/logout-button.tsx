@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
+import { cn } from "@/lib/utils";
 
-export function LogoutButton() {
+export function LogoutButton({ className }: { className?: string }) {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -28,13 +29,15 @@ export function LogoutButton() {
   return (
     <Button
       variant="ghost"
-      size="sm"
+      size={className?.includes('w-full') ? 'default' : 'icon'}
       onClick={handleLogout}
       loading={loading}
-      className="text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50"
+      className={cn("dash-shell-icon-btn", className)}
+      aria-label="Log out"
+      title="Log out"
     >
-      <LogOut className="mr-2 h-4 w-4" />
-      Log out
+      <LogOut className="h-4 w-4 mr-2" />
+      {className?.includes('w-full') ? 'Log out' : null}
     </Button>
   );
 }

@@ -1,0 +1,4 @@
+CREATE UNIQUE INDEX "rework_cycles_deliverable_id_cycle_number_unique_idx" ON "rework_cycles" USING btree ("deliverable_id","cycle_number");--> statement-breakpoint
+ALTER TABLE "feedback_items" ADD CONSTRAINT "feedback_items_severity_1_to_10_check" CHECK ("feedback_items"."severity" between 1 and 10);--> statement-breakpoint
+ALTER TABLE "feedback_items" ADD CONSTRAINT "feedback_items_time_spent_non_negative_check" CHECK ("feedback_items"."time_spent_minutes" is null or "feedback_items"."time_spent_minutes" >= 0);--> statement-breakpoint
+ALTER TABLE "rework_cycles" ADD CONSTRAINT "rework_cycles_cycle_number_positive_check" CHECK ("rework_cycles"."cycle_number" >= 1);

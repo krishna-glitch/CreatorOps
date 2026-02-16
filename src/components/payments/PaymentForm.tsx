@@ -85,8 +85,10 @@ export function PaymentForm({
   onOpenChange,
   onCreated,
 }: PaymentFormProps) {
+  const trpcUtils = trpc.useUtils();
   const createPaymentMutation = trpc.payments.create.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
+      await trpcUtils.analytics.getDashboardStats.invalidate();
       toast.success("Payment added.", { duration: 2500 });
       onCreated?.();
       onOpenChange(false);

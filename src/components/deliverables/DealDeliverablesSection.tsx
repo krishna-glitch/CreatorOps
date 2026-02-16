@@ -43,7 +43,7 @@ function getFeedbackTypeClassName(type: string) {
     TECHNICAL:
       "border-transparent bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300",
     OTHER:
-      "border-transparent bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200",
+      "border-transparent dash-bg-card text-gray-700 dark:bg-gray-800 dark:text-gray-200",
   };
 
   return map[type] ?? map.OTHER;
@@ -72,7 +72,7 @@ function FeedbackForDeliverable({
   const latestOpenCycle = cycles.find((cycle) => cycle.completedAt === null);
 
   return (
-    <div className="space-y-3 rounded-lg bg-gray-50/70 p-3 dark:bg-gray-900/40">
+    <div className="space-y-3 rounded-lg dash-bg-card p-3 dark:bg-gray-900/40">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <p className="text-sm font-medium">Feedback & Rework</p>
@@ -139,7 +139,7 @@ function FeedbackForDeliverable({
           {feedbackItems.map((feedback) => (
             <div
               key={feedback.id}
-              className="rounded-md border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950"
+              className="rounded-md border dash-border dash-bg-card p-3 dash-border dash-bg-panel"
             >
               <div className="flex flex-wrap items-center gap-2">
                 <Badge className={getFeedbackTypeClassName(feedback.feedbackType)}>
@@ -150,7 +150,7 @@ function FeedbackForDeliverable({
                 </Badge>
                 <Badge variant="outline">{feedback.status}</Badge>
                 <span className="text-xs text-muted-foreground">
-                  {formatDealDate(feedback.receivedAt, undefined, true)}
+                  {formatDealDate(feedback.receivedAt, { includeTime: true })}
                 </span>
               </div>
 
@@ -176,7 +176,7 @@ function FeedbackForDeliverable({
               <Badge variant="outline">#{cycle.cycleNumber}</Badge>
               <span>
                 {cycle.completedAt ? "Completed" : "Open"} • Requested{" "}
-                {formatDealDate(cycle.requestedAt, undefined, true)}
+                {formatDealDate(cycle.requestedAt, { includeTime: true })}
               </span>
               {cycle.timeSpentMinutes !== null ? (
                 <span>• Time {cycle.timeSpentMinutes} min</span>
@@ -212,7 +212,7 @@ export function DealDeliverablesSection({ dealId }: DealDeliverablesSectionProps
   };
 
   return (
-    <section className="mt-6 rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+    <section className="mt-6 rounded-xl border dash-border p-4 dash-border">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-sm font-medium">Deliverables</h2>
         <button
@@ -245,7 +245,7 @@ export function DealDeliverablesSection({ dealId }: DealDeliverablesSectionProps
         <div className="mt-3 overflow-x-auto">
           <table className="w-full min-w-[640px] text-left text-sm">
             <thead>
-              <tr className="border-b border-gray-200 text-muted-foreground dark:border-gray-800">
+              <tr className="border-b dash-border text-muted-foreground dash-border">
                 <th scope="col" className="px-3 py-2 font-medium">
                   Platform + Type
                 </th>
@@ -268,7 +268,7 @@ export function DealDeliverablesSection({ dealId }: DealDeliverablesSectionProps
                 return [
                     <tr
                       key={`${deliverable.id}-row`}
-                      className="border-b border-gray-100 dark:border-gray-900"
+                      className="border-b dash-border dark:border-gray-900"
                     >
                       <td className="px-3 py-3 font-medium">
                         {deliverable.platform} / {deliverable.type}
@@ -276,7 +276,7 @@ export function DealDeliverablesSection({ dealId }: DealDeliverablesSectionProps
                       <td className="px-3 py-3">{deliverable.quantity}</td>
                       <td className="px-3 py-3">
                         {deliverable.scheduledAt
-                          ? formatDealDate(deliverable.scheduledAt, undefined, true)
+                          ? formatDealDate(deliverable.scheduledAt, { includeTime: true })
                           : "Not scheduled"}
                       </td>
                       <td className="px-3 py-3">
@@ -297,7 +297,7 @@ export function DealDeliverablesSection({ dealId }: DealDeliverablesSectionProps
                   ,
                   <tr
                       key={`${deliverable.id}-feedback`}
-                      className="border-b border-gray-100 last:border-0 dark:border-gray-900"
+                      className="border-b dash-border last:border-0 dark:border-gray-900"
                     >
                       <td className="px-3 pb-4" colSpan={5}>
                         <FeedbackForDeliverable

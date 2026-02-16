@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { deals } from "@/server/infrastructure/database/schema/deals";
 import { deliverables } from "@/server/infrastructure/database/schema/deliverables";
@@ -45,23 +45,56 @@ const restoreScriptVersionInput = z.object({
 
 const STORAGE_LIMIT_BYTES = 1024 * 1024 * 1024; // 1GB free tier
 
+function extractPgErrorCode(error: unknown): string | null {
+  if (!error || typeof error !== "object") {
+    return null;
+  }
+
+  const maybeCode =
+    "code" in error && typeof error.code === "string" ? error.code : null;
+  if (maybeCode) {
+    return maybeCode;
+  }
+
+  const nestedCause = "cause" in error ? error.cause : null;
+  return extractPgErrorCode(nestedCause);
+}
+
 export const mediaAssetsRouter = createTRPCRouter({
   storageUsage: protectedProcedure.query(async ({ ctx }) => {
-    const result = await ctx.db
-      .select({
-        totalBytes: sql<number>`coalesce(sum(${mediaAssets.fileSizeBytes}), 0)::bigint`,
-      })
-      .from(mediaAssets)
-      .innerJoin(deliverables, eq(mediaAssets.deliverableId, deliverables.id))
-      .innerJoin(deals, eq(deliverables.dealId, deals.id))
-      .where(eq(deals.userId, ctx.user.id));
+    let assetRows: Array<{ fileSizeBytes: number }> = [];
+    try {
+      assetRows = await ctx.db
+        .select({
+          fileSizeBytes: mediaAssets.fileSizeBytes,
+        })
+        .from(mediaAssets)
+        .innerJoin(deliverables, eq(mediaAssets.deliverableId, deliverables.id))
+        .innerJoin(deals, eq(deliverables.dealId, deals.id))
+        .where(eq(deals.userId, ctx.user.id));
+    } catch (error) {
+      const pgCode = extractPgErrorCode(error);
 
-    const totalBytesRaw = result[0]?.totalBytes ?? 0;
-    const totalBytes =
-      typeof totalBytesRaw === "number"
-        ? totalBytesRaw
-        : Number(totalBytesRaw);
-    const safeTotalBytes = Number.isFinite(totalBytes) ? totalBytes : 0;
+      // Gracefully handle schema drift when media_assets table/columns are missing.
+      if (pgCode === "42703" || pgCode === "42P01") {
+        return {
+          totalBytesUsed: 0,
+          storageLimitBytes: STORAGE_LIMIT_BYTES,
+          percentUsed: 0,
+          approachingLimit: false,
+        };
+      }
+
+      throw error;
+    }
+
+    const safeTotalBytes = assetRows.reduce((total, row) => {
+      const size =
+        typeof row.fileSizeBytes === "number"
+          ? row.fileSizeBytes
+          : Number(row.fileSizeBytes);
+      return total + (Number.isFinite(size) ? size : 0);
+    }, 0);
     const percentUsed = Math.min(
       100,
       Math.round((safeTotalBytes / STORAGE_LIMIT_BYTES) * 100),
@@ -103,12 +136,16 @@ export const mediaAssetsRouter = createTRPCRouter({
         });
       }
 
-      const versionHistory = scriptVersionSchema.array().parse(scriptAsset.versionHistory);
+      const versionHistory = scriptVersionSchema
+        .array()
+        .parse(scriptAsset.versionHistory);
 
       return {
         scriptId: scriptAsset.id,
         content: scriptAsset.scriptContent ?? "",
-        versionHistory: [...versionHistory].sort((a, b) => b.version - a.version),
+        versionHistory: [...versionHistory].sort(
+          (a, b) => b.version - a.version,
+        ),
         versionNumber: scriptAsset.versionNumber,
         updatedAt: scriptAsset.updatedAt,
       };
@@ -142,7 +179,9 @@ export const mediaAssetsRouter = createTRPCRouter({
         });
       }
 
-      const existingHistory = scriptVersionSchema.array().parse(scriptAsset.versionHistory);
+      const existingHistory = scriptVersionSchema
+        .array()
+        .parse(scriptAsset.versionHistory);
       const latestVersion = existingHistory[existingHistory.length - 1];
       const now = new Date();
       const nowIso = now.toISOString();
@@ -169,15 +208,14 @@ export const mediaAssetsRouter = createTRPCRouter({
           content: unchanged.scriptContent ?? "",
           savedAt: nowIso,
           versionNumber: unchanged.versionNumber,
-          versionHistory: [...existingHistory].sort((a, b) => b.version - a.version),
+          versionHistory: [...existingHistory].sort(
+            (a, b) => b.version - a.version,
+          ),
         };
       }
 
       const nextVersion =
-        Math.max(
-          scriptAsset.versionNumber,
-          latestVersion?.version ?? 0,
-        ) + 1;
+        Math.max(scriptAsset.versionNumber, latestVersion?.version ?? 0) + 1;
       const nextVersionEntry = {
         version: nextVersion,
         content: input.content,
@@ -241,8 +279,12 @@ export const mediaAssetsRouter = createTRPCRouter({
         });
       }
 
-      const existingHistory = scriptVersionSchema.array().parse(scriptAsset.versionHistory);
-      const targetVersion = existingHistory.find((entry) => entry.version === input.version);
+      const existingHistory = scriptVersionSchema
+        .array()
+        .parse(scriptAsset.versionHistory);
+      const targetVersion = existingHistory.find(
+        (entry) => entry.version === input.version,
+      );
 
       if (!targetVersion) {
         throw new TRPCError({

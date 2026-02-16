@@ -160,14 +160,14 @@ export function ScriptVersionHistory({
   }
 
   return (
-    <section className="space-y-4 rounded-lg border border-gray-200 p-4 dark:border-gray-800">
+    <section className="space-y-4 rounded-lg border dash-border p-4 dash-border">
       <h3 className="text-sm font-medium">Version History</h3>
 
       <div className="space-y-2">
         {versions.map((version, index) => (
           <div
             key={version.version}
-            className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-gray-100 bg-white p-3 text-sm dark:border-gray-900 dark:bg-gray-950"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-md border dash-border dash-bg-card p-3 text-sm dark:border-gray-900 dash-bg-panel"
           >
             <div className="space-y-0.5">
               <p className="font-medium">v{version.version}</p>
@@ -207,11 +207,11 @@ export function ScriptVersionHistory({
         ))}
       </div>
 
-      <div className="space-y-3 rounded-md border border-gray-100 bg-gray-50 p-3 dark:border-gray-900 dark:bg-gray-950/40">
+      <div className="space-y-3 rounded-md border dash-border dash-bg-card p-3 dark:border-gray-900 dash-bg-panel">
         <p className="text-xs font-medium text-muted-foreground">Compare Versions</p>
         <div className="flex flex-wrap items-center gap-2">
           <select
-            className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
+            className="rounded-md border dash-border dash-bg-card px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
             value={compareFrom ?? ""}
             onChange={(event) =>
               setCompareFrom(event.target.value ? Number(event.target.value) : null)
@@ -226,7 +226,7 @@ export function ScriptVersionHistory({
           </select>
 
           <select
-            className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
+            className="rounded-md border dash-border dash-bg-card px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
             value={compareTo ?? ""}
             onChange={(event) =>
               setCompareTo(event.target.value ? Number(event.target.value) : null)

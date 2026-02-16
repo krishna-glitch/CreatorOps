@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { calculateDeadlineState } from "@/src/server/domain/services/DeadlineCalculator";
+import { syncDeliverableReminders } from "@/src/server/domain/services/ReminderSync";
 import {
   detectExclusivityConflicts,
   type Conflict,
@@ -10,6 +11,7 @@ import {
 import { conflicts } from "@/server/infrastructure/database/schema/exclusivity";
 import { deals } from "@/server/infrastructure/database/schema/deals";
 import { deliverables } from "@/server/infrastructure/database/schema/deliverables";
+import { reminders } from "@/server/infrastructure/database/schema/reminders";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const deliverablePlatformSchema = z.enum([
@@ -224,6 +226,17 @@ export const deliverablesRouter = createTRPCRouter({
           });
         }
 
+        await syncDeliverableReminders({
+          db: ctx.db as any,
+          deliverable: {
+            id: created.id,
+            dealId: created.dealId,
+            scheduledAt: created.scheduledAt,
+            postedAt: created.postedAt,
+            status: created.status,
+          },
+        });
+
         return {
           created,
           conflicts: detectedConflicts as Conflict[],
@@ -315,6 +328,17 @@ export const deliverablesRouter = createTRPCRouter({
           });
         }
 
+        await syncDeliverableReminders({
+          db: ctx.db as any,
+          deliverable: {
+            id: updated.id,
+            dealId: updated.dealId,
+            scheduledAt: updated.scheduledAt,
+            postedAt: updated.postedAt,
+            status: updated.status,
+          },
+        });
+
         return updated;
       } catch (error) {
         if (error instanceof TRPCError) {
@@ -352,21 +376,29 @@ export const deliverablesRouter = createTRPCRouter({
           });
         }
 
-        const [deleted] = await ctx.db
+        await ctx.db
+          .update(reminders)
+          .set({
+            status: "CANCELLED",
+            updatedAt: new Date(),
+          })
+          .where(eq(reminders.deliverableId, input.id));
+
+        const [deletedDeliverable] = await ctx.db
           .delete(deliverables)
           .where(eq(deliverables.id, input.id))
           .returning({
             id: deliverables.id,
           });
 
-        if (!deleted) {
+        if (!deletedDeliverable) {
           throw new TRPCError({
             code: "NOT_FOUND",
             message: "Deliverable not found",
           });
         }
 
-        return deleted;
+        return deletedDeliverable;
       } catch (error) {
         if (error instanceof TRPCError) {
           throw error;

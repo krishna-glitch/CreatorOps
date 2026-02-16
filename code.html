@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>CreatorOps - Luxury 3D Dashboard</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography,container-queries"></script>
+    <link href="https://fonts.googleapis.com" rel="preconnect"/>
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#ec5b13',
+                        midnight: '#000000',
+                        charcoal: '#121212',
+                        gold: '#D4AF37',
+                    },
+                    fontFamily: {
+                        publicSans: ['Plus Jakarta Sans', 'sans-serif'],
+                        serif: ['Playfair Display', 'serif'],
+                    },
+                    borderRadius: {
+                        'lg': '0.5rem',
+                        '2xl': '1rem',
+                        '3xl': '2rem',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style type="text/tailwindcss">
+        @layer components {
+            /* Dark Mode Styles (Screen 1 Inspired) */
+            .dark .pillowy-card {
+                background: linear-gradient(145deg, #151515, #080808);
+                box-shadow: 8px 8px 16px #000000, 
+                            -2px -2px 10px rgba(212, 175, 55, 0.08),
+                            inset 1px 1px 1px rgba(212, 175, 55, 0.2);
+                border-radius: 32px;
+                border: 1px solid rgba(212, 175, 55, 0.15);
+            }
+            .dark .pillowy-card-pressed {
+                background: #080808;
+                box-shadow: inset 6px 6px 12px #000000, 
+                            inset -2px -2px 8px rgba(212, 175, 55, 0.05);
+                border-radius: 24px;
+            }
+            .dark .icon-3d-gold {
+                background: linear-gradient(135deg, #F9E29C 0%, #D4AF37 45%, #8A6D3B 100%);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.8));
+            }
+            .dark .gold-text {
+                color: #D4AF37;
+                text-shadow: 0 0 8px rgba(212, 175, 55, 0.3);
+            }
+
+            /* Light Mode Styles (Screen 2 Inspired) */
+            html:not(.dark) .pillowy-card {
+                background: #F4F5F7;
+                box-shadow: 8px 8px 16px #D1D9E6, 
+                            -8px -8px 16px #FFFFFF;
+                border-radius: 32px;
+                border: 1px solid rgba(255, 255, 255, 0.5);
+            }
+            html:not(.dark) .pillowy-card-pressed {
+                background: #F4F5F7;
+                box-shadow: inset 6px 6px 12px #D1D9E6, 
+                            inset -6px -6px 12px #FFFFFF;
+                border-radius: 24px;
+            }
+            html:not(.dark) .icon-3d-gold {
+                background: linear-gradient(135deg, #D4AF37 0%, #F9E29C 45%, #B8860B 100%);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                filter: drop-shadow(0px 1px 1px rgba(0,0,0,0.1));
+            }
+            html:not(.dark) .gold-text {
+                color: #B8860B;
+            }
+            html:not(.dark) .icon-frosted {
+                color: rgba(184, 134, 11, 0.6);
+                backdrop-filter: blur(4px);
+                background: rgba(255, 255, 255, 0.4);
+                border-radius: 50%;
+                padding: 4px;
+            }
+
+            .nav-3d-active {
+                @apply border border-gold/40;
+                box-shadow: inset 2px 2px 5px rgba(0,0,0,0.2);
+            }
+        }
+        
+        body {
+            transition: background-color 0.3s ease, color 0.3s ease;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            min-height: 100vh;
+        }
+
+        .revenue-line-glow {
+            filter: drop-shadow(0px 0px 8px rgba(212, 175, 55, 0.6));
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-slate-50 dark:bg-black text-slate-800 dark:text-zinc-100">
+    <div id="root"></div>
+
+    <!-- React and Dependencies -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/history@5/umd/history.development.js"></script>
+    <script src="https://unpkg.com/react-router@6.3.0/umd/react-router.development.js"></script>
+    <script src="https://unpkg.com/react-router-dom@6.3.0/umd/react-router-dom.development.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const { createRoot } = ReactDOM;
+        const { MemoryRouter, Routes, Route, Link, useNavigate, useLocation } = ReactRouterDOM;
+
+        // --- Shared Components ---
+
+        const Header = ({ darkMode, setDarkMode }) => {
+            return (
+                <header class="p-6 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-2xl pillowy-card flex items-center justify-center">
+                            <span class="material-symbols-outlined icon-3d-gold text-2xl font-bold">diamond</span>
+                        </div>
+                        <div>
+                            <h1 class="font-serif text-2xl font-bold gold-text leading-tight">CreatorOps</h1>
+                            <p class="text-[10px] uppercase tracking-[0.2em] text-zinc-400 dark:text-amber-200/40 font-bold">Elite Tier</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button 
+                            onClick={() => setDarkMode(!darkMode)}
+                            class="w-10 h-10 rounded-full pillowy-card flex items-center justify-center"
+                        >
+                            <span class="material-symbols-outlined text-zinc-500 dark:text-amber-100/60 text-xl">
+                                {darkMode ? 'light_mode' : 'dark_mode'}
+                            </span>
+                        </button>
+                        <div class="w-10 h-10 rounded-full border border-gold/40 p-0.5 shadow-lg overflow-hidden bg-zinc-200 dark:bg-zinc-900">
+                            <div class="w-full h-full rounded-full bg-gradient-to-br from-zinc-100 dark:from-zinc-800 to-zinc-300 dark:to-black flex items-center justify-center">
+                                <span class="material-symbols-outlined text-zinc-400 dark:text-amber-200/30 text-lg">person</span>
+                            </div>
+                        </div>
+                    </div>
+                </header>
+            );
+        };
+
+        const Navigation = () => {
+            const location = useLocation();
+            const navigate = useNavigate();
+            
+            return (
+                <nav class="fixed bottom-0 left-0 right-0 p-6 z-50">
+                    <div class="pillowy-card h-16 flex items-center justify-around px-4 border-t border-zinc-200 dark:border-zinc-800 shadow-2xl">
+                        <button 
+                            onClick={() => navigate('/')}
+                            class={`${location.pathname === '/' ? 'nav-3d-active' : ''} w-12 h-10 rounded-xl flex items-center justify-center transition-all`}
+                        >
+                            <span class={`material-symbols-outlined text-2xl ${location.pathname === '/' ? 'icon-3d-gold' : 'text-zinc-400 dark:text-zinc-700'}`}>dashboard</span>
+                        </button>
+                        <button 
+                            onClick={() => navigate('/deals')}
+                            class={`${location.pathname === '/deals' ? 'nav-3d-active' : ''} w-12 h-10 rounded-xl flex items-center justify-center transition-all`}
+                        >
+                            <span class={`material-symbols-outlined text-2xl ${location.pathname === '/deals' ? 'icon-3d-gold' : 'text-zinc-400 dark:text-zinc-700'}`}>handshake</span>
+                        </button>
+                        
+                        <div class="relative -top-8">
+                            <button class="w-16 h-16 rounded-full pillowy-card border border-gold/40 flex items-center justify-center shadow-2xl">
+                                <span class="material-symbols-outlined icon-3d-gold text-3xl font-bold">add</span>
+                            </button>
+                        </div>
+                        
+                        <button class="w-12 h-10 flex items-center justify-center">
+                            <span class="material-symbols-outlined text-zinc-400 dark:text-zinc-700 text-2xl">monitoring</span>
+                        </button>
+                        <button class="w-12 h-10 flex items-center justify-center">
+                            <span class="material-symbols-outlined text-zinc-400 dark:text-zinc-700 text-2xl">settings</span>
+                        </button>
+                    </div>
+                </nav>
+            );
+        };
+
+        const RevenueChart = ({ isDark }) => (
+            <div class="pillowy-card p-6 h-64 relative overflow-hidden">
+                <div class="absolute inset-0 opacity-10 dark:opacity-5" style={{backgroundImage: `radial-gradient(circle at 2px 2px, #D4AF37 1px, transparent 0)`, backgroundSize: '24px 24px'}}></div>
+                <div class="relative h-full w-full flex flex-col justify-end">
+                    <svg class="w-full h-4/5 revenue-line-glow" preserveAspectRatio="none" viewBox="0 0 400 100">
+                        <defs>
+                            <linearGradient id="goldGradient" x1="0%" x2="0%" y1="0%" y2="100%">
+                                <stop offset="0%" style={{stopColor:'var(--gold)', stopOpacity: 0.4}}></stop>
+                                <stop offset="100%" style={{stopColor: isDark ? 'black' : 'white', stopOpacity: 0}}></stop>
+                            </linearGradient>
+                        </defs>
+                        <path d="M0,80 C50,70 80,20 120,40 C160,60 200,10 240,30 C280,50 320,10 360,20 C380,25 400,40 400,40 V100 H0 Z" fill="url(#goldGradient)"></path>
+                        <path d="M0,78 C50,68 80,18 120,38 C160,58 200,8 240,28 C280,48 320,8 360,18 C380,23 400,38 400,38" fill="none" stroke="var(--gold)" stroke-linecap="round" stroke-width="3"></path>
+                    </svg>
+                    <div class="flex justify-between mt-4 px-2">
+                        {['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map(day => (
+                            <span key={day} class="text-[9px] font-bold text-zinc-400 dark:text-zinc-600">{day}</span>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        );
+
+        // --- Pages ---
+
+        const DashboardPage = ({ isDark }) => {
+            return (
+                <main class="px-6 space-y-8 pb-32">
+                    <section>
+                        <h2 class="font-serif text-3xl text-zinc-800 dark:text-zinc-100">{isDark ? 'Welcome,' : 'Bonjour,'} <span class="gold-text italic">Alexandre</span></h2>
+                        <p class="text-zinc-500 text-sm mt-1">{isDark ? 'Your midnight vault is secure and thriving.' : 'Your pearl treasury is expanding gracefully.'}</p>
+                    </section>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="pillowy-card p-5 flex flex-col justify-between h-40">
+                            <div class="flex justify-between items-start">
+                                <span class="material-symbols-outlined icon-3d-gold text-3xl">account_balance_wallet</span>
+                                <span class="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">+12%</span>
+                            </div>
+                            <div>
+                                <p class="text-[10px] uppercase tracking-wider text-zinc-400 font-semibold mb-1">Total Revenue</p>
+                                <p class="text-xl font-bold text-zinc-800 dark:text-zinc-100 tracking-tight">£12,500</p>
+                            </div>
+                        </div>
+                        <div class="pillowy-card p-5 flex flex-col justify-between h-40">
+                            <div class="flex justify-between items-start">
+                                <span class={`material-symbols-outlined text-3xl ${isDark ? 'icon-3d-gold' : 'icon-frosted'}`}>pending_actions</span>
+                            </div>
+                            <div>
+                                <p class="text-[10px] uppercase tracking-wider text-zinc-400 font-semibold mb-1">Outstanding</p>
+                                <p class="text-xl font-bold text-zinc-800 dark:text-zinc-100 tracking-tight">£3,200</p>
+                            </div>
+                        </div>
+                        <div class="pillowy-card p-5 flex flex-col justify-between h-40">
+                            <div class="flex justify-between items-start">
+                                <span class={`material-symbols-outlined text-3xl ${isDark ? 'icon-3d-gold' : 'icon-frosted'}`}>auto_awesome</span>
+                            </div>
+                            <div>
+                                <p class="text-[10px] uppercase tracking-wider text-zinc-400 font-semibold mb-1">Active Deals</p>
+                                <p class="text-xl font-bold text-zinc-800 dark:text-zinc-100 tracking-tight">08</p>
+                            </div>
+                        </div>
+                        <div class="pillowy-card p-5 flex flex-col justify-between h-40">
+                            <div class="flex justify-between items-start">
+                                <span class="material-symbols-outlined icon-3d-gold text-3xl">rebase_edit</span>
+                            </div>
+                            <div>
+                                <p class="text-[10px] uppercase tracking-wider text-zinc-400 font-semibold mb-1">Scripts</p>
+                                <p class="text-xl font-bold text-zinc-800 dark:text-zinc-100 tracking-tight">14</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <section>
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-serif text-xl text-zinc-800 dark:text-zinc-100">Revenue Flow</h3>
+                            <span class="material-symbols-outlined text-zinc-400">more_horiz</span>
+                        </div>
+                        <RevenueChart isDark={isDark} />
+                    </section>
+
+                    <section>
+                        <h3 class="font-serif text-xl text-zinc-800 dark:text-zinc-100 mb-4">Tactile Actions</h3>
+                        <div class="grid grid-cols-4 gap-4">
+                            {[
+                                { icon: 'add_circle', label: 'New Deal', highlight: true },
+                                { icon: 'neurology', label: 'AI Script', highlight: false },
+                                { icon: 'payments', label: 'Invoice', highlight: false },
+                                { icon: 'share', label: 'Pitch', highlight: true }
+                            ].map((action, i) => (
+                                <div key={i} class="flex flex-col items-center gap-2">
+                                    <button class="pillowy-card w-full aspect-square flex items-center justify-center">
+                                        <span class={`material-symbols-outlined text-2xl ${action.highlight || isDark ? 'icon-3d-gold' : 'icon-frosted'}`}>
+                                            {action.icon}
+                                        </span>
+                                    </button>
+                                    <span class="text-[10px] font-semibold text-zinc-500">{action.label}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                </main>
+            );
+        };
+
+        const DealsPage = () => {
+            return (
+                <main class="px-6 space-y-8 pb-32">
+                    <section>
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-serif text-xl text-zinc-800 dark:text-zinc-100">Ongoing Affairs</h3>
+                            <button class="text-[10px] font-bold gold-text uppercase tracking-widest">View All</button>
+                        </div>
+                        <div class="pillowy-card-pressed p-2">
+                            <div class="space-y-1">
+                                <div class="flex items-center justify-between p-4 bg-white/40 dark:bg-zinc-900/40 rounded-2xl border border-zinc-200/50 dark:border-zinc-800/50">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 rounded-xl pillowy-card flex items-center justify-center">
+                                            <span class="material-symbols-outlined icon-3d-gold">token</span>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm font-bold text-zinc-800 dark:text-zinc-100">Global Velocity</p>
+                                            <p class="text-[10px] text-zinc-400">Campaign Launch</p>
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-sm font-bold gold-text">£4,200</p>
+                                        <p class="text-[10px] text-emerald-500 font-bold">READY</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center justify-between p-4 bg-white/40 dark:bg-zinc-900/40 rounded-2xl border border-zinc-200/50 dark:border-zinc-800/50">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 rounded-xl pillowy-card flex items-center justify-center">
+                                            <span class="material-symbols-outlined icon-3d-gold">fingerprint</span>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm font-bold text-zinc-800 dark:text-zinc-100">Aether Tech</p>
+                                            <p class="text-[10px] text-zinc-400">Brand Integration</p>
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-sm font-bold gold-text">£2,150</p>
+                                        <p class="text-[10px] text-amber-500 font-bold">DRAFT</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center justify-between p-4 bg-white/40 dark:bg-zinc-900/40 rounded-2xl border border-zinc-200/50 dark:border-zinc-800/50">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 rounded-xl pillowy-card flex items-center justify-center">
+                                            <span class="material-symbols-outlined icon-3d-gold">auto_awesome</span>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm font-bold text-zinc-800 dark:text-zinc-100">Nebula Stream</p>
+                                            <p class="text-[10px] text-zinc-400">Sponsorship</p>
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-sm font-bold gold-text">£1,800</p>
+                                        <p class="text-[10px] text-blue-500 font-bold">PENDING</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </main>
+            );
+        };
+
+        // --- Main App ---
+
+        const App = () => {
+            const [darkMode, setDarkMode] = useState(true);
+
+            useEffect(() => {
+                if (darkMode) {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
+            }, [darkMode]);
+
+            return (
+                <div class="min-h-screen">
+                    <Header darkMode={darkMode} setDarkMode={setDarkMode} />
+                    <Routes>
+                        <Route path="/" element={<DashboardPage isDark={darkMode} />} />
+                        <Route path="/deals" element={<DealsPage />} />
+                    </Routes>
+                    <Navigation />
+                </div>
+            );
+        };
+
+        const rootElement = document.getElementById('root');
+        const root = createRoot(rootElement);
+        root.render(
+            <MemoryRouter>
+                <App />
+            </MemoryRouter>
+        );
+    </script>
+</body>
+</html>

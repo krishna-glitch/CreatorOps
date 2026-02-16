@@ -10,8 +10,15 @@ import {
 import { sendReminderEmail } from "@/src/server/services/email/ResendEmailService";
 import { deliverables } from "@/server/infrastructure/database/schema/deliverables";
 import { payments } from "@/server/infrastructure/database/schema/payments";
+import { pushNotificationDeliveries } from "@/server/infrastructure/database/schema/pushNotificationDeliveries";
+import { pushSubscriptions } from "@/server/infrastructure/database/schema/pushSubscriptions";
 import { reminders } from "@/server/infrastructure/database/schema/reminders";
 import logger from "@/server/utils/logger";
+import {
+  buildReminderNotificationPayload,
+  isWebPushConfigured,
+  sendWebPushNotification,
+} from "@/src/server/services/notifications/webPush";
 
 const REMINDER_QUEUE_NAME = "check-reminders";
 const REMINDER_JOB_NAME = "check-reminders-hourly";
@@ -25,6 +32,9 @@ type CheckRemindersResult = {
   generatedCount: number;
   insertedCount: number;
   skippedDuplicateCount: number;
+  pushAttempted: number;
+  pushSent: number;
+  pushFailed: number;
   emailsAttempted: number;
   emailsSent: number;
   emailsFailed: number;
@@ -244,6 +254,9 @@ export async function runCheckRemindersJob(): Promise<CheckRemindersResult> {
 
     let insertedCount = 0;
     let skippedDuplicateCount = 0;
+    let pushAttempted = 0;
+    let pushSent = 0;
+    let pushFailed = 0;
     let emailsAttempted = 0;
     let emailsSent = 0;
     let emailsFailed = 0;
@@ -287,6 +300,155 @@ export async function runCheckRemindersJob(): Promise<CheckRemindersResult> {
 
         insertedCount = inserted.length;
       }
+    }
+
+    if (isWebPushConfigured()) {
+      const dueReminders = await db.query.reminders.findMany({
+        where: and(eq(reminders.status, "OPEN"), lte(reminders.dueAt, now)),
+        with: {
+          deal: {
+            columns: {
+              id: true,
+              userId: true,
+              title: true,
+            },
+          },
+          deliverable: {
+            columns: {
+              id: true,
+            },
+          },
+        },
+        orderBy: [asc(reminders.dueAt)],
+        limit: 200,
+      });
+
+      const subscriptionsByUser = new Map<
+        string,
+        Array<{
+          id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+        }>
+      >();
+
+      for (const reminder of dueReminders) {
+        let subscriptions = subscriptionsByUser.get(reminder.deal.userId);
+        if (!subscriptions) {
+          subscriptions = await db
+            .select({
+              id: pushSubscriptions.id,
+              endpoint: pushSubscriptions.endpoint,
+              p256dh: pushSubscriptions.p256dh,
+              auth: pushSubscriptions.auth,
+            })
+            .from(pushSubscriptions)
+            .where(
+              and(
+                eq(pushSubscriptions.userId, reminder.deal.userId),
+                eq(pushSubscriptions.isActive, true),
+              ),
+            );
+          subscriptionsByUser.set(reminder.deal.userId, subscriptions);
+        }
+
+        if (subscriptions.length === 0) {
+          continue;
+        }
+
+        for (const subscription of subscriptions) {
+          const [existingDelivery] = await db
+            .select({ id: pushNotificationDeliveries.id })
+            .from(pushNotificationDeliveries)
+            .where(
+              and(
+                eq(pushNotificationDeliveries.reminderId, reminder.id),
+                eq(pushNotificationDeliveries.subscriptionId, subscription.id),
+                eq(pushNotificationDeliveries.scheduledFor, reminder.dueAt),
+              ),
+            )
+            .limit(1);
+
+          if (existingDelivery) {
+            continue;
+          }
+
+          pushAttempted += 1;
+
+          try {
+            const payload = buildReminderNotificationPayload({
+              reminderId: reminder.id,
+              dealId: reminder.dealId,
+              deliverableId: reminder.deliverableId,
+              reason: reminder.reason,
+              dueAt: reminder.dueAt,
+              priority: reminder.priority,
+              dealTitle: reminder.deal.title,
+            });
+
+            await sendWebPushNotification({
+              subscription: {
+                endpoint: subscription.endpoint,
+                keys: {
+                  p256dh: subscription.p256dh,
+                  auth: subscription.auth,
+                },
+              },
+              payload,
+            });
+
+            await db.insert(pushNotificationDeliveries).values({
+              reminderId: reminder.id,
+              subscriptionId: subscription.id,
+              scheduledFor: reminder.dueAt,
+              status: "SENT",
+            });
+
+            pushSent += 1;
+          } catch (pushError) {
+            pushFailed += 1;
+
+            const errorMessage =
+              pushError instanceof Error ? pushError.message : "Unknown push error";
+
+            await db
+              .insert(pushNotificationDeliveries)
+              .values({
+                reminderId: reminder.id,
+                subscriptionId: subscription.id,
+                scheduledFor: reminder.dueAt,
+                status: "FAILED",
+                error: errorMessage.slice(0, 500),
+              })
+              .onConflictDoNothing({
+                target: [
+                  pushNotificationDeliveries.reminderId,
+                  pushNotificationDeliveries.subscriptionId,
+                  pushNotificationDeliveries.scheduledFor,
+                ],
+              });
+
+            if (errorMessage.includes("410") || errorMessage.includes("404")) {
+              await db
+                .update(pushSubscriptions)
+                .set({
+                  isActive: false,
+                  updatedAt: new Date(),
+                })
+                .where(eq(pushSubscriptions.id, subscription.id));
+            }
+
+            logger.error("Reminder push send failed", {
+              reminderId: reminder.id,
+              subscriptionId: subscription.id,
+              error: errorMessage,
+            });
+          }
+        }
+      }
+    } else {
+      logger.warn("Skipping web push delivery because VAPID is not configured");
     }
 
     if (canProcessReminderEmails()) {
@@ -440,6 +602,9 @@ export async function runCheckRemindersJob(): Promise<CheckRemindersResult> {
       generatedCount: generated.length,
       insertedCount,
       skippedDuplicateCount,
+      pushAttempted,
+      pushSent,
+      pushFailed,
       emailsAttempted,
       emailsSent,
       emailsFailed,
