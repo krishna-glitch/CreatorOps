@@ -19,6 +19,7 @@ import {
 import { GestureTutorial } from "@/src/components/onboarding/GestureTutorial";
 import { VoiceCommandButton } from "@/src/components/voice/VoiceCommandButton";
 import { usePullToRefresh } from "@/src/hooks/usePullToRefresh";
+import { useDefaultCurrency } from "@/src/hooks/useDefaultCurrency";
 import type { ParsedCommand } from "@/src/lib/voice/commandParser";
 
 type DealsListResponse = inferRouterOutputs<AppRouter>["deals"]["list"];
@@ -89,6 +90,7 @@ export function DealsListClient({
 }: DealsListClientProps) {
   const router = useRouter();
   const trpcUtils = trpc.useUtils();
+  const { defaultCurrency } = useDefaultCurrency();
   const [optimisticStatusById, setOptimisticStatusById] = useState<
     Record<string, DealItem["status"]>
   >({});
@@ -282,7 +284,7 @@ export function DealsListClient({
           brand_id: brandId,
           title: `${command.entities.brand} collab`,
           total_value: command.entities.amount,
-          currency: command.entities.currency ?? "USD",
+          currency: command.entities.currency ?? defaultCurrency,
           status: "INBOUND",
           revision_limit: 2,
           exclusivity_rules: [],
@@ -363,7 +365,7 @@ export function DealsListClient({
         await createPaymentMutation.mutateAsync({
           deal_id: deal.id,
           amount: command.entities.amount,
-          currency: command.entities.currency ?? "USD",
+          currency: command.entities.currency ?? defaultCurrency,
           kind: "FINAL",
           status: "PAID",
           expected_date: null,
@@ -423,6 +425,7 @@ export function DealsListClient({
       createDealMutation,
       createDeliverableMutation,
       createPaymentMutation,
+      defaultCurrency,
       dealsQuery,
       ensureBrandId,
       findDealForBrand,

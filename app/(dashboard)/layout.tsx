@@ -8,7 +8,6 @@ import { createClient } from "@/lib/supabase/server";
 import { MobileNav } from "@/components/mobile-nav";
 import { MobileHeader } from "@/components/mobile-header";
 import { NotificationPopover } from "@/components/notification-popover";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { NotificationPrompt } from "@/src/components/notifications/NotificationPrompt";
 
 import { NotificationMessageHandler } from "@/src/components/notifications/NotificationMessageHandler";
@@ -50,9 +49,6 @@ export default async function DashboardLayout({
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full pillowy-card flex items-center justify-center">
-                <ThemeToggle />
-              </div>
               <div className="w-10 h-10 rounded-full pillowy-card flex items-center justify-center">
                 <NotificationPopover />
               </div>

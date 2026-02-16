@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -40,6 +40,7 @@ import {
 import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
 import { VoiceCommandButton } from "@/src/components/voice/VoiceCommandButton";
+import { useDefaultCurrency } from "@/src/hooks/useDefaultCurrency";
 import type { ParsedCommand } from "@/src/lib/voice/commandParser";
 
 const exclusivityRuleFormSchema = z
@@ -151,8 +152,21 @@ function getCreateDealErrorMessage(error: unknown): string {
 }
 
 function getCreateBrandErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message.includes("UNAUTHORIZED")) {
+  const trpcLikeError =
+    typeof error === "object" && error !== null ? error : null;
+  const trpcMessage =
+    trpcLikeError &&
+    "message" in trpcLikeError &&
+    typeof trpcLikeError.message === "string"
+      ? trpcLikeError.message
+      : null;
+
+  if (trpcMessage?.includes("UNAUTHORIZED")) {
     return "Your session expired. Please sign in again.";
+  }
+
+  if (trpcMessage && trpcMessage.trim().length > 0) {
+    return trpcMessage;
   }
 
   return "Could not create brand. Please try again.";
@@ -162,8 +176,9 @@ export default function NewDealPage() {
   const router = useRouter();
   const trpcUtils = trpc.useUtils();
   const platformOptions = ["INSTAGRAM", "YOUTUBE", "TIKTOK"] as const;
+  const { defaultCurrency } = useDefaultCurrency();
   const [brandPopoverOpen, setBrandPopoverOpen] = useState(false);
-  const [newBrandName, setNewBrandName] = useState("");
+  const [brandSearch, setBrandSearch] = useState("");
   const [selectedBrandFallbackName, setSelectedBrandFallbackName] = useState<
     string | null
   >(null);
@@ -174,7 +189,7 @@ export default function NewDealPage() {
   const createBrandMutation = trpc.brands.create.useMutation({
     onSuccess: async (createdBrand) => {
       setSelectedBrandFallbackName(createdBrand.name);
-      setNewBrandName("");
+      setBrandSearch("");
       setBrandPopoverOpen(false);
       form.setValue("brand_id", createdBrand.id, {
         shouldDirty: true,
@@ -209,7 +224,7 @@ export default function NewDealPage() {
       brand_id: "",
       title: "",
       total_value: undefined,
-      currency: "USD",
+      currency: defaultCurrency,
       status: "INBOUND",
       exclusivity_rules: [],
     },
@@ -218,6 +233,12 @@ export default function NewDealPage() {
     control: form.control,
     name: "exclusivity_rules",
   });
+
+  useEffect(() => {
+    if (!form.formState.dirtyFields.currency) {
+      form.setValue("currency", defaultCurrency, { shouldDirty: false });
+    }
+  }, [defaultCurrency, form]);
 
   const onSubmit = (values: CreateDealFormValues) => {
     createDealMutation.mutate(values);
@@ -256,9 +277,46 @@ export default function NewDealPage() {
   const isSubmitting = createDealMutation.isPending;
   const brandItems = brands?.items ?? [];
   const hasBrands = brandItems.length > 0;
-  const canCreateBrand =
-    newBrandName.trim().length > 0 && !createBrandMutation.isPending;
+  const normalizedBrandSearch = brandSearch.trim().toLowerCase();
+  const exactBrandMatch =
+    normalizedBrandSearch.length > 0
+      ? brandItems.find(
+          (brand) => brand.name.trim().toLowerCase() === normalizedBrandSearch,
+        ) ?? null
+      : null;
+  const canCreateBrandFromSearch =
+    brandSearch.trim().length > 0 &&
+    !exactBrandMatch &&
+    !createBrandMutation.isPending;
   const brandNames = brandItems.map((brand) => brand.name);
+
+  const selectBrand = (brandId: string, brandName: string | null = null) => {
+    setSelectedBrandFallbackName(brandName);
+    setBrandPopoverOpen(false);
+    form.setValue("brand_id", brandId, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  };
+
+  const createBrandFromName = (rawName: string) => {
+    const name = rawName.trim();
+    if (!name || createBrandMutation.isPending) {
+      return;
+    }
+
+    const existingBrand = brandItems.find(
+      (brand) => brand.name.trim().toLowerCase() === name.toLowerCase(),
+    );
+    if (existingBrand) {
+      selectBrand(existingBrand.id, existingBrand.name);
+      setBrandSearch("");
+      toast.info("Brand already exists and was selected.", { duration: 2200 });
+      return;
+    }
+
+    createBrandMutation.mutate({ name });
+  };
 
   const executeVoiceCommand = async (command: ParsedCommand) => {
     if (command.intent === "CREATE_DEAL") {
@@ -369,7 +427,12 @@ export default function NewDealPage() {
                         </FormLabel>
                         <Popover
                           open={brandPopoverOpen}
-                          onOpenChange={setBrandPopoverOpen}
+                          onOpenChange={(open) => {
+                            setBrandPopoverOpen(open);
+                            if (!open) {
+                              setBrandSearch("");
+                            }
+                          }}
                         >
                           <PopoverTrigger asChild>
                             <FormControl>
@@ -395,10 +458,30 @@ export default function NewDealPage() {
                             align="start"
                           >
                             <Command>
-                              <CommandInput placeholder="Search brand..." />
+                              <CommandInput
+                                placeholder="Search brand..."
+                                value={brandSearch}
+                                onValueChange={setBrandSearch}
+                              />
                               <CommandList>
                                 <CommandEmpty>
-                                  No brand found. Create one below.
+                                  {brandSearch.trim().length > 0 ? (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      className="h-8 px-2 text-sm"
+                                      onClick={() =>
+                                        createBrandFromName(brandSearch)
+                                      }
+                                      disabled={!canCreateBrandFromSearch}
+                                    >
+                                      {createBrandMutation.isPending
+                                        ? "Adding..."
+                                        : `Add "${brandSearch.trim()}"`}
+                                    </Button>
+                                  ) : (
+                                    "No brand found."
+                                  )}
                                 </CommandEmpty>
                                 <CommandGroup>
                                   {brandItems.map((brand) => (
@@ -406,11 +489,8 @@ export default function NewDealPage() {
                                       value={brand.name}
                                       key={brand.id}
                                       onSelect={() => {
-                                        setSelectedBrandFallbackName(null);
-                                        setBrandPopoverOpen(false);
-                                        form.setValue("brand_id", brand.id, {
-                                          shouldValidate: true,
-                                        });
+                                        setBrandSearch("");
+                                        selectBrand(brand.id);
                                       }}
                                     >
                                       <Check
@@ -427,35 +507,6 @@ export default function NewDealPage() {
                                 </CommandGroup>
                               </CommandList>
                             </Command>
-                            <div className="border-t p-3">
-                              <p className="mb-2 text-xs text-muted-foreground">
-                                Brand missing? Add it now.
-                              </p>
-                              <div className="flex gap-2">
-                                <Input
-                                  value={newBrandName}
-                                  onChange={(event) =>
-                                    setNewBrandName(event.target.value)
-                                  }
-                                  placeholder="New brand name"
-                                  className="h-9"
-                                />
-                                <Button
-                                  type="button"
-                                  onClick={() =>
-                                    createBrandMutation.mutate({
-                                      name: newBrandName.trim(),
-                                    })
-                                  }
-                                  disabled={!canCreateBrand}
-                                  className="h-9"
-                                >
-                                  {createBrandMutation.isPending
-                                    ? "Adding..."
-                                    : "Add"}
-                                </Button>
-                              </div>
-                            </div>
                           </PopoverContent>
                         </Popover>
                         {!hasBrands && !isLoadingBrands && (

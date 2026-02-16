@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc/client";
+import { useDefaultCurrency } from "@/src/hooks/useDefaultCurrency";
 
 const paymentFormSchema = z
   .object({
@@ -86,6 +87,7 @@ export function PaymentForm({
   onCreated,
 }: PaymentFormProps) {
   const trpcUtils = trpc.useUtils();
+  const { defaultCurrency } = useDefaultCurrency();
   const createPaymentMutation = trpc.payments.create.useMutation({
     onSuccess: async () => {
       await trpcUtils.analytics.getDashboardStats.invalidate();
@@ -104,7 +106,7 @@ export function PaymentForm({
     resolver: zodResolver(paymentFormSchema),
     defaultValues: {
       amount: undefined,
-      currency: "USD",
+      currency: defaultCurrency,
       kind: "DEPOSIT",
       expected_date: undefined,
       payment_method: "WIRE",
@@ -119,7 +121,7 @@ export function PaymentForm({
     if (!open) {
       form.reset({
         amount: undefined,
-        currency: "USD",
+        currency: defaultCurrency,
         kind: "DEPOSIT",
         expected_date: undefined,
         payment_method: "WIRE",
@@ -127,7 +129,13 @@ export function PaymentForm({
         paid_at: undefined,
       });
     }
-  }, [form, open]);
+  }, [defaultCurrency, form, open]);
+
+  useEffect(() => {
+    if (!form.formState.dirtyFields.currency) {
+      form.setValue("currency", defaultCurrency, { shouldDirty: false });
+    }
+  }, [defaultCurrency, form]);
 
   const onSubmit = (values: PaymentFormValues) => {
     createPaymentMutation.mutate({

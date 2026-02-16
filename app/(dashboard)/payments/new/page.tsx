@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -25,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc/client";
 import { VoiceCommandButton } from "@/src/components/voice/VoiceCommandButton";
+import { useDefaultCurrency } from "@/src/hooks/useDefaultCurrency";
 import type { ParsedCommand } from "@/src/lib/voice/commandParser";
 
 const createPaymentFormSchema = z
@@ -73,6 +75,7 @@ export default function NewPaymentPage() {
   const trpcUtils = trpc.useUtils();
   const searchParams = useSearchParams();
   const initialDealId = searchParams.get("dealId") ?? "";
+  const { defaultCurrency } = useDefaultCurrency();
 
   const { data: dealsData, isLoading: isLoadingDeals } =
     trpc.deals.list.useQuery({ limit: 100 });
@@ -95,7 +98,7 @@ export default function NewPaymentPage() {
     defaultValues: {
       deal_id: initialDealId,
       amount: undefined,
-      currency: "USD",
+      currency: defaultCurrency,
       kind: "DEPOSIT",
       expected_date: undefined,
       payment_method: "WIRE",
@@ -107,6 +110,12 @@ export default function NewPaymentPage() {
   const markAsPaid = form.watch("mark_as_paid");
   const deals = dealsData?.items ?? [];
   const hasDeals = deals.length > 0;
+
+  useEffect(() => {
+    if (!form.formState.dirtyFields.currency) {
+      form.setValue("currency", defaultCurrency, { shouldDirty: false });
+    }
+  }, [defaultCurrency, form]);
 
   const executeVoiceCommand = async (command: ParsedCommand) => {
     const matchDealByBrand = (brandName: string | undefined) => {

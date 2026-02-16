@@ -89,6 +89,7 @@ export function MobileHeader({ userEmail }: { userEmail?: string | null }) {
                   <Link href="/brands" className="dash-mobile-drawer-link flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium">Brands</Link>
                   <Link href="/conflicts" className="dash-mobile-drawer-link flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium">Conflicts</Link>
                   <Link href="/analytics" className="dash-mobile-drawer-link flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium">Analytics</Link>
+                  <Link href="/calendar" className="dash-mobile-drawer-link flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium">Calendar</Link>
                   <Link href="/scripts" className="dash-mobile-drawer-link flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium">Script Lab</Link>
                   <Link href="/settings" className="dash-mobile-drawer-link flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium">Settings</Link>
                 </nav>

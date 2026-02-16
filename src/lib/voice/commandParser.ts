@@ -432,6 +432,7 @@ export function parseCommand(
 export function parseVoiceCommand(
   transcript: string,
   knownBrands: string[] = [],
+  defaultCurrency: "USD" | "INR" = "USD",
 ): VoiceCommand {
   const parsed = parseCommand(transcript, knownBrands);
 
@@ -462,7 +463,7 @@ export function parseVoiceCommand(
       intent: "ADD_PAYMENT",
       brandName: parsed.entities.brand,
       amount: parsed.entities.amount,
-      currency: parsed.entities.currency ?? "USD",
+      currency: parsed.entities.currency ?? defaultCurrency,
       kind: "FINAL",
       markAsPaid: true,
       transcript,
@@ -473,7 +474,7 @@ export function parseVoiceCommand(
       intent: "CREATE_DEAL",
       brandName: parsed.entities.brand,
       amount: parsed.entities.amount,
-      currency: parsed.entities.currency ?? "USD",
+      currency: parsed.entities.currency ?? defaultCurrency,
       deliverables: parsed.entities.deliverables,
       status: "INBOUND",
       transcript,

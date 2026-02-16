@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Playfair_Display, Plus_Jakarta_Sans } from "next/font/google";
 import { Toaster } from "sonner";
 import { PWAClient } from "@/components/pwa-client";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { TRPCProvider } from "@/lib/trpc/provider";
 import "./globals.css";
 
@@ -78,7 +77,6 @@ export default function RootLayout({
         <TRPCProvider>
           {children}
           <PWAClient />
-          <ThemeToggle />
           <div className="z-[var(--z-toast)] relative">
             <Toaster duration={3000} richColors />
           </div>

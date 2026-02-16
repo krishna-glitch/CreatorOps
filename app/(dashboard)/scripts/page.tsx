@@ -1,7 +1,8 @@
 "use client";
 
-import { FileText, Plus, Search, Trash2, X } from "lucide-react";
+import { FileText, Plus, Search, Share2, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,6 +53,15 @@ function formatUpdatedAt(isoDate: string) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
+}
+
+function htmlToPlainText(html: string) {
+  if (typeof window === "undefined") {
+    return "";
+  }
+  const container = window.document.createElement("div");
+  container.innerHTML = html;
+  return container.textContent?.trim() ?? "";
 }
 
 export default function ScriptLabPage() {
@@ -177,6 +187,36 @@ export default function ScriptLabPage() {
     setFiles((current) => current.filter((file) => file.id !== selectedFileId));
   };
 
+  const shareSelectedFile = async () => {
+    if (!selectedFile || typeof window === "undefined") return;
+
+    const deliverableId = getDeliverableId(selectedFile.id);
+    const rawDraft =
+      window.localStorage.getItem(`creatorops.script.draft.${deliverableId}`) ??
+      "";
+    const scriptText = htmlToPlainText(rawDraft);
+    const shareTitle = selectedFile.title.trim() || "Video Script";
+    const sharePayload = {
+      title: shareTitle,
+      text:
+        scriptText.length > 0
+          ? `${shareTitle}\n\n${scriptText}`
+          : `${shareTitle}\n\n(No script content yet)`,
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(sharePayload);
+        return;
+      }
+
+      await navigator.clipboard.writeText(sharePayload.text);
+      toast.success("Script copied to clipboard.");
+    } catch {
+      toast.error("Could not share this script right now.");
+    }
+  };
+
   return (
     <div className="mx-auto w-full max-w-[1400px] px-3 py-4 sm:px-6 sm:py-6">
       {showInfoBanner ? (
@@ -207,7 +247,7 @@ export default function ScriptLabPage() {
       ) : null}
 
       <div className="grid min-h-[78vh] grid-cols-1 gap-4 md:grid-cols-[330px_minmax(0,1fr)]">
-        <Card className="overflow-hidden dash-border shadow-md dash-border">
+        <Card className="overflow-hidden border-2 dash-border shadow-md">
           <CardHeader className="space-y-4 border-b dash-border bg-gradient-to-b from-slate-50 to-white pb-4 dash-border dark:from-slate-950 dark:to-slate-950">
             <div className="flex items-center justify-between gap-2">
               <CardTitle className="text-base">Script Library</CardTitle>
@@ -250,7 +290,7 @@ export default function ScriptLabPage() {
                     className={`w-full rounded-xl border px-3 py-2.5 text-left transition ${
                       active
                         ? "border-slate-900 dash-bg-panel text-white shadow-sm dash-border dash-bg-card dark:text-slate-900"
-                        : "dash-border dash-bg-card dash-border dash-bg-card dash-border dash-bg-panel dash-bg-panel"
+                        : "border dash-border dash-bg-panel"
                     }`}
                   >
                     <p className="line-clamp-1 text-sm font-medium">{file.title}</p>
@@ -268,7 +308,7 @@ export default function ScriptLabPage() {
           </CardContent>
         </Card>
 
-        <Card className="min-w-0 dash-border shadow-md dash-border">
+        <Card className="min-w-0 border-2 dash-border shadow-md">
           <CardHeader className="border-b dash-border bg-gradient-to-r from-slate-50 to-white pb-4 dash-border dark:from-slate-950 dark:to-slate-950">
             {selectedFile ? (
               <div className="flex flex-wrap items-center gap-2">
@@ -279,6 +319,15 @@ export default function ScriptLabPage() {
                   placeholder="Video script title"
                   className="min-w-0 flex-1"
                 />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={shareSelectedFile}
+                  className="border-slate-300 dark:border-slate-700"
+                >
+                  <Share2 className="h-4 w-4" />
+                  Share
+                </Button>
                 <Button
                   type="button"
                   variant="outline"
@@ -296,19 +345,21 @@ export default function ScriptLabPage() {
 
           <CardContent className="p-3 md:p-4">
             {selectedFile ? (
-              <ScriptEditor
-                key={selectedFile.id}
-                deliverableId={getDeliverableId(selectedFile.id)}
-                fileBaseName={toFileBaseName(selectedFile.title)}
-                autoSaveIntervalMs={20_000}
-                getSignedUrl={async ({ fileName }) => ({
-                  signedUrl: NOOP_UPLOAD_ENDPOINT,
-                  path: `local/script-lab/${selectedFile.id}/${fileName}`,
-                  method: "POST",
-                })}
-                saveMetadata={async () => {}}
-                onSaved={touchSelectedFile}
-              />
+              <div className="rounded-xl border dash-border">
+                <ScriptEditor
+                  key={selectedFile.id}
+                  deliverableId={getDeliverableId(selectedFile.id)}
+                  fileBaseName={toFileBaseName(selectedFile.title)}
+                  autoSaveIntervalMs={20_000}
+                  getSignedUrl={async ({ fileName }) => ({
+                    signedUrl: NOOP_UPLOAD_ENDPOINT,
+                    path: `local/script-lab/${selectedFile.id}/${fileName}`,
+                    method: "POST",
+                  })}
+                  saveMetadata={async () => {}}
+                  onSaved={touchSelectedFile}
+                />
+              </div>
             ) : (
               <div className="flex min-h-[520px] items-center justify-center rounded-xl border border-dashed dash-border text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
                 Create a script file to start writing.
