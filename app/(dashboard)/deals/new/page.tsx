@@ -507,6 +507,35 @@ export default function NewDealPage() {
                                 </CommandGroup>
                               </CommandList>
                             </Command>
+                            <div className="border-t p-3">
+                              <p className="mb-2 text-xs text-muted-foreground">
+                                Brand missing? Add it now.
+                              </p>
+                              <div className="flex gap-2">
+                                <Input
+                                  value={newBrandName}
+                                  onChange={(event) =>
+                                    setNewBrandName(event.target.value)
+                                  }
+                                  placeholder="New brand name"
+                                  className="h-9"
+                                />
+                                <Button
+                                  type="button"
+                                  onClick={() =>
+                                    createBrandMutation.mutate({
+                                      name: newBrandName.trim(),
+                                    })
+                                  }
+                                  disabled={!canCreateBrand}
+                                  className="h-9"
+                                >
+                                  {createBrandMutation.isPending
+                                    ? "Adding..."
+                                    : "Add"}
+                                </Button>
+                              </div>
+                            </div>
                           </PopoverContent>
                         </Popover>
                         {!hasBrands && !isLoadingBrands && (
