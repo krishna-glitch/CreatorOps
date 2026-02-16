@@ -23,6 +23,10 @@
 # misc
 .DS_Store
 *.pem
+*.key
+*.crt
+*.p12
+*.pfx
 
 # debug
 npm-debug.log*
@@ -39,12 +43,9 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
-next-env.d.ts
 
-# drizzle
-drizzle/
+# drizzle local artifacts
 .drizzle/
-migrations/
 
 # IDE
 .vscode/*
