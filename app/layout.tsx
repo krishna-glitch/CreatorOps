@@ -63,10 +63,21 @@ export default function RootLayout({
               (function() {
                 try {
                   var savedTheme = localStorage.getItem("creatorops-theme");
-                  // Default to 'dark' if no preference acts as "Midnight Gold" default
-                  var theme = savedTheme === "light" ? "light" : "dark";
+                  var supportsMatchMedia = typeof window.matchMedia === "function";
+                  var prefersDark = supportsMatchMedia
+                    ? window.matchMedia("(prefers-color-scheme: dark)").matches
+                    : true;
+                  var theme = "dark";
+
+                  if (savedTheme === "light" || savedTheme === "dark") {
+                    theme = savedTheme;
+                  } else if (savedTheme === "system" || !savedTheme) {
+                    theme = prefersDark ? "dark" : "light";
+                  }
+
                   document.documentElement.classList.toggle("dark", theme === "dark");
                   document.documentElement.setAttribute("data-theme", theme);
+                  document.documentElement.style.colorScheme = theme;
                 } catch (_) {}
               })();
             `,

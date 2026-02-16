@@ -41,25 +41,61 @@ export function SettingsClient({ user, storageUsage }: SettingsClientProps) {
   const [theme, setTheme] = useState<string>("system");
   const { defaultCurrency, setDefaultCurrency } = useDefaultCurrency();
 
+  const resolveThemeMode = (preference: string): "light" | "dark" => {
+    if (preference === "light" || preference === "dark") {
+      return preference;
+    }
+
+    const supportsMatchMedia =
+      typeof window !== "undefined" && typeof window.matchMedia === "function";
+    if (!supportsMatchMedia) {
+      return "dark";
+    }
+
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  };
+
+  const applyThemePreference = (preference: string) => {
+    const root = document.documentElement;
+    const resolved = resolveThemeMode(preference);
+
+    root.classList.toggle("dark", resolved === "dark");
+    root.setAttribute("data-theme", resolved);
+    root.style.colorScheme = resolved;
+  };
+
   useEffect(() => {
-    const savedTheme = localStorage.getItem("creatorops-theme") || "system";
-    setTheme(savedTheme);
+    try {
+      const rawTheme = localStorage.getItem("creatorops-theme");
+      const savedTheme =
+        rawTheme === "light" || rawTheme === "dark" || rawTheme === "system"
+          ? rawTheme
+          : "system";
+      setTheme(savedTheme);
+      applyThemePreference(savedTheme);
+    } catch {
+      setTheme("system");
+      applyThemePreference("system");
+    }
   }, []);
 
   const handleThemeChange = (newTheme: string) => {
-    setTheme(newTheme);
-    localStorage.setItem("creatorops-theme", newTheme);
-    
-    const root = document.documentElement;
-    if (newTheme === "system") {
-      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      root.classList.toggle("dark", prefersDark);
-      root.setAttribute("data-theme", prefersDark ? "dark" : "light");
-    } else {
-      root.classList.toggle("dark", newTheme === "dark");
-      root.setAttribute("data-theme", newTheme);
+    const safeTheme =
+      newTheme === "light" || newTheme === "dark" || newTheme === "system"
+        ? newTheme
+        : "system";
+
+    try {
+      setTheme(safeTheme);
+      localStorage.setItem("creatorops-theme", safeTheme);
+      applyThemePreference(safeTheme);
+      toast.success(`Theme set to ${safeTheme}`);
+    } catch (error) {
+      console.error("Failed to update theme preference", error);
+      toast.error("Could not change theme on this device/browser.");
     }
-    toast.success(`Theme set to ${newTheme}`);
   };
 
   const handleExport = () => {
