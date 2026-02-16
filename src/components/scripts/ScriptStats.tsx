@@ -194,117 +194,90 @@ export function ScriptStats({ text, className }: ScriptStatsProps) {
     : "No duration target for this content type.";
 
   return (
-    <div className={cn("rounded-lg border bg-card p-3 text-card-foreground", className)}>
-      <div className="flex items-center justify-between gap-2">
-        <div className="text-sm font-medium">Script Stats</div>
-        <button
-          type="button"
-          onClick={() => setIsExpanded((prev) => !prev)}
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-        >
-          {isExpanded ? "Less" : "Details"}
-          {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-        </button>
-      </div>
-
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <div>
-          <p className="mb-1 text-[11px] uppercase tracking-wide text-muted-foreground">Platform</p>
-          <Select
-            value={platform}
-            onValueChange={(value) => {
-              if (!isPlatform(value)) return;
-              setPlatform(value);
-
-              const nextOptions = getContentTypeOptions(value);
-              if (!nextOptions.includes(contentType)) {
-                setContentType(nextOptions[0] ?? "video");
-              }
-            }}
-          >
-            <SelectTrigger className="h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {platformOptions.map((option) => (
-                <SelectItem key={option} value={option}>
-                  {platformLabel[option]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+    <div className={cn("flex flex-col gap-4", className)}>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1 rounded-xl border dash-border dash-bg-card p-3 shadow-sm">
+          <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Words</p>
+          <p className="text-2xl font-bold text-slate-900">{estimate.wordCount}</p>
         </div>
-
-        <div>
-          <p className="mb-1 text-[11px] uppercase tracking-wide text-muted-foreground">Type</p>
-          <Select value={contentType} onValueChange={setContentType}>
-            <SelectTrigger className="h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {contentTypeOptions.map((option) => (
-                <SelectItem key={option} value={option}>
-                  {contentTypeLabel[option] ?? option}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="space-y-1 rounded-xl border dash-border dash-bg-card p-3 shadow-sm">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Duration</p>
+            <Badge variant="outline" className={cn("h-5 px-1.5 text-[10px]", indicatorStyles.badgeClass)}>
+              {indicatorStyles.iconText} {indicator.label}
+            </Badge>
+          </div>
+          <p className="text-2xl font-bold text-slate-900">{formatDuration(estimate.estimatedSeconds)}</p>
         </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-3 gap-2">
-        <div className="rounded-md border bg-background px-2 py-2">
-          <p className="text-[11px] text-muted-foreground">Words</p>
-          <p className="text-sm font-semibold">{estimate.wordCount}</p>
-        </div>
-        <div className="rounded-md border bg-background px-2 py-2">
-          <p className="text-[11px] text-muted-foreground">Chars</p>
-          <p className="text-sm font-semibold">{estimate.characterCount}</p>
-        </div>
-        <div className="rounded-md border bg-background px-2 py-2">
-          <p className="text-[11px] text-muted-foreground">Duration</p>
-          <p className="text-sm font-semibold">{formatDuration(estimate.estimatedSeconds)}</p>
-        </div>
-      </div>
+      <div className="rounded-xl border dash-border dash-bg-card p-4 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-slate-900">Target</span>
+            <span className="text-xs text-slate-500">{rangeHint}</span>
+          </div>
 
-      <div className="mt-3 flex items-center justify-between gap-2">
-        <Badge variant="outline" className={cn("text-xs", indicatorStyles.badgeClass)}>
-          <indicatorStyles.Icon className="mr-1 h-3.5 w-3.5" />
-          {indicatorStyles.iconText} {indicator.label}
-        </Badge>
-        {isCalculating ? (
-          <p className="text-xs text-muted-foreground">Calculating...</p>
-        ) : (
-          <p className="text-xs text-muted-foreground">{rangeHint}</p>
+          <div className="flex items-center gap-2">
+            <Select
+              value={platform}
+              onValueChange={(value) => {
+                if (!isPlatform(value)) return;
+                setPlatform(value);
+                const nextOptions = getContentTypeOptions(value);
+                if (!nextOptions.includes(contentType)) {
+                  setContentType(nextOptions[0] ?? "video");
+                }
+              }}
+            >
+              <SelectTrigger className="h-6 w-auto gap-1 border-none bg-transparent p-0 text-xs font-medium text-slate-500 shadow-none hover:text-slate-900 focus:ring-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {platformOptions.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {platformLabel[option]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span className="text-slate-300">/</span>
+            <Select value={contentType} onValueChange={setContentType}>
+              <SelectTrigger className="h-6 w-auto gap-1 border-none bg-transparent p-0 text-xs font-medium text-slate-500 shadow-none hover:text-slate-900 focus:ring-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {contentTypeOptions.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {contentTypeLabel[option] ?? option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <div className="h-2 w-full overflow-hidden rounded-full dash-bg-card">
+            <div
+              className={cn("h-full transition-all duration-500 ease-out", indicatorStyles.barClass)}
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+          <div className="mt-2 flex justify-between text-[10px] text-slate-400">
+            <span>0s</span>
+            <span>{target ? `${target.max}s` : "No limit"}</span>
+          </div>
+        </div>
+
+        {estimate.suggestion && (
+          <div className="mt-4 rounded-lg dash-bg-card p-2 text-xs leading-relaxed text-slate-600">
+            {estimate.suggestion}
+          </div>
         )}
       </div>
-
-      <div className="mt-2">
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-          <div
-            className={cn("h-full transition-all", indicatorStyles.barClass)}
-            style={{ width: `${progressPercent}%` }}
-          />
-        </div>
-      </div>
-
-      <p className="mt-2 text-xs text-muted-foreground">{estimate.suggestion}</p>
-
-      {isExpanded ? (
-        <div className="mt-3 grid grid-cols-2 gap-2 border-t pt-3">
-          <div className="rounded-md bg-muted/40 px-2 py-2">
-            <p className="text-[11px] text-muted-foreground">Current Platform</p>
-            <p className="text-xs font-medium">
-              {platformLabel[platform]} {contentTypeLabel[contentType] ?? contentType}
-            </p>
-          </div>
-          <div className="rounded-md bg-muted/40 px-2 py-2">
-            <p className="text-[11px] text-muted-foreground">Target Window</p>
-            <p className="text-xs font-medium">{rangeHint}</p>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
+
 

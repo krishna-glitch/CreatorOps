@@ -89,7 +89,7 @@ function getStatusBadgeClassName(status: MediaAssetStatus) {
     return "border-transparent bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300";
   }
 
-  return "border-transparent bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200";
+  return "border-transparent dash-bg-card text-gray-700 dark:bg-gray-800 dark:text-gray-200";
 }
 
 function toLocalDate(value: string | Date) {
@@ -148,7 +148,7 @@ export function DeliverableMediaSection({
   }, [assets]);
 
   return (
-    <section className="space-y-4 rounded-lg border border-gray-200 bg-white/60 p-3 dark:border-gray-800 dark:bg-gray-950/40">
+    <section className="space-y-4 rounded-lg border dash-border dash-bg-card p-3 dash-border dash-bg-panel">
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">Content Files</h3>
         <div className="flex items-center gap-2">
@@ -171,7 +171,7 @@ export function DeliverableMediaSection({
             </p>
 
             {items.length === 0 ? (
-              <p className="rounded-md border border-dashed border-gray-200 px-3 py-2 text-xs text-muted-foreground dark:border-gray-800">
+              <p className="rounded-md border border-dashed dash-border px-3 py-2 text-xs text-muted-foreground dash-border">
                 No {group.label.toLowerCase()} uploaded yet.
               </p>
             ) : (
@@ -179,7 +179,7 @@ export function DeliverableMediaSection({
                 {items.map((asset) => (
                   <article
                     key={asset.id}
-                    className="rounded-md border border-gray-200 p-3 dark:border-gray-800"
+                    className="rounded-md border dash-border p-3 dash-border"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex min-w-0 items-center gap-2">
@@ -206,7 +206,7 @@ export function DeliverableMediaSection({
                     ) : null}
 
                     {group.type === "SCRIPT" ? (
-                      <pre className="mt-2 max-h-28 overflow-auto whitespace-pre-wrap rounded-md border border-gray-200 bg-gray-50 p-2 text-xs dark:border-gray-800 dark:bg-gray-900">
+                      <pre className="mt-2 max-h-28 overflow-auto whitespace-pre-wrap rounded-md border dash-border dash-bg-card p-2 text-xs dash-border dark:bg-gray-900">
                         {getScriptPreview(asset.scriptPreview) ?? "No preview available."}
                       </pre>
                     ) : null}
@@ -218,7 +218,7 @@ export function DeliverableMediaSection({
                       <img
                         src={asset.thumbnailUrl}
                         alt={`${asset.fileName} preview`}
-                        className="mt-2 h-24 w-40 rounded-md border border-gray-200 object-cover dark:border-gray-800"
+                        className="mt-2 h-24 w-40 rounded-md border dash-border object-cover dash-border"
                       />
                     ) : null}
 
@@ -322,7 +322,7 @@ export function DeliverableMediaSection({
                       ) : null}
                     </div>
 
-                    <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-900">
+                    <div className="mt-3 rounded-md border dash-border dash-bg-card p-2 dash-border dark:bg-gray-900">
                       <p className="text-xs font-medium text-muted-foreground">
                         Approval Timeline
                       </p>
@@ -436,7 +436,7 @@ export function DeliverableMediaSection({
               value={rejectNotes}
               onChange={(event) => setRejectNotes(event.target.value)}
               rows={5}
-              className="w-full rounded-md border border-gray-300 bg-white p-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+              className="w-full rounded-md border dash-border dash-bg-card p-2 text-sm dark:border-gray-700 dash-bg-panel"
               placeholder="Explain what needs to change..."
             />
             <div className="flex justify-end gap-2">

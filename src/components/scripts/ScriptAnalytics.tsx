@@ -1,6 +1,14 @@
 "use client";
 
-import { BarChart3, ChevronDown, ChevronUp, Download, Minus, TrendingUp } from "lucide-react";
+import {
+  BarChart3,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Download,
+  Minus,
+  TrendingUp,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Badge } from "@/components/ui/badge";
@@ -79,7 +87,7 @@ function getSentimentBadge(sentiment: SentimentResult["sentiment"]) {
   if (sentiment === "negative") {
     return "border-rose-200 bg-rose-100 text-rose-700";
   }
-  return "border-slate-200 bg-slate-100 text-slate-700";
+  return "dash-border dash-bg-card text-slate-700";
 }
 
 function normalizeSentimentScore(score: number): number {
@@ -265,236 +273,221 @@ export function ScriptAnalytics({
   }
 
   return (
-    <Card className={cn("rounded-xl border bg-white shadow-sm", className)}>
-      <CardHeader className="space-y-3 pb-3">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <BarChart3 className="h-4 w-4 text-slate-600" />
-              {title}
-            </CardTitle>
-            <p className="mt-1 text-xs text-slate-500">Quality, readability, engagement, sentiment, and keyword insights.</p>
-          </div>
+    <div className={cn("flex flex-col gap-4", className)}>
+      <div className="rounded-xl border dash-border dash-bg-card p-4 shadow-sm">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full border dash-border dash-bg-card text-slate-500">
+              <BarChart3 className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-900">{title}</p>
+              <p className="text-[10px] text-slate-500">AI-powered content analysis</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
             <Button
               type="button"
               variant="ghost"
-              size="sm"
+              size="icon"
               onClick={() => expandCollapseAll(false)}
-              className="h-8 px-2 text-xs"
+              className="h-7 w-7 text-slate-400 hover:text-slate-600"
+              title="Collapse all"
             >
-              <Minus className="mr-1 h-3.5 w-3.5" />
-              Collapse all
+              <Minus className="h-3.5 w-3.5" />
             </Button>
             <Button
               type="button"
               variant="ghost"
-              size="sm"
+              size="icon"
               onClick={() => expandCollapseAll(true)}
-              className="h-8 px-2 text-xs"
+              className="h-7 w-7 text-slate-400 hover:text-slate-600"
+              title="Expand all"
             >
-              <TrendingUp className="mr-1 h-3.5 w-3.5" />
-              Expand all
+              <TrendingUp className="h-3.5 w-3.5" />
             </Button>
-            {enablePdfExport ? <ExportPdfButton onExport={handleExportPdf} /> : null}
+            {enablePdfExport && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={handleExportPdf}
+                className="h-7 w-7 text-slate-400 hover:text-slate-600"
+                title="Export PDF"
+              >
+                <Download className="h-3.5 w-3.5" />
+              </Button>
+            )}
           </div>
         </div>
-      </CardHeader>
 
-      <CardContent className="space-y-3">
-        <Section title="1. Quality Score (Overall)" expanded={expanded.quality} onToggle={() => toggle("quality")}>
-          <div className={cn("rounded-lg border p-4", qualityTone.bgClass)}>
-            <div className="flex items-end gap-3">
-              <p className={cn("text-4xl font-bold leading-none", qualityTone.textClass)}>{qualityScore}</p>
-              <p className="pb-1 text-sm text-slate-600">/100</p>
-              <Badge variant="outline" className={cn("ml-auto", qualityTone.badgeClass)}>
-                {qualityTone.label}
-              </Badge>
-            </div>
-            <p className="mt-3 text-sm text-slate-600">
-              Derived from readability, engagement, and sentiment.
-            </p>
-            <div className="mt-4 grid grid-cols-1 gap-2 text-xs text-slate-600 sm:grid-cols-3">
-              <div className="rounded border bg-white px-3 py-2">
-                Readability: <span className="font-semibold">{metrics.readability.score}</span>
+        <div className="mt-4 space-y-3">
+          <Section title="Quality Score" expanded={expanded.quality} onToggle={() => toggle("quality")}>
+            <div className={cn("rounded-lg border p-4 transition-colors", qualityTone.bgClass, qualityTone.textClass.replace("text-", "border-").replace("700", "200"))}>
+              <div className="flex items-end justify-between">
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider opacity-80 font-semibold">Overall Score</p>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-4xl font-bold tracking-tight">{qualityScore}</span>
+                    <span className="text-sm opacity-60">/100</span>
+                  </div>
+                </div>
+                <Badge variant="outline" className={cn("mb-1", qualityTone.badgeClass)}>
+                  {qualityTone.label}
+                </Badge>
               </div>
-              <div className="rounded border bg-white px-3 py-2">
-                Engagement: <span className="font-semibold">{metrics.engagement.score}</span>
+
+              <div className="mt-4 grid grid-cols-3 gap-2">
+                <div className="rounded-md dash-bg-card p-2 text-center backdrop-blur-sm">
+                  <p className="text-[10px] uppercase tracking-wide opacity-70">Readability</p>
+                  <p className="text-lg font-bold">{metrics.readability.score}</p>
+                </div>
+                <div className="rounded-md dash-bg-card p-2 text-center backdrop-blur-sm">
+                  <p className="text-[10px] uppercase tracking-wide opacity-70">Engagement</p>
+                  <p className="text-lg font-bold">{metrics.engagement.score}</p>
+                </div>
+                <div className="rounded-md dash-bg-card p-2 text-center backdrop-blur-sm">
+                  <p className="text-[10px] uppercase tracking-wide opacity-70">Sentiment</p>
+                  <p className="text-lg font-bold">{metrics.sentiment.score}</p>
+                </div>
               </div>
-              <div className="rounded border bg-white px-3 py-2">
-                Sentiment: <span className="font-semibold">{metrics.sentiment.score}</span>
+            </div>
+          </Section>
+
+          <Section title="Readability" expanded={expanded.readability} onToggle={() => toggle("readability")}>
+            <div className="space-y-3">
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-lg border border-slate-100 dash-bg-card p-2 text-center">
+                  <p className="text-[10px] text-slate-500 uppercase">Grade</p>
+                  <p className="font-semibold text-slate-900">{metrics.readability.grade}</p>
+                </div>
+                <div className="rounded-lg border border-slate-100 dash-bg-card p-2 text-center">
+                  <p className="text-[10px] text-slate-500 uppercase">Level</p>
+                  <p className="font-semibold text-slate-900">{metrics.readability.level}</p>
+                </div>
+                <div className="rounded-lg border border-slate-100 dash-bg-card p-2 text-center">
+                  <p className="text-[10px] text-slate-500 uppercase">Score</p>
+                  <p className="font-semibold text-slate-900">{metrics.readability.score}</p>
+                </div>
+              </div>
+              <div className="rounded-md bg-emerald-50/50 px-3 py-2 text-xs text-emerald-800 border border-emerald-100">
+                <span className="font-medium">Tip:</span> {getReadabilityTip(metrics.readability.score)}
               </div>
             </div>
-          </div>
-        </Section>
+          </Section>
 
-        <Section title="2. Readability" expanded={expanded.readability} onToggle={() => toggle("readability")}>
-          <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
-            <div className="rounded border bg-slate-50 px-3 py-2">
-              <p className="text-xs text-slate-500">Score</p>
-              <p className="text-lg font-semibold text-slate-900">{metrics.readability.score}</p>
-            </div>
-            <div className="rounded border bg-slate-50 px-3 py-2">
-              <p className="text-xs text-slate-500">Reading Level</p>
-              <p className="text-lg font-semibold text-slate-900">{metrics.readability.level}</p>
-            </div>
-            <div className="rounded border bg-slate-50 px-3 py-2">
-              <p className="text-xs text-slate-500">US Grade</p>
-              <p className="text-lg font-semibold text-slate-900">{metrics.readability.grade}</p>
-            </div>
-          </div>
-          <p className="mt-3 rounded-md border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-            Tip: {getReadabilityTip(metrics.readability.score)}
-          </p>
-        </Section>
+          <Section title="Engagement" expanded={expanded.engagement} onToggle={() => toggle("engagement")}>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between rounded-lg border border-slate-100 dash-bg-card p-3">
+                <span className="text-xs font-medium text-slate-600">Engagement Potential</span>
+                <span className="text-lg font-bold text-slate-900">{metrics.engagement.score}/100</span>
+              </div>
 
-        <Section title="3. Engagement" expanded={expanded.engagement} onToggle={() => toggle("engagement")}>
-          <div className="mb-3">
-            <p className="text-2xl font-bold text-slate-900">{metrics.engagement.score}/100</p>
-          </div>
-          <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-            <div className="rounded border px-3 py-2">
-              {metrics.engagement.factors.hasQuestions ? "✓" : "✗"} Has questions
-              <span className="ml-2 text-xs text-slate-500">({metrics.engagement.factors.questionCount})</span>
-            </div>
-            <div className="rounded border px-3 py-2">
-              {metrics.engagement.factors.hasCallToAction ? "✓" : "✗"} Has call to action
-            </div>
-            <div className="rounded border px-3 py-2">
-              Emojis: <span className="font-semibold">{metrics.engagement.factors.emojiCount}</span>
-            </div>
-            <div className="rounded border px-3 py-2">
-              Personal pronouns: <span className="font-semibold">{metrics.engagement.factors.personalPronouns}</span>
-            </div>
-          </div>
-          <p className="mt-3 rounded-md border border-amber-100 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            Tip: {getEngagementTip(metrics)}
-          </p>
-        </Section>
+              <div className="grid grid-cols-2 gap-2">
+                <div className={cn("flex items-center gap-2 rounded border p-2 text-xs", metrics.engagement.factors.hasQuestions ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "dash-border dash-bg-card text-slate-500")}>
+                  {metrics.engagement.factors.hasQuestions ? <CheckCircle2 className="h-3 w-3" /> : <div className="h-3 w-3 rounded-full border border-current" />}
+                  <span>Questions ({metrics.engagement.factors.questionCount})</span>
+                </div>
+                <div className={cn("flex items-center gap-2 rounded border p-2 text-xs", metrics.engagement.factors.hasCallToAction ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "dash-border dash-bg-card text-slate-500")}>
+                  {metrics.engagement.factors.hasCallToAction ? <CheckCircle2 className="h-3 w-3" /> : <div className="h-3 w-3 rounded-full border border-current" />}
+                  <span>Call to Action</span>
+                </div>
+                <div className="flex items-center justify-between rounded border dash-border dash-bg-card p-2 text-xs text-slate-600">
+                  <span>Emojis</span>
+                  <span className="font-semibold">{metrics.engagement.factors.emojiCount}</span>
+                </div>
+                <div className="flex items-center justify-between rounded border dash-border dash-bg-card p-2 text-xs text-slate-600">
+                  <span>"You/Your"</span>
+                  <span className="font-semibold">{metrics.engagement.factors.personalPronouns}</span>
+                </div>
+              </div>
 
-        <Section title="4. Sentiment" expanded={expanded.sentiment} onToggle={() => toggle("sentiment")}>
-          <div className="flex items-center gap-3">
-            <Badge variant="outline" className={cn(getSentimentBadge(metrics.sentiment.sentiment))}>
-              {metrics.sentiment.sentiment.toUpperCase()}
-            </Badge>
-            <span className="text-sm text-slate-600">Score: {metrics.sentiment.score}</span>
-          </div>
-          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <div className="rounded border bg-emerald-50 px-3 py-2">
-              <p className="text-xs text-emerald-700">Top positive words</p>
-              <p className="mt-1 text-sm text-emerald-800">
-                {sentimentDetails.positive.length > 0 ? sentimentDetails.positive.join(", ") : "None detected"}
-              </p>
+              <div className="rounded-md bg-amber-50/50 px-3 py-2 text-xs text-amber-800 border border-amber-100">
+                <span className="font-medium">Tip:</span> {getEngagementTip(metrics)}
+              </div>
             </div>
-            <div className="rounded border bg-rose-50 px-3 py-2">
-              <p className="text-xs text-rose-700">Top negative words</p>
-              <p className="mt-1 text-sm text-rose-800">
-                {sentimentDetails.negative.length > 0 ? sentimentDetails.negative.join(", ") : "None detected"}
-              </p>
-            </div>
-          </div>
-        </Section>
+          </Section>
 
-        <Section title="5. Keywords" expanded={expanded.keywords} onToggle={() => toggle("keywords")}>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={keywordChartData} margin={{ left: 8, right: 8, top: 8, bottom: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="word" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} unit="%" />
-                <Tooltip
-                  formatter={(value) => {
-                    const numericValue =
-                      typeof value === "number"
-                        ? value
-                        : Number(Array.isArray(value) ? value[0] : value ?? 0);
-                    return [`${numericValue}%`, "Density"];
-                  }}
-                />
-                <Bar dataKey="density" fill="#0f766e" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="mt-3 space-y-1 text-xs text-slate-600">
-            {metrics.keywords.slice(0, 10).map((item) => (
-              <p key={item.word}>
-                {item.word}: {item.count} ({item.percentage}%)
-              </p>
-            ))}
-            {metrics.keywords.length === 0 ? <p>No meaningful keywords yet.</p> : null}
-          </div>
-          <p className="mt-3 rounded-md border border-sky-100 bg-sky-50 px-3 py-2 text-sm text-sky-800">
-            Tip: {getKeywordTip(metrics.keywords)}
-          </p>
-        </Section>
+          <Section title="Sentiment Analysis" expanded={expanded.sentiment} onToggle={() => toggle("sentiment")}>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Badge variant="outline" className={cn(getSentimentBadge(metrics.sentiment.sentiment))}>
+                  {metrics.sentiment.sentiment.toUpperCase()}
+                </Badge>
+                <span className="text-xs font-medium text-slate-500">Intensity: {metrics.sentiment.score}</span>
+              </div>
 
-        <Section title="6. Quick Stats" expanded={expanded.quickStats} onToggle={() => toggle("quickStats")}>
-          <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
-            <div className="rounded border px-3 py-2">
-              <p className="text-xs text-slate-500">Words</p>
-              <p className="font-semibold">{metrics.basic.words}</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <p className="text-[10px] uppercase text-emerald-600 font-semibold mb-1">Positives</p>
+                  {sentimentDetails.positive.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {sentimentDetails.positive.map(w => (
+                        <span key={w} className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] text-emerald-700 border border-emerald-100">{w}</span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-slate-400 italic">None detected</p>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] uppercase text-rose-600 font-semibold mb-1">Negatives</p>
+                  {sentimentDetails.negative.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {sentimentDetails.negative.map(w => (
+                        <span key={w} className="rounded bg-rose-50 px-1.5 py-0.5 text-[10px] text-rose-700 border border-rose-100">{w}</span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-slate-400 italic">None detected</p>
+                  )}
+                </div>
+              </div>
             </div>
-            <div className="rounded border px-3 py-2">
-              <p className="text-xs text-slate-500">Sentences</p>
-              <p className="font-semibold">{metrics.basic.sentences}</p>
-            </div>
-            <div className="rounded border px-3 py-2">
-              <p className="text-xs text-slate-500">Avg Sentence Length</p>
-              <p className="font-semibold">{metrics.basic.avgSentenceLength}</p>
-            </div>
-            <div className="rounded border px-3 py-2">
-              <p className="text-xs text-slate-500">Characters</p>
-              <p className="font-semibold">{metrics.basic.characters}</p>
-            </div>
-            <div className="rounded border px-3 py-2">
-              <p className="text-xs text-slate-500">Emojis</p>
-              <p className="font-semibold">{metrics.basic.emojis}</p>
-            </div>
-            <div className="rounded border px-3 py-2">
-              <p className="text-xs text-slate-500">Hashtags</p>
-              <p className="font-semibold">{metrics.basic.hashtags}</p>
-            </div>
-            <div className="rounded border px-3 py-2">
-              <p className="text-xs text-slate-500">Mentions</p>
-              <p className="font-semibold">{metrics.basic.mentions}</p>
-            </div>
-            <div className="rounded border px-3 py-2">
-              <p className="text-xs text-slate-500">Links</p>
-              <p className="font-semibold">{metrics.basic.links}</p>
-            </div>
-          </div>
-        </Section>
+          </Section>
 
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-          <p className="mb-3 text-sm font-semibold text-slate-800">Compare with top performers</p>
-          <div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded border bg-white px-3 py-2">
-              <p className="text-slate-500">Quality</p>
-              <p className="font-semibold text-slate-900">
-                {compareLabel(qualityScore, topAverages.quality)}
-              </p>
+          <Section title="Keywords & Topics" expanded={expanded.keywords} onToggle={() => toggle("keywords")}>
+            <div className="space-y-3">
+              <div className="h-48 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={keywordChartData} margin={{ left: -20, right: 0, top: 10, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                    <XAxis dataKey="word" tick={{ fontSize: 10, fill: "#64748b" }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: "#64748b" }} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      cursor={{ fill: "#f8fafc" }}
+                      contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0", fontSize: "12px" }}
+                    />
+                    <Bar dataKey="density" fill="#0f172a" radius={[4, 4, 0, 0]} barSize={20} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="rounded-md bg-blue-50/50 px-3 py-2 text-xs text-blue-800 border border-blue-100">
+                <span className="font-medium">Tip:</span> {getKeywordTip(metrics.keywords)}
+              </div>
             </div>
-            <div className="rounded border bg-white px-3 py-2">
-              <p className="text-slate-500">Readability</p>
-              <p className="font-semibold text-slate-900">
-                {compareLabel(metrics.readability.score, topAverages.readability)}
-              </p>
+          </Section>
+
+          <Section title="Quick Stats" expanded={expanded.quickStats} onToggle={() => toggle("quickStats")}>
+            <div className="grid grid-cols-4 gap-2 text-center">
+              {[
+                { label: "Words", value: metrics.basic.words },
+                { label: "Sentences", value: metrics.basic.sentences },
+                { label: "Links", value: metrics.basic.links },
+                { label: "Mentions", value: metrics.basic.mentions },
+                { label: "Hashtags", value: metrics.basic.hashtags },
+                { label: "Emojis", value: metrics.basic.emojis },
+                { label: "Chars", value: metrics.basic.characters, colSpan: 2 },
+              ].map((stat) => (
+                <div key={stat.label} className={cn("rounded border border-slate-100 dash-bg-card p-2", stat.colSpan && `col-span-${stat.colSpan}`)}>
+                  <p className="text-[10px] text-slate-500 uppercase">{stat.label}</p>
+                  <p className="font-semibold text-slate-900">{stat.value}</p>
+                </div>
+              ))}
             </div>
-            <div className="rounded border bg-white px-3 py-2">
-              <p className="text-slate-500">Engagement</p>
-              <p className="font-semibold text-slate-900">
-                {compareLabel(metrics.engagement.score, topAverages.engagement)}
-              </p>
-            </div>
-            <div className="rounded border bg-white px-3 py-2">
-              <p className="text-slate-500">Sentiment</p>
-              <p className="font-semibold text-slate-900">
-                {compareLabel(metrics.sentiment.score, topAverages.sentiment, true)}
-              </p>
-            </div>
-          </div>
+          </Section>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

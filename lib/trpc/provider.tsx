@@ -12,6 +12,14 @@ function getBaseUrl() {
   return `http://localhost:${process.env.PORT ?? 3000}`;
 }
 
+function createIdempotencyKey() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
 export function TRPCProvider({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
     () =>
@@ -31,6 +39,18 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
         httpBatchLink({
           url: `${getBaseUrl()}/api/trpc`,
           transformer: superjson,
+          headers({ opList }) {
+            const hasMutation = opList.some((operation) => operation.type === "mutation");
+
+            if (!hasMutation) {
+              return {};
+            }
+
+            return {
+              "x-trpc-mutation-batch": "1",
+              "x-idempotency-key": createIdempotencyKey(),
+            };
+          },
         }),
       ],
     }),

@@ -11,19 +11,19 @@ const buttonVariants = cva(
       variant: {
         default:
           "bg-foreground text-background shadow-sm hover:bg-foreground/90",
-        destructive: "bg-red-500 text-white shadow-sm hover:bg-red-600",
+        destructive: "border border-[var(--shell-tone-red-border)] bg-[var(--shell-tone-red-bg)] text-[var(--shell-tone-red-text)] shadow-sm hover:opacity-90",
         outline:
-          "border border-gray-200 bg-background shadow-sm hover:bg-gray-100 hover:text-foreground dark:border-gray-800 dark:hover:bg-gray-800",
+          "border border-border bg-background text-foreground shadow-sm hover:bg-[var(--shell-gold-soft)] hover:text-foreground",
         secondary:
-          "bg-gray-100 text-foreground shadow-sm hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700",
-        ghost: "hover:bg-gray-100 hover:text-foreground dark:hover:bg-gray-800",
+          "border border-border bg-background text-foreground shadow-sm hover:bg-[var(--shell-gold-soft)]",
+        ghost: "text-foreground hover:bg-[var(--shell-gold-soft)] hover:text-foreground",
         link: "text-foreground underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-10 px-4 py-2",
-        sm: "h-9 rounded-md px-3",
+        default: "h-11 px-4 py-2",
+        sm: "h-11 rounded-md px-3",
         lg: "h-11 rounded-lg px-8",
-        icon: "h-10 w-10",
+        icon: "h-11 w-11",
       },
     },
     defaultVariants: {

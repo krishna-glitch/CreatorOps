@@ -1,0 +1,53 @@
+{
+  "generatedAt": "2026-02-16T18:00:32.584Z",
+  "user": {
+    "id": "33681343-b51c-44f6-909a-70f2f74c0467",
+    "deals": 23
+  },
+  "config": {
+    "runs": 20,
+    "concurrency": 4
+  },
+  "scenarios": [
+    {
+      "name": "deals.list initial page",
+      "runs": 20,
+      "concurrency": 4,
+      "minMs": 27.35112499999991,
+      "p50Ms": 32.35900000000004,
+      "p95Ms": 322.047375,
+      "maxMs": 322.13712499999997,
+      "avgMs": 82.7250603
+    },
+    {
+      "name": "deals.list next page",
+      "runs": 20,
+      "concurrency": 4,
+      "minMs": 26.48333300000013,
+      "p50Ms": 32.152000000000044,
+      "p95Ms": 85.683041,
+      "maxMs": 86.08895899999993,
+      "avgMs": 42.3156729
+    },
+    {
+      "name": "analytics dashboard rollup",
+      "runs": 20,
+      "concurrency": 4,
+      "minMs": 26.217750000000024,
+      "p50Ms": 30.46004199999993,
+      "p95Ms": 117.57183299999997,
+      "maxMs": 117.59187500000007,
+      "avgMs": 54.283831449999994
+    },
+    {
+      "name": "analytics revenue by platform",
+      "runs": 20,
+      "concurrency": 4,
+      "minMs": 27.76020799999992,
+      "p50Ms": 29.889499999999998,
+      "p95Ms": 67.35783300000003,
+      "maxMs": 67.46741699999984,
+      "avgMs": 37.61534784999999
+    }
+  ]
+}

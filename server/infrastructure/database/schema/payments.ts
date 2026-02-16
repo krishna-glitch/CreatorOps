@@ -33,6 +33,14 @@ export const payments = pgTable(
         table.status,
         table.expectedDate,
       ),
+      dealStatusPaidAtIdx: index("payments_deal_status_paid_at_idx").on(
+        table.dealId,
+        table.status,
+        table.paidAt,
+      ),
+      dealStatusExpectedDateIdx: index(
+        "payments_deal_status_expected_date_idx",
+      ).on(table.dealId, table.status, table.expectedDate),
     };
   },
 );

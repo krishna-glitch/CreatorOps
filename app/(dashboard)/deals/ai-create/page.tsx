@@ -39,18 +39,63 @@ function confidenceClass(confidence: number) {
     return "border-yellow-200 bg-yellow-50 text-yellow-700";
   }
 
-  return "border-gray-200 bg-gray-50 text-gray-700";
+  return "dash-border dash-bg-card text-gray-700";
 }
 
 function getCreateDealErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    if (error.message.includes("Brand not found")) {
-      return "Selected brand was not found. Please refresh and try again.";
-    }
+  const trpcLikeError =
+    typeof error === "object" && error !== null ? error : null;
+  const trpcMessage =
+    trpcLikeError &&
+    "message" in trpcLikeError &&
+    typeof trpcLikeError.message === "string"
+      ? trpcLikeError.message
+      : null;
+  const zodError =
+    trpcLikeError &&
+    "data" in trpcLikeError &&
+    typeof trpcLikeError.data === "object" &&
+    trpcLikeError.data !== null &&
+    "zodError" in trpcLikeError.data &&
+    typeof trpcLikeError.data.zodError === "object" &&
+    trpcLikeError.data.zodError !== null
+      ? trpcLikeError.data.zodError
+      : null;
 
-    if (error.message.includes("UNAUTHORIZED")) {
-      return "Your session expired. Please sign in again.";
+  if (
+    zodError &&
+    "fieldErrors" in zodError &&
+    typeof zodError.fieldErrors === "object" &&
+    zodError.fieldErrors !== null
+  ) {
+    const firstFieldError = Object.values(
+      zodError.fieldErrors as Record<string, unknown>,
+    ).find((value) => Array.isArray(value) && typeof value[0] === "string") as
+      | string[]
+      | undefined;
+
+    if (firstFieldError?.[0]) {
+      return firstFieldError[0];
     }
+  }
+
+  if (trpcMessage?.includes("Brand not found")) {
+    return "Selected brand was not found. Please refresh and try again.";
+  }
+
+  if (trpcMessage?.includes("UNAUTHORIZED")) {
+    return "Your session expired. Please sign in again.";
+  }
+
+  if (
+    trpcMessage?.includes("Failed query:") ||
+    trpcMessage?.includes("Could not create deal:")
+  ) {
+    return "Could not create deal right now. Please try again in a moment.";
+  }
+
+  if (trpcMessage && trpcMessage.trim().length > 0) {
+    return trpcMessage;
   }
 
   return "Could not create the deal. Please check your inputs and try again.";
@@ -122,7 +167,10 @@ function calculateFuzzyScore(source: string, candidate: string) {
   return calculateTokenOverlapScore(sourceNormalized, candidateNormalized);
 }
 
-function findBrandMatch(extractedBrandName: string, brands: BrandItem[]): BrandMatchResult {
+function findBrandMatch(
+  extractedBrandName: string,
+  brands: BrandItem[],
+): BrandMatchResult {
   const normalizedExtracted = normalizeBrandName(extractedBrandName);
   if (!normalizedExtracted || brands.length === 0) {
     return { kind: "none" };
@@ -156,19 +204,27 @@ function findBrandMatch(extractedBrandName: string, brands: BrandItem[]): BrandM
 
 export default function AICreateDealPage() {
   const router = useRouter();
+  const trpcUtils = trpc.useUtils();
   const hasRedirectedForQuotaRef = useRef(false);
 
   const { data: brands, isLoading: isLoadingBrands } =
     trpc.brands.list.useQuery({ limit: 100 });
-  const aiAvailabilityQuery = trpc.ai.extractionAvailability.useQuery(undefined, {
-    refetchOnWindowFocus: true,
-    refetchInterval: 60_000,
-  });
+  const aiAvailabilityQuery = trpc.ai.extractionAvailability.useQuery(
+    undefined,
+    {
+      refetchOnWindowFocus: true,
+      refetchInterval: 60_000,
+    },
+  );
 
   const parseMessageMutation = trpc.deals.parseMessage.useMutation();
   const smartParseMutation = trpc.deals.smartParse.useMutation();
   const createDealMutation = trpc.deals.create.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
+      await Promise.all([
+        trpcUtils.deals.list.invalidate(),
+        trpcUtils.analytics.getDashboardStats.invalidate(),
+      ]);
       toast.success("Deal created successfully.", { duration: 3000 });
       router.push("/deals");
     },
@@ -196,7 +252,7 @@ export default function AICreateDealPage() {
 
   const confidenceStyles = useMemo(() => {
     if (confidence === null) {
-      return "border-gray-200 bg-gray-50 text-gray-700";
+      return "dash-border dash-bg-card text-gray-700";
     }
 
     return confidenceClass(confidence);
@@ -264,9 +320,12 @@ export default function AICreateDealPage() {
       setStatus(result.status);
 
       if (result.total_value !== null && result.currency === null) {
-        toast.info("Amount found but currency was not detected. Please select it.", {
-          duration: 3000,
-        });
+        toast.info(
+          "Amount found but currency was not detected. Please select it.",
+          {
+            duration: 3000,
+          },
+        );
       }
 
       setTitle((previous) => {
@@ -329,10 +388,9 @@ export default function AICreateDealPage() {
         {
           onSuccess: onExtractionSuccess,
           onError: (error) => {
-            toast.error(
-              "AI unavailable right now. Switching to Smart Parse.",
-              { duration: 3000 },
-            );
+            toast.error("AI unavailable right now. Switching to Smart Parse.", {
+              duration: 3000,
+            });
             console.warn("deals.parseMessage failed", error);
             setParseMode("smart");
           },
@@ -423,13 +481,14 @@ export default function AICreateDealPage() {
     );
   };
 
-  const isExtracting = parseMessageMutation.isPending || smartParseMutation.isPending;
+  const isExtracting =
+    parseMessageMutation.isPending || smartParseMutation.isPending;
   const isCreating = createDealMutation.isPending;
 
   return (
     <div className="mx-auto w-full max-w-4xl px-3 py-4 sm:px-6 sm:py-6">
-      <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-950">
-        <div className="border-b border-gray-200 px-5 py-5 sm:px-8 dark:border-gray-800">
+      <div className="rounded-2xl border dash-border dash-bg-card shadow-sm dash-border dash-bg-panel">
+        <div className="border-b dash-border px-5 py-5 sm:px-8 dash-border">
           <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
             Smart Deal Intake
           </p>
@@ -442,20 +501,22 @@ export default function AICreateDealPage() {
             </Button>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Parse messages instantly with Smart Parse, or use AI for complex messages.
+            Parse messages instantly with Smart Parse, or use AI for complex
+            messages.
           </p>
         </div>
 
         <div className="space-y-6 px-5 py-6 sm:px-8 sm:py-8">
-          <div className="rounded-xl border border-gray-200 p-4 sm:p-5 dark:border-gray-800">
-            <div className="mb-4 flex rounded-lg border border-gray-200 p-1 dark:border-gray-800">
+          <div className="rounded-xl border dash-border p-4 sm:p-5 dash-border">
+            <div className="mb-4 flex rounded-lg border dash-border p-1 dash-border">
               <button
                 type="button"
                 onClick={() => setParseMode("smart")}
-                className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${parseMode === "smart"
-                  ? "bg-emerald-600 text-white shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-                  }`}
+                className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                  parseMode === "smart"
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
               >
                 ⚡ Smart Parse
               </button>
@@ -471,12 +532,13 @@ export default function AICreateDealPage() {
                   }
                   setParseMode("ai");
                 }}
-                className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${parseMode === "ai"
-                  ? "bg-emerald-600 text-white shadow-sm"
-                  : isAIExtractionDisabled
-                    ? "cursor-not-allowed text-muted-foreground/50"
-                    : "text-muted-foreground hover:text-foreground"
-                  }`}
+                className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                  parseMode === "ai"
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : isAIExtractionDisabled
+                      ? "cursor-not-allowed text-muted-foreground/50"
+                      : "text-muted-foreground hover:text-foreground"
+                }`}
               >
                 🤖 AI Parse{isAIExtractionDisabled ? " (Quota)" : ""}
               </button>
@@ -494,7 +556,7 @@ export default function AICreateDealPage() {
                 : "Uses Groq AI for complex or ambiguous messages."}
             </p>
             {hasExtraction &&
-              (confidence === null || confidence < 0.6 || !detectedBrandName) ? (
+            (confidence === null || confidence < 0.6 || !detectedBrandName) ? (
               <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
                 Low-confidence parse. Review brand, amount, currency, and status
                 before creating.
@@ -524,7 +586,7 @@ export default function AICreateDealPage() {
 
           {hasExtraction ? (
             <>
-              <div className="rounded-xl border border-gray-200 p-4 sm:p-5 dark:border-gray-800">
+              <div className="rounded-xl border dash-border p-4 sm:p-5 dash-border">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="text-sm font-medium">Extraction Preview</p>
                   <span
@@ -552,7 +614,9 @@ export default function AICreateDealPage() {
                   <div className="sm:col-span-2">
                     <p className="font-medium">Deliverables:</p>
                     {deliverables.length === 0 ? (
-                      <p className="mt-1 text-muted-foreground">None detected</p>
+                      <p className="mt-1 text-muted-foreground">
+                        None detected
+                      </p>
                     ) : (
                       <ul className="mt-1 space-y-1 text-muted-foreground">
                         {deliverables.map((item, index) => (
@@ -567,7 +631,8 @@ export default function AICreateDealPage() {
                     {detectedBrandName ? (
                       brandMatch.kind === "exact" ? (
                         <p className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-700">
-                          Exact brand match found: <strong>{brandMatch.brand.name}</strong>
+                          Exact brand match found:{" "}
+                          <strong>{brandMatch.brand.name}</strong>
                         </p>
                       ) : brandMatch.kind === "fuzzy" ? (
                         <div className="flex flex-wrap items-center gap-2 rounded-md border border-yellow-200 bg-yellow-50 px-3 py-2">
@@ -589,9 +654,10 @@ export default function AICreateDealPage() {
                           </Button>
                         </div>
                       ) : (
-                        <div className="flex flex-wrap items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+                        <div className="flex flex-wrap items-center gap-2 rounded-md border dash-border dash-bg-card px-3 py-2">
                           <p className="text-xs text-gray-700">
-                            No existing brand match found for "{detectedBrandName}".
+                            No existing brand match found for "
+                            {detectedBrandName}".
                           </p>
                           <Button asChild size="sm" variant="outline">
                             <Link href="/brands/new">Create New Brand</Link>
@@ -607,7 +673,7 @@ export default function AICreateDealPage() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-gray-200 p-4 sm:p-5 dark:border-gray-800">
+              <div className="rounded-xl border dash-border p-4 sm:p-5 dash-border">
                 <p className="text-sm font-medium">Edit Before Creating</p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Fix any extracted fields before confirming.
@@ -704,7 +770,7 @@ export default function AICreateDealPage() {
                   </div>
                 </div>
 
-                <div className="mt-6 rounded-lg border border-dashed border-gray-300 p-4 dark:border-gray-700">
+                <div className="mt-6 rounded-lg border border-dashed dash-border p-4 dark:border-gray-700">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-medium">Deliverables</p>
                     <Button
@@ -731,7 +797,7 @@ export default function AICreateDealPage() {
                       deliverables.map((item, index) => (
                         <div
                           key={`${item.platform}-${item.type}-${index}`}
-                          className="grid grid-cols-1 gap-3 rounded-md border border-gray-200 p-3 sm:grid-cols-4 dark:border-gray-800"
+                          className="grid grid-cols-1 gap-3 rounded-md border dash-border p-3 sm:grid-cols-4 dash-border"
                         >
                           <Select
                             value={item.platform}
@@ -743,7 +809,9 @@ export default function AICreateDealPage() {
                               <SelectValue placeholder="Platform" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="INSTAGRAM">INSTAGRAM</SelectItem>
+                              <SelectItem value="INSTAGRAM">
+                                INSTAGRAM
+                              </SelectItem>
                               <SelectItem value="YOUTUBE">YOUTUBE</SelectItem>
                               <SelectItem value="TIKTOK">TIKTOK</SelectItem>
                             </SelectContent>
@@ -798,7 +866,7 @@ export default function AICreateDealPage() {
             </>
           ) : null}
 
-          <div className="flex flex-col-reverse gap-3 border-t border-gray-200 pt-5 sm:flex-row sm:items-center sm:justify-end dark:border-gray-800">
+          <div className="flex flex-col-reverse gap-3 border-t dash-border pt-5 sm:flex-row sm:items-center sm:justify-end dash-border">
             <Button
               type="button"
               variant="outline"
@@ -810,7 +878,9 @@ export default function AICreateDealPage() {
             <Button
               type="button"
               onClick={handleConfirmCreate}
-              disabled={!hasExtraction || isCreating || isExtracting || !hasBrands}
+              disabled={
+                !hasExtraction || isCreating || isExtracting || !hasBrands
+              }
               className="w-full sm:w-auto sm:min-w-48"
             >
               {isCreating ? "Creating deal..." : "Confirm & Create Deal"}

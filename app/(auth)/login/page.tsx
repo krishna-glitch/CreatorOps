@@ -1,6 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -24,6 +25,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 export default function LoginPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const {
     register,
@@ -41,12 +43,37 @@ export default function LoginPage() {
     setError(null);
 
     const supabase = createClient();
-    const { error: authError } = await supabase.auth.signInWithPassword({
+    let { error: authError } = await supabase.auth.signInWithPassword({
       email: data.email,
       password: data.password,
     });
 
+    if (authError?.message.toLowerCase().includes("email not confirmed")) {
+      const confirmResponse = await fetch("/api/auth/dev-confirm-email", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ email: data.email }),
+      });
+
+      if (confirmResponse.ok) {
+        const retryResult = await supabase.auth.signInWithPassword({
+          email: data.email,
+          password: data.password,
+        });
+        authError = retryResult.error;
+      }
+    }
+
     if (authError) {
+      if (authError.message.toLowerCase().includes("email not confirmed")) {
+        setError(
+          "Email is not confirmed. In test mode we attempted auto-confirmation but sign-in still failed.",
+        );
+        return;
+      }
+
       setError(authError.message);
       return;
     }
@@ -56,23 +83,23 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <div className="dashboard-shell flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-md space-y-8">
         {/* Header */}
         <div className="text-center">
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">
+          <h1 className="font-serif text-3xl font-bold tracking-tight gold-text">
             Welcome back
           </h1>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+          <p className="mt-2 text-sm dash-text-muted">
             Sign in to your CreatorOps account
           </p>
         </div>
 
         {/* Card */}
-        <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm dark:border-gray-800 dark:bg-gray-950">
+        <div className="pillowy-card dash-card rounded-xl border p-8">
           {/* Error Banner */}
           {error && (
-            <div className="mb-6 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 dark:bg-red-950/50 dark:border-red-900 dark:text-red-400">
+            <div className="dash-chip-tone-red mb-6 rounded-lg border px-4 py-3 text-sm">
               {error}
             </div>
           )}
@@ -99,18 +126,29 @@ export default function LoginPage() {
                 <Label htmlFor="password">Password</Label>
                 <Link
                   href="/forgot-password"
-                  className="text-xs text-gray-500 hover:text-foreground transition-colors"
+                  className="text-xs dash-text-muted hover:gold-text transition-colors"
                 >
                   Forgot password?
                 </Link>
               </div>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                autoComplete="current-password"
-                {...register("password")}
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                  className="pr-10"
+                  {...register("password")}
+                />
+                <button
+                  type="button"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  onClick={() => setShowPassword((current) => !current)}
+                  className="absolute inset-y-0 right-0 flex items-center px-3 dash-text-muted hover:gold-text"
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
               {errors.password && (
                 <p className="text-sm text-red-500">
                   {errors.password.message}
@@ -126,11 +164,11 @@ export default function LoginPage() {
         </div>
 
         {/* Footer */}
-        <p className="text-center text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-center text-sm dash-text-muted">
           Don&apos;t have an account?{" "}
           <Link
             href="/signup"
-            className="font-medium text-foreground hover:underline"
+            className="font-medium gold-text hover:underline"
           >
             Sign up
           </Link>

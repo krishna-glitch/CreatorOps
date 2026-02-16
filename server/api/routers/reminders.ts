@@ -1,8 +1,9 @@
 import { TRPCError } from "@trpc/server";
 import { addDays } from "date-fns";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { deals } from "@/server/infrastructure/database/schema/deals";
+import { deliverables } from "@/server/infrastructure/database/schema/deliverables";
 import { reminders } from "@/server/infrastructure/database/schema/reminders";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -128,5 +129,81 @@ export const remindersRouter = createTRPCRouter({
       }
 
       return updated;
+    }),
+
+  markPosted: protectedProcedure
+    .input(reminderIdInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const existing = await ctx.db.query.reminders.findFirst({
+        where: eq(reminders.id, input.id),
+        with: {
+          deal: {
+            columns: {
+              userId: true,
+            },
+          },
+        },
+      });
+
+      if (!existing || existing.deal.userId !== ctx.user.id) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Reminder not found",
+        });
+      }
+
+      if (!existing.deliverableId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Reminder is not linked to a deliverable",
+        });
+      }
+
+      const deliverable = await ctx.db.query.deliverables.findFirst({
+        where: eq(deliverables.id, existing.deliverableId),
+        with: {
+          deal: {
+            columns: {
+              userId: true,
+            },
+          },
+        },
+      });
+
+      if (!deliverable || deliverable.deal.userId !== ctx.user.id) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Deliverable not found",
+        });
+      }
+
+      const now = new Date();
+
+      await ctx.db
+        .update(deliverables)
+        .set({
+          postedAt: deliverable.postedAt ?? now,
+          status: "POSTED",
+          updatedAt: now,
+        })
+        .where(eq(deliverables.id, deliverable.id));
+
+      await ctx.db
+        .update(reminders)
+        .set({
+          status: "DONE",
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(reminders.deliverableId, deliverable.id),
+            inArray(reminders.status, ["OPEN", "SNOOZED"]),
+          ),
+        );
+
+      return {
+        ok: true,
+        deliverableId: deliverable.id,
+      };
     }),
 });

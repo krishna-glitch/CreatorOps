@@ -24,6 +24,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc/client";
+import { VoiceCommandButton } from "@/src/components/voice/VoiceCommandButton";
+import type { ParsedCommand } from "@/src/lib/voice/commandParser";
 
 const createPaymentFormSchema = z
   .object({
@@ -68,6 +70,7 @@ function DateInput({
 
 export default function NewPaymentPage() {
   const router = useRouter();
+  const trpcUtils = trpc.useUtils();
   const searchParams = useSearchParams();
   const initialDealId = searchParams.get("dealId") ?? "";
 
@@ -75,7 +78,8 @@ export default function NewPaymentPage() {
     trpc.deals.list.useQuery({ limit: 100 });
 
   const createPaymentMutation = trpc.payments.create.useMutation({
-    onSuccess: (_payment, variables) => {
+    onSuccess: async (_payment, variables) => {
+      await trpcUtils.analytics.getDashboardStats.invalidate();
       toast.success("Payment added.", { duration: 2500 });
       router.push(`/deals/${variables.deal_id}`);
     },
@@ -104,6 +108,73 @@ export default function NewPaymentPage() {
   const deals = dealsData?.items ?? [];
   const hasDeals = deals.length > 0;
 
+  const executeVoiceCommand = async (command: ParsedCommand) => {
+    const matchDealByBrand = (brandName: string | undefined) => {
+      if (!brandName) {
+        return null;
+      }
+      const normalized = brandName.toLowerCase().trim();
+      return (
+        deals.find((deal) => deal.brand?.name.toLowerCase() === normalized) ??
+        deals.find((deal) =>
+          deal.brand?.name.toLowerCase().includes(normalized),
+        ) ??
+        null
+      );
+    };
+
+    if (command.intent === "ADD_PAYMENT") {
+      if (command.entities.amount && command.entities.amount > 0) {
+        form.setValue("amount", command.entities.amount, { shouldDirty: true });
+      }
+      if (command.entities.currency) {
+        form.setValue("currency", command.entities.currency, {
+          shouldDirty: true,
+        });
+      }
+
+      const matchedDeal = matchDealByBrand(command.entities.brand);
+      if (matchedDeal) {
+        form.setValue("deal_id", matchedDeal.id, {
+          shouldDirty: true,
+        });
+      }
+
+      form.setValue("mark_as_paid", true, {
+        shouldDirty: true,
+      });
+      toast.success("Voice command applied to payment form.", {
+        duration: 2200,
+      });
+      return;
+    }
+
+    if (command.intent === "MARK_PAID") {
+      const matchedDeal = matchDealByBrand(command.entities.brand);
+      if (matchedDeal) {
+        form.setValue("deal_id", matchedDeal.id, {
+          shouldDirty: true,
+        });
+      }
+      form.setValue("mark_as_paid", true, {
+        shouldDirty: true,
+      });
+      toast.success("Payment marked as paid in form.", {
+        duration: 2200,
+      });
+      return;
+    }
+
+    if (command.intent === "OPEN_NEW_DEAL_FORM") {
+      router.push("/deals/new");
+      return;
+    }
+
+    toast.error("This voice command isn't supported on this page.", {
+      duration: 2800,
+    });
+  };
+
   const onSubmit = (values: CreatePaymentFormValues) => {
     createPaymentMutation.mutate({
       deal_id: values.deal_id,
@@ -124,8 +195,15 @@ export default function NewPaymentPage() {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-3 py-4 sm:px-6 sm:py-6">
-      <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-950">
-        <div className="border-b border-gray-200 px-5 py-5 sm:px-8 dark:border-gray-800">
+      <VoiceCommandButton
+        brandVocabulary={deals
+          .map((deal) => deal.brand?.name ?? "")
+          .filter((name) => name.length > 0)}
+        disabled={createPaymentMutation.isPending}
+        onExecuteCommand={executeVoiceCommand}
+      />
+      <div className="rounded-2xl border dash-border dash-bg-card shadow-sm dash-border dash-bg-panel">
+        <div className="border-b dash-border px-5 py-5 sm:px-8 dash-border">
           <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
             Payments
           </p>
@@ -134,6 +212,9 @@ export default function NewPaymentPage() {
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Select a deal and record the payment details.
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Tip: Tap the floating mic button to use voice commands.
           </p>
         </div>
 
@@ -330,7 +411,7 @@ export default function NewPaymentPage() {
                 name="mark_as_paid"
                 render={({ field }) => (
                   <FormItem>
-                    <div className="flex items-center gap-2 rounded-md border border-gray-200 px-3 py-2 dark:border-gray-800">
+                    <div className="flex items-center gap-2 rounded-md border dash-border px-3 py-2 dash-border">
                       <input
                         id="mark-as-paid"
                         type="checkbox"

@@ -236,44 +236,41 @@ export function HookBrowser({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className={cn("w-[min(96vw,68rem)] max-w-[68rem] p-0", className)}
+        className={cn("w-[min(96vw,68rem)] max-w-[68rem] gap-0 p-0 overflow-hidden rounded-xl", className)}
         onKeyDown={handleKeyDown}
       >
-        <div className="grid max-h-[88vh] grid-rows-[auto_auto_1fr] overflow-hidden">
-          <DialogHeader className="border-b px-6 py-4">
-            <DialogTitle className="flex items-center gap-2 text-xl">
-              <Sparkles className="h-5 w-5" />
+        <div className="grid h-[85vh] grid-rows-[auto_auto_1fr] overflow-hidden">
+          <DialogHeader className="border-b dash-border dash-bg-card px-6 py-4">
+            <DialogTitle className="flex items-center gap-2 text-xl font-semibold text-slate-900">
+              <Sparkles className="h-5 w-5 text-amber-500" />
               Hook Browser
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-slate-500">
               Search, customize, copy, and insert high-performing hooks.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 border-b px-6 py-4">
+          <div className="space-y-4 border-b dash-border dash-bg-card px-6 py-4">
             <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search hooks by text or category..."
-                className="pl-9"
+                className="pl-9 dash-bg-card dash-border text-slate-900 placeholder:text-slate-400 focus-visible:ring-slate-400"
               />
             </div>
 
-            <div className="grid gap-3 md:grid-cols-3">
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Category
-                </p>
+            <div className="flex flex-wrap gap-4">
+              <div className="min-w-[140px]">
                 <Select
                   value={categoryFilter}
                   onValueChange={(value) =>
                     setCategoryFilter(value as typeof CATEGORY_ALL | HookTemplate["category"])
                   }
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Filter by category" />
+                  <SelectTrigger className="h-8 dash-border dash-bg-card text-xs text-slate-900">
+                    <SelectValue placeholder="Category" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value={CATEGORY_ALL}>All categories</SelectItem>
@@ -286,90 +283,92 @@ export function HookBrowser({
                 </Select>
               </div>
 
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Platform
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {platformFilters.map((platform) => {
-                    const selected = platformFilter === platform;
-
-                    return (
-                      <Button
-                        key={platform}
-                        type="button"
-                        size="sm"
-                        variant={selected ? "default" : "outline"}
-                        onClick={() => setPlatformFilter(platform)}
-                        className="h-8 rounded-full"
-                      >
-                        {platformIconByName[platform]}
-                        {platform}
-                      </Button>
-                    );
-                  })}
-                </div>
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+                {platformFilters.map((platform) => {
+                  const selected = platformFilter === platform;
+                  return (
+                    <Button
+                      key={platform}
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setPlatformFilter(platform)}
+                      className={cn(
+                        "h-8 rounded-full border px-3 text-xs font-medium transition-colors",
+                        selected
+                          ? "border-slate-900 dash-bg-panel text-white dash-bg-panel hover:text-white"
+                          : "dash-border dash-bg-card text-slate-600 dash-border dash-bg-card hover:text-slate-900"
+                      )}
+                    >
+                      {platformIconByName[platform]}
+                      <span className="ml-1.5">{platform}</span>
+                    </Button>
+                  );
+                })}
               </div>
 
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Tone
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {toneFilters.map((tone) => {
-                    const selected = toneFilter === tone;
-
-                    return (
-                      <Button
-                        key={tone}
-                        type="button"
-                        size="sm"
-                        variant={selected ? "default" : "outline"}
-                        onClick={() => setToneFilter(tone)}
-                        className="h-8 rounded-full"
-                      >
-                        {tone}
-                      </Button>
-                    );
-                  })}
-                </div>
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+                {toneFilters.map((tone) => {
+                  const selected = toneFilter === tone;
+                  return (
+                    <Button
+                      key={tone}
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setToneFilter(tone)}
+                      className={cn(
+                        "h-8 rounded-full border px-3 text-xs font-medium transition-colors",
+                        selected
+                          ? "border-slate-900 dash-bg-panel text-white dash-bg-panel hover:text-white"
+                          : "dash-border dash-bg-card text-slate-600 dash-border dash-bg-card hover:text-slate-900"
+                      )}
+                    >
+                      {tone}
+                    </Button>
+                  );
+                })}
               </div>
             </div>
           </div>
 
-          <div className="grid min-h-0 gap-6 overflow-hidden p-6 lg:grid-cols-[20rem_1fr]">
-            <aside className="min-h-0 overflow-y-auto rounded-lg border p-4">
-              <h3 className="text-sm font-semibold">Recently Used</h3>
-              <p className="mt-1 text-xs text-muted-foreground">Most recent hooks you inserted or copied.</p>
+          <div className="grid min-h-0 gap-0 overflow-hidden lg:grid-cols-[18rem_1fr]">
+            <aside className="min-h-0 overflow-y-auto border-r dash-border dash-bg-card p-4">
+              <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-3">Recently Used</h3>
 
-              <div className="mt-3 space-y-2">
+              <div className="space-y-2">
                 {recentHooks.length === 0 ? (
-                  <p className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
-                    No recent hooks yet.
-                  </p>
+                  <div className="rounded-lg border border-dashed dash-border p-4 text-center">
+                    <p className="text-xs text-slate-400">No recent hooks</p>
+                  </div>
                 ) : (
                   recentHooks.map((hook) => (
                     <button
                       key={hook.id}
                       type="button"
                       onClick={() => useHook(hook)}
-                      className="w-full rounded-md border p-3 text-left text-xs transition hover:bg-muted"
+                      className="group w-full rounded-lg border dash-border dash-bg-card p-3 text-left transition-all dash-border hover:shadow-sm"
                     >
-                      <p className="line-clamp-2 font-medium">{applyVariables(hook, valuesByHookId[hook.id] ?? {})}</p>
-                      <p className="mt-1 text-muted-foreground">{hook.category}</p>
+                      <p className="line-clamp-2 text-xs font-medium text-slate-700 group-hover:text-slate-900">{applyVariables(hook, valuesByHookId[hook.id] ?? {})}</p>
+                      <div className="mt-2 flex items-center justify-between">
+                        <Badge variant="secondary" className="dash-bg-card text-[10px] text-slate-500">{hook.category}</Badge>
+                        <span className="text-slate-400">{platformIconByName[hook.platform]}</span>
+                      </div>
                     </button>
                   ))
                 )}
               </div>
             </aside>
 
-            <div className="min-h-0 overflow-y-auto pr-1">
+            <div className="min-h-0 overflow-y-auto dash-bg-card p-6">
               {filteredHooks.length === 0 ? (
-                <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-                  No hooks found. Try adjusting filters or search.
+                <div className="flex h-64 flex-col items-center justify-center rounded-xl border border-dashed dash-border dash-bg-card text-center text-sm text-slate-500">
+                  <Search className="mb-2 h-8 w-8 text-slate-300" />
+                  <p>No hooks found</p>
+                  <p className="text-xs">Try adjusting filters or search.</p>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {filteredHooks.map((hook, index) => {
                     const isActive = index === activeIndex;
                     const hasVariables = Boolean(hook.variables?.length);
@@ -381,35 +380,34 @@ export function HookBrowser({
                           cardRefs.current[hook.id] = node;
                         }}
                         className={cn(
-                          "border transition",
-                          isActive && "border-foreground/50 ring-2 ring-foreground/10",
+                          "dash-border transition-all shadow-sm",
+                          isActive ? "border-slate-900 ring-1 ring-slate-900/10 shadow-md" : "dash-border hover:shadow-md"
                         )}
                       >
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <p className="text-sm leading-relaxed">
+                        <CardContent className="p-5">
+                          <div className="flex items-start justify-between gap-4">
+                            <p className="flex-1 text-base font-medium leading-relaxed text-slate-900">
                               {applyVariables(hook, valuesByHookId[hook.id] ?? {})}
                             </p>
-                            <div className="flex items-center gap-1 text-muted-foreground">
+                            <div className="flex shrink-0 items-center justify-center h-8 w-8 rounded-full dash-bg-card text-slate-400">
                               {platformIconByName[hook.platform]}
                             </div>
                           </div>
 
-                          <div className="mt-3 flex flex-wrap items-center gap-2">
-                            <Badge variant="secondary">{hook.category}</Badge>
-                            <Badge variant="outline">{hook.tone}</Badge>
-                            <Badge variant="outline">{hook.platform}</Badge>
+                          <div className="mt-4 flex flex-wrap items-center gap-2">
+                            <Badge variant="secondary" className="dash-bg-card text-slate-700 hover:bg-slate-200">{hook.category}</Badge>
+                            <Badge variant="outline" className="dash-border text-slate-500">{hook.tone}</Badge>
                             {isActive ? (
-                              <Badge variant="outline" className="border-foreground/40">
-                                Selected (↑↓ Enter)
+                              <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700 animate-pulse">
+                                Selected (Press Enter)
                               </Badge>
                             ) : null}
                           </div>
 
                           {hasVariables ? (
-                            <div className="mt-3 rounded-md border border-dashed p-3">
-                              <p className="mb-2 text-xs text-muted-foreground">
-                                Placeholder hints: {hook.variables?.map((name) => `{${name}}`).join(", ")}
+                            <div className="mt-4 rounded-lg border dash-border dash-bg-card p-3">
+                              <p className="mb-2 text-xs font-medium text-slate-500 uppercase tracking-wide">
+                                Customize Placeholders
                               </p>
                               <div className="grid gap-2 sm:grid-cols-2">
                                 {hook.variables?.map((variable) => (
@@ -419,25 +417,26 @@ export function HookBrowser({
                                     onChange={(event) =>
                                       handleValueChange(hook.id, variable, event.target.value)
                                     }
-                                    placeholder={`Enter ${variable}`}
-                                    className="h-9 text-xs"
+                                    placeholder={`Enter ${variable}...`}
+                                    className="h-9 dash-bg-card dash-border text-xs focus-visible:ring-slate-400"
                                   />
                                 ))}
                               </div>
                             </div>
                           ) : null}
 
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            <Button type="button" size="sm" onClick={() => useHook(hook)}>
+                          <div className="mt-4 flex flex-wrap gap-2 pt-4 border-t border-slate-100">
+                            <Button type="button" size="sm" onClick={() => useHook(hook)} className="dash-bg-panel text-white dash-bg-panel">
                               Use This Hook
                             </Button>
                             <Button
                               type="button"
                               size="sm"
-                              variant="outline"
+                              variant="ghost"
                               onClick={() => copyHook(hook)}
+                              className="text-slate-600 dash-bg-card hover:text-slate-900"
                             >
-                              <Copy className="h-4 w-4" />
+                              <Copy className="mr-1.5 h-3.5 w-3.5" />
                               Copy
                             </Button>
                           </div>

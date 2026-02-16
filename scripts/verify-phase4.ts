@@ -173,8 +173,8 @@ async function main() {
   );
   addCheck(
     "Dates formatted nicely",
-    formatDealDate("2025-02-15T12:00:00.000Z", "en-US") === "Feb 15, 2025",
-    `got=${formatDealDate("2025-02-15T12:00:00.000Z", "en-US")}`,
+    formatDealDate("2025-02-15T12:00:00.000Z", { locale: "en-US" }) === "Feb 15, 2025",
+    `got=${formatDealDate("2025-02-15T12:00:00.000Z", { locale: "en-US" })}`,
   );
 
   const emptyUserCaller = appRouter.createCaller({

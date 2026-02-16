@@ -44,9 +44,14 @@ function getCreateBrandErrorMessage(error: unknown): string {
 
 export default function NewBrandPage() {
   const router = useRouter();
+  const trpcUtils = trpc.useUtils();
 
   const createBrandMutation = trpc.brands.create.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
+      await Promise.all([
+        trpcUtils.brands.list.invalidate(),
+        trpcUtils.analytics.getDashboardStats.invalidate(),
+      ]);
       toast.success("Brand created successfully.", { duration: 3000 });
       router.push("/brands");
     },
@@ -73,8 +78,8 @@ export default function NewBrandPage() {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-3 py-4 sm:px-6 sm:py-6">
-      <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-950">
-        <div className="border-b border-gray-200 px-5 py-5 sm:px-8 dark:border-gray-800">
+      <div className="rounded-2xl border dash-border dash-bg-card shadow-sm dash-border dash-bg-panel">
+        <div className="border-b dash-border px-5 py-5 sm:px-8 dash-border">
           <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
             Brand Management
           </p>
@@ -91,7 +96,7 @@ export default function NewBrandPage() {
             onSubmit={form.handleSubmit(onSubmit)}
             className="space-y-7 px-5 py-6 sm:px-8 sm:py-8"
           >
-            <div className="space-y-5 rounded-xl border border-gray-200 p-4 sm:p-5 dark:border-gray-800">
+            <div className="space-y-5 rounded-xl border dash-border p-4 sm:p-5 dash-border">
               <FormField
                 control={form.control}
                 name="name"
@@ -133,7 +138,7 @@ export default function NewBrandPage() {
               />
             </div>
 
-            <div className="flex flex-col-reverse gap-3 border-t border-gray-200 pt-5 sm:flex-row sm:items-center sm:justify-end dark:border-gray-800">
+            <div className="flex flex-col-reverse gap-3 border-t dash-border pt-5 sm:flex-row sm:items-center sm:justify-end dash-border">
               <Button
                 type="button"
                 variant="outline"

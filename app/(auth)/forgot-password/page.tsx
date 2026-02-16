@@ -41,26 +41,26 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <div className="dashboard-shell flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">
+          <h1 className="font-serif text-3xl font-bold tracking-tight gold-text">
             Reset password
           </h1>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+          <p className="mt-2 text-sm dash-text-muted">
             Enter your account email to receive a reset link.
           </p>
         </div>
 
-        <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm dark:border-gray-800 dark:bg-gray-950">
+        <div className="pillowy-card dash-card rounded-xl border p-8">
           {error && (
-            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-400">
+            <div className="dash-chip-tone-red mb-4 rounded-lg border px-4 py-3 text-sm">
               {error}
             </div>
           )}
 
           {message && (
-            <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700 dark:border-green-900 dark:bg-green-950/50 dark:text-green-400">
+            <div className="dash-chip-tone-green mb-4 rounded-lg border px-4 py-3 text-sm">
               {message}
             </div>
           )}
@@ -84,11 +84,11 @@ export default function ForgotPasswordPage() {
           </form>
         </div>
 
-        <p className="text-center text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-center text-sm dash-text-muted">
           Back to{" "}
           <Link
             href="/login"
-            className="font-medium text-foreground hover:underline"
+            className="font-medium gold-text hover:underline"
           >
             sign in
           </Link>

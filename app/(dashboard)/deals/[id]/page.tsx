@@ -33,7 +33,7 @@ function getPaymentStatusClassName(status: string | null) {
     return "border-transparent bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300";
   }
 
-  return "border-transparent bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200";
+  return "border-transparent dash-bg-card text-gray-700 dark:bg-gray-800 dark:text-gray-200";
 }
 
 function formatPaymentAmount(
@@ -115,7 +115,7 @@ export default async function DealDetailPage({ params }: DealDetailPageProps) {
 
     return (
       <div className="mx-auto w-full max-w-4xl px-3 py-4 sm:px-6 sm:py-6">
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-950 sm:p-8">
+        <div className="rounded-2xl border dash-border dash-bg-card p-6 shadow-sm dash-border dash-bg-panel sm:p-8">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
@@ -139,7 +139,7 @@ export default async function DealDetailPage({ params }: DealDetailPageProps) {
           </div>
 
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
-            <section className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+            <section className="rounded-xl border dash-border p-4 dash-border">
               <h2 className="text-sm font-medium">Deal Overview</h2>
               <dl className="mt-4 space-y-3">
                 <div className="flex items-center justify-between gap-3">
@@ -175,26 +175,26 @@ export default async function DealDetailPage({ params }: DealDetailPageProps) {
               </dl>
             </section>
 
-            <section className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+            <section className="rounded-xl border dash-border p-4 dash-border">
               <h2 className="text-sm font-medium">Dates</h2>
               <dl className="mt-4 space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <dt className="text-sm text-muted-foreground">Created</dt>
                   <dd className="text-sm font-medium">
-                    {formatDealDate(deal.createdAt, undefined, true)}
+                    {formatDealDate(deal.createdAt, { includeTime: true })}
                   </dd>
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <dt className="text-sm text-muted-foreground">Updated</dt>
                   <dd className="text-sm font-medium">
-                    {formatDealDate(deal.updatedAt, undefined, true)}
+                    {formatDealDate(deal.updatedAt, { includeTime: true })}
                   </dd>
                 </div>
               </dl>
             </section>
           </div>
 
-          <section className="mt-6 rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+          <section className="mt-6 rounded-xl border dash-border p-4 dash-border">
             <h2 className="text-sm font-medium">Revision Limit</h2>
             <p className="mt-2 text-sm font-medium">
               {revisionsUsed} / {revisionLimit} revisions used
@@ -222,7 +222,7 @@ export default async function DealDetailPage({ params }: DealDetailPageProps) {
 
           <DealDeliverablesSection dealId={deal.id} />
 
-          <section className="mt-6 rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+          <section className="mt-6 rounded-xl border dash-border p-4 dash-border">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-sm font-medium">Payments</h2>
               <button
@@ -235,7 +235,7 @@ export default async function DealDetailPage({ params }: DealDetailPageProps) {
             </div>
 
             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+              <div className="rounded-lg border dash-border p-3 dash-border">
                 <p className="text-xs uppercase tracking-[0.1em] text-muted-foreground">
                   Total expected
                 </p>
@@ -243,7 +243,7 @@ export default async function DealDetailPage({ params }: DealDetailPageProps) {
                   {formatPaymentAmount(totalExpected, deal.currency)}
                 </p>
               </div>
-              <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+              <div className="rounded-lg border dash-border p-3 dash-border">
                 <p className="text-xs uppercase tracking-[0.1em] text-muted-foreground">
                   Total paid
                 </p>
@@ -251,7 +251,7 @@ export default async function DealDetailPage({ params }: DealDetailPageProps) {
                   {formatPaymentAmount(totalPaid, deal.currency)}
                 </p>
               </div>
-              <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+              <div className="rounded-lg border dash-border p-3 dash-border">
                 <p className="text-xs uppercase tracking-[0.1em] text-muted-foreground">
                   Outstanding
                 </p>
@@ -266,63 +266,100 @@ export default async function DealDetailPage({ params }: DealDetailPageProps) {
                 No payments added to this deal yet.
               </p>
             ) : (
-              <div className="mt-3 overflow-x-auto">
-                <table className="w-full min-w-[760px] text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-200 text-muted-foreground dark:border-gray-800">
-                      <th scope="col" className="px-3 py-2 font-medium">
-                        Amount
-                      </th>
-                      <th scope="col" className="px-3 py-2 font-medium">
-                        Status
-                      </th>
-                      <th scope="col" className="px-3 py-2 font-medium">
-                        Dates
-                      </th>
-                      <th scope="col" className="px-3 py-2 font-medium">
-                        Payment method
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {payments.map((payment) => (
-                      <tr
-                        key={payment.id}
-                        className="border-b border-gray-100 last:border-0 dark:border-gray-900"
-                      >
-                        <td className="px-3 py-3 font-medium">
-                          {formatPaymentAmount(payment.amount, payment.currency)}
-                        </td>
-                        <td className="px-3 py-3">
-                          <span
-                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getPaymentStatusClassName(payment.status)}`}
-                          >
-                            {payment.status ?? "UNKNOWN"}
-                          </span>
-                        </td>
-                        <td className="px-3 py-3">
-                          <div className="space-y-1">
-                            <p>
-                              Expected:{" "}
-                              {payment.expectedDate
-                                ? formatDealDate(payment.expectedDate, undefined, true)
-                                : "N/A"}
-                            </p>
-                            <p>
-                              Paid:{" "}
-                              {payment.paidAt
-                                ? formatDealDate(payment.paidAt, undefined, true)
-                                : "N/A"}
-                            </p>
-                          </div>
-                        </td>
-                        <td className="px-3 py-3">
-                          {payment.paymentMethod ?? "N/A"}
-                        </td>
+              <div className="mt-3">
+                <div className="space-y-3 md:hidden">
+                  {payments.map((payment) => (
+                    <article
+                      key={payment.id}
+                      className="rounded-lg border dash-border p-3 dash-border"
+                    >
+                      <p className="text-sm font-semibold">
+                        {formatPaymentAmount(payment.amount, payment.currency)}
+                      </p>
+                      <div className="mt-2">
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getPaymentStatusClassName(payment.status)}`}
+                        >
+                          {payment.status ?? "UNKNOWN"}
+                        </span>
+                      </div>
+                      <div className="mt-2 space-y-1 text-sm text-muted-foreground">
+                        <p>
+                          Expected:{" "}
+                          {payment.expectedDate
+                            ? formatDealDate(payment.expectedDate, { includeTime: true })
+                            : "N/A"}
+                        </p>
+                        <p>
+                          Paid:{" "}
+                          {payment.paidAt
+                            ? formatDealDate(payment.paidAt, { includeTime: true })
+                            : "N/A"}
+                        </p>
+                        <p>Payment method: {payment.paymentMethod ?? "N/A"}</p>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+
+                <div className="hidden overflow-x-auto md:block">
+                  <table className="w-full min-w-full text-left text-sm">
+                    <thead>
+                      <tr className="border-b dash-border text-muted-foreground dash-border">
+                        <th scope="col" className="px-3 py-2 font-medium">
+                          Amount
+                        </th>
+                        <th scope="col" className="px-3 py-2 font-medium">
+                          Status
+                        </th>
+                        <th scope="col" className="px-3 py-2 font-medium">
+                          Dates
+                        </th>
+                        <th scope="col" className="px-3 py-2 font-medium">
+                          Payment method
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {payments.map((payment) => (
+                        <tr
+                          key={payment.id}
+                          className="border-b dash-border last:border-0 dark:border-gray-900"
+                        >
+                          <td className="px-3 py-3 font-medium">
+                            {formatPaymentAmount(payment.amount, payment.currency)}
+                          </td>
+                          <td className="px-3 py-3">
+                            <span
+                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getPaymentStatusClassName(payment.status)}`}
+                            >
+                              {payment.status ?? "UNKNOWN"}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3">
+                            <div className="space-y-1">
+                              <p>
+                                Expected:{" "}
+                                {payment.expectedDate
+                                  ? formatDealDate(payment.expectedDate, { includeTime: true })
+                                  : "N/A"}
+                              </p>
+                              <p>
+                                Paid:{" "}
+                                {payment.paidAt
+                                  ? formatDealDate(payment.paidAt, { includeTime: true })
+                                  : "N/A"}
+                              </p>
+                            </div>
+                          </td>
+                          <td className="px-3 py-3">
+                            {payment.paymentMethod ?? "N/A"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </section>

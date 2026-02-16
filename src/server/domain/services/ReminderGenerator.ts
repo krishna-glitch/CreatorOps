@@ -57,14 +57,14 @@ export function generateRemindersForDeliverable(
     timezone: deliverable.timezone,
   }).deadline_state;
 
-  // Rule: scheduled within next 24h -> due soon reminder at scheduled_at - 24h.
-  const dueSoonWindowEnd = addHours(now, 24);
-  if (isAfter(scheduledAt, now) && !isAfter(scheduledAt, dueSoonWindowEnd)) {
+  // Rule: any future deliverable gets a due-soon reminder at scheduled_at - 24h.
+  if (isAfter(scheduledAt, now)) {
+    const dueSoonAt = addHours(scheduledAt, -24);
     pushReminder(reminders, dedupe, {
       deal_id: deliverable.deal_id,
       deliverable_id: deliverable.id,
       reason: "Deliverable due within 24 hours",
-      due_at: addHours(scheduledAt, -24),
+      due_at: isBefore(dueSoonAt, now) ? now : dueSoonAt,
       priority: "MED",
       status: "OPEN",
       delivery_method: "EMAIL",

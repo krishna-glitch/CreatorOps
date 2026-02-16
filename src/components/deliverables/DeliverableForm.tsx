@@ -75,13 +75,14 @@ export function DeliverableForm({
   onOpenChange,
   onCreated,
 }: DeliverableFormProps) {
+  const trpcUtils = trpc.useUtils();
   const [pendingConflicts, setPendingConflicts] = useState<Conflict[]>([]);
   const [deliverableDraftId, setDeliverableDraftId] = useState<string | null>(null);
   const [conflictSessionId, setConflictSessionId] = useState<string | null>(null);
   const [pendingValues, setPendingValues] = useState<DeliverableFormValues | null>(null);
 
   const createDeliverableMutation = trpc.deliverables.create.useMutation({
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       if (result.requires_acknowledgement) {
         setPendingConflicts(result.conflicts);
         toast.warning("Exclusivity conflicts detected. Review before proceeding.", {
@@ -99,6 +100,11 @@ export function DeliverableForm({
       }
       setPendingConflicts([]);
       setPendingValues(null);
+      await Promise.all([
+        trpcUtils.analytics.getDashboardStats.invalidate(),
+        trpcUtils.conflicts.list.invalidate(),
+        trpcUtils.conflicts.summary.invalidate(),
+      ]);
       onCreated?.();
       onOpenChange(false);
     },
@@ -215,7 +221,7 @@ export function DeliverableForm({
                   {pendingConflicts.map((conflict) => (
                     <div
                       key={`${conflict.conflicting_rule_id}-${conflict.new_deal_or_deliverable_id}`}
-                      className="rounded border border-amber-300/70 bg-white/70 p-2"
+                      className="rounded border border-amber-300/70 dash-bg-card p-2"
                     >
                       <p className="text-xs font-medium">
                         Rule: {conflict.overlap.category.rule} ({conflict.overlap.category.scope})
