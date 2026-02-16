@@ -31,10 +31,25 @@ export function ContextMenu({
     const menuRef = useRef<HTMLDivElement>(null);
     const [mounted, setMounted] = useState(false);
     const [isClosing, setIsClosing] = useState(false);
+    const [isMobile, setIsMobile] = useState(false);
 
     useEffect(() => {
         setMounted(true);
         return () => setMounted(false);
+    }, []);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+
+        const mediaQuery = window.matchMedia("(max-width: 767px)");
+        const updateIsMobile = () => setIsMobile(mediaQuery.matches);
+
+        updateIsMobile();
+        mediaQuery.addEventListener("change", updateIsMobile);
+
+        return () => {
+            mediaQuery.removeEventListener("change", updateIsMobile);
+        };
     }, []);
 
     useEffect(() => {
@@ -68,14 +83,6 @@ export function ContextMenu({
 
     // Calculate position logic to keep menu on screen
     // This is a simplified version; robust positioning might need useLayoutEffect
-    const menuStyle: React.CSSProperties = {
-        position: "fixed",
-        left: position.x,
-        top: position.y,
-        // Add logic here if needed to shift up/down based on screen height
-        // For now, we center it horizontally relative to the touch, and place it below
-    };
-
     // Adjust to center the menu around the touch point horizontally
     // and maintain a margin from screen edges
     const menuWidth = 280;
@@ -90,7 +97,7 @@ export function ContextMenu({
     let top = position.y + 20;
     const menuApproxHeight = actions.length * 56 + (title ? 40 : 0) + 20;
 
-    if (top + menuApproxHeight > viewportHeight - 20) {
+    if (!isMobile && top + menuApproxHeight > viewportHeight - 20) {
         top = position.y - menuApproxHeight - 20;
     }
 
@@ -110,15 +117,27 @@ export function ContextMenu({
                 aria-orientation="vertical"
                 aria-labelledby="options-menu"
                 className={cn(
-                    "relative overflow-hidden rounded-2xl bg-white/90 shadow-[0_4px_20px_rgba(0,0,0,0.15)] backdrop-blur-xl ring-1 ring-black/5 dark:bg-zinc-900/90 dark:ring-white/10",
-                    "origin-center transition-all duration-200 ease-out",
-                    isClosing ? "scale-95 opacity-0" : "animate-in fade-in zoom-in-95 scale-100 opacity-100",
+                    "relative overflow-hidden bg-white/90 shadow-[0_4px_20px_rgba(0,0,0,0.15)] backdrop-blur-xl ring-1 ring-black/5 transition-all duration-200 ease-out dark:bg-zinc-900/90 dark:ring-white/10",
+                    isMobile
+                        ? "fixed inset-x-3 bottom-3 max-h-[85vh] rounded-2xl origin-bottom"
+                        : "rounded-2xl origin-center",
+                    isClosing
+                        ? isMobile
+                            ? "translate-y-4 opacity-0"
+                            : "scale-95 opacity-0"
+                        : isMobile
+                            ? "translate-y-0 opacity-100"
+                            : "animate-in fade-in zoom-in-95 scale-100 opacity-100",
                 )}
                 style={{
-                    top,
-                    left,
-                    width: menuWidth,
-                    maxWidth: "90vw",
+                    ...(isMobile
+                        ? {}
+                        : {
+                              top,
+                              left,
+                              width: menuWidth,
+                              maxWidth: "90vw",
+                          }),
                 }}
                 onClick={(e) => e.stopPropagation()}
             >

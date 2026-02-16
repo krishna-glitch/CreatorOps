@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc/client";
+import { useDefaultCurrency } from "@/src/hooks/useDefaultCurrency";
 
 type Deliverable = {
   platform: "INSTAGRAM" | "YOUTUBE" | "TIKTOK";
@@ -206,6 +207,8 @@ export default function AICreateDealPage() {
   const router = useRouter();
   const trpcUtils = trpc.useUtils();
   const hasRedirectedForQuotaRef = useRef(false);
+  const { defaultCurrency } = useDefaultCurrency();
+  const previousDefaultCurrencyRef = useRef<Currency>(defaultCurrency);
 
   const { data: brands, isLoading: isLoadingBrands } =
     trpc.brands.list.useQuery({ limit: 100 });
@@ -240,7 +243,7 @@ export default function AICreateDealPage() {
   const [brandId, setBrandId] = useState("");
   const [title, setTitle] = useState("");
   const [totalValue, setTotalValue] = useState("");
-  const [currency, setCurrency] = useState<Currency | "">("");
+  const [currency, setCurrency] = useState<Currency | "">(defaultCurrency);
   const [status, setStatus] = useState<DealStatus>("INBOUND");
   const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
   const [hasExtraction, setHasExtraction] = useState(false);
@@ -292,6 +295,14 @@ export default function AICreateDealPage() {
     }
   }, [isAIExtractionDisabled, parseMode]);
 
+  useEffect(() => {
+    const previousDefaultCurrency = previousDefaultCurrencyRef.current;
+    if (!currency || currency === previousDefaultCurrency) {
+      setCurrency(defaultCurrency);
+    }
+    previousDefaultCurrencyRef.current = defaultCurrency;
+  }, [currency, defaultCurrency]);
+
   const handleExtract = () => {
     const normalizedMessage = message.trim();
     if (!normalizedMessage) {
@@ -316,7 +327,7 @@ export default function AICreateDealPage() {
       setConfidence(result.confidence);
       setDeliverables(result.deliverables);
       setTotalValue(result.total_value?.toString() ?? "");
-      setCurrency(result.currency ?? "");
+      setCurrency(result.currency ?? defaultCurrency);
       setStatus(result.status);
 
       if (result.total_value !== null && result.currency === null) {

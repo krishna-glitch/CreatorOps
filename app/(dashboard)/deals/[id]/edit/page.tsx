@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc/client";
+import { useDefaultCurrency } from "@/src/hooks/useDefaultCurrency";
 import { useVoiceCommandRecognition } from "@/src/hooks/useVoiceCommandRecognition";
 import { parseVoiceCommand } from "@/src/lib/voice/commandParser";
 
@@ -156,6 +157,7 @@ export default function EditDealPage() {
   const router = useRouter();
   const trpcUtils = trpc.useUtils();
   const dealId = params?.id;
+  const { defaultCurrency } = useDefaultCurrency();
   const platformOptions = ["INSTAGRAM", "YOUTUBE", "TIKTOK"] as const;
 
   const { data: brands, isLoading: isLoadingBrands } =
@@ -182,6 +184,23 @@ export default function EditDealPage() {
     },
     onError: (error) => {
       toast.error(getUpdateDealErrorMessage(error), { duration: 3000 });
+    },
+  });
+  const deleteDealMutation = trpc.deals.delete.useMutation({
+    onSuccess: async () => {
+      await Promise.all([
+        trpcUtils.deals.list.invalidate(),
+        trpcUtils.analytics.getDashboardStats.invalidate(),
+      ]);
+      toast.success("Deal deleted.", { duration: 3000 });
+      router.push("/deals");
+    },
+    onError: (error) => {
+      const message =
+        error instanceof Error && error.message.trim().length > 0
+          ? error.message
+          : "Could not delete deal right now.";
+      toast.error(message, { duration: 3000 });
     },
   });
 
@@ -274,6 +293,20 @@ export default function EditDealPage() {
       ...values,
     });
   };
+  const onDeleteDeal = () => {
+    if (!dealId || deleteDealMutation.isPending) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Delete this deal permanently? This also deletes related payments and exclusivity rules.",
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    deleteDealMutation.mutate({ id: dealId });
+  };
   const onInvalidSubmit = () => {
     const firstError =
       getFirstFieldError(form.formState.errors) ??
@@ -289,7 +322,11 @@ export default function EditDealPage() {
 
   const applyVoiceCommand = useCallback(
     (transcript: string) => {
-      const command = parseVoiceCommand(transcript, brandNames);
+      const command = parseVoiceCommand(
+        transcript,
+        brandNames,
+        defaultCurrency,
+      );
 
       if (command.intent === "UPDATE_DEAL_STATUS") {
         form.setValue("status", command.status, { shouldDirty: true });
@@ -346,7 +383,7 @@ export default function EditDealPage() {
         duration: 2800,
       });
     },
-    [brandItems, brandNames, form],
+    [brandItems, brandNames, defaultCurrency, form],
   );
 
   const voice = useVoiceCommandRecognition({
@@ -784,14 +821,27 @@ export default function EditDealPage() {
                 </div>
               </div>
 
-              <div className="flex flex-col-reverse gap-3 border-t dash-border pt-5 sm:flex-row sm:items-center sm:justify-end dash-border">
+              <div className="flex flex-col-reverse gap-3 border-t dash-border pt-5 sm:flex-row sm:items-center sm:justify-between dash-border">
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={onDeleteDeal}
+                  disabled={isSubmitting || deleteDealMutation.isPending}
+                >
+                  {deleteDealMutation.isPending ? "Deleting..." : "Delete Deal"}
+                </Button>
                 <Link
                   href={`/deals/${dealId}`}
                   className={buttonVariants({ variant: "outline" })}
                 >
                   Cancel
                 </Link>
-                <Button type="submit" disabled={isSubmitting || !hasBrands}>
+                <Button
+                  type="submit"
+                  disabled={
+                    isSubmitting || !hasBrands || deleteDealMutation.isPending
+                  }
+                >
                   {isSubmitting ? "Saving..." : "Save Changes"}
                 </Button>
               </div>

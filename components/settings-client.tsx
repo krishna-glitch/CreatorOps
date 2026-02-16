@@ -12,7 +12,8 @@ import {
   ShieldCheck, 
   Info,
   LogOut,
-  ExternalLink
+  ExternalLink,
+  Coins
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -21,6 +22,7 @@ import { usePWA } from "@/src/hooks/usePWA";
 import { cn } from "@/lib/utils";
 import { LogoutButton } from "@/components/logout-button";
 import { Badge } from "@/components/ui/badge";
+import { useDefaultCurrency } from "@/src/hooks/useDefaultCurrency";
 
 type SettingsClientProps = {
   user: {
@@ -37,6 +39,7 @@ type SettingsClientProps = {
 export function SettingsClient({ user, storageUsage }: SettingsClientProps) {
   const { canInstall, isInstalled, isOffline, install } = usePWA();
   const [theme, setTheme] = useState<string>("system");
+  const { defaultCurrency, setDefaultCurrency } = useDefaultCurrency();
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("creatorops-theme") || "system";
@@ -77,6 +80,11 @@ export function SettingsClient({ user, storageUsage }: SettingsClientProps) {
       toast.success("Cache cleared. Reloading...");
       setTimeout(() => window.location.reload(), 1000);
     }
+  };
+
+  const handleDefaultCurrencyChange = (currency: "USD" | "INR") => {
+    setDefaultCurrency(currency);
+    toast.success(`Default currency set to ${currency}`);
   };
 
   return (
@@ -171,6 +179,37 @@ export function SettingsClient({ user, storageUsage }: SettingsClientProps) {
                 >
                   <item.icon className="h-4 w-4" />
                   {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="p-4 space-y-3">
+            <div className="flex items-center gap-3 mb-1">
+              <div className="p-2 rounded-lg bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
+                <Coins className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">Default Currency</p>
+                <p className="text-xs text-muted-foreground">
+                  Used by deal and payment forms across the app.
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 dark:bg-gray-900 rounded-xl">
+              {(["USD", "INR"] as const).map((currency) => (
+                <button
+                  key={currency}
+                  type="button"
+                  onClick={() => handleDefaultCurrencyChange(currency)}
+                  className={cn(
+                    "py-2 px-1 rounded-lg text-xs font-medium transition-all",
+                    defaultCurrency === currency
+                      ? "bg-white text-emerald-700 shadow-sm dark:bg-gray-800 dark:text-emerald-400"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {currency}
                 </button>
               ))}
             </div>
@@ -270,4 +309,3 @@ export function SettingsClient({ user, storageUsage }: SettingsClientProps) {
     </div>
   );
 }
-

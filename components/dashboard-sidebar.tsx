@@ -3,6 +3,7 @@
 import {
   AlertTriangle,
   BarChart3,
+  CalendarDays,
   ChevronLeft,
   ChevronRight,
   Home,
@@ -187,6 +188,20 @@ export function DashboardSidebar() {
             >
               <BarChart3 className="h-4 w-4" />
               {!collapsed ? "Analytics" : null}
+            </Link>
+            <Link
+              href="/calendar"
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2 transition-all text-shell-text-muted",
+                collapsed && "justify-center px-2",
+                isActiveRoute(pathname, "/calendar")
+                  ? "dash-sidebar-link-active text-shell-text"
+                  : "dash-sidebar-link",
+              )}
+              title="Calendar"
+            >
+              <CalendarDays className="h-4 w-4" />
+              {!collapsed ? "Calendar" : null}
             </Link>
             <Link
               href="/scripts"
