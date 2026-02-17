@@ -2,13 +2,12 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
@@ -253,6 +252,7 @@ export default function EditDealPage() {
         notes: rule.notes ?? "",
       })),
     });
+    setShowExclusivityRules((deal.exclusivityRules ?? []).length > 0);
   }, [dealQuery.data, form]);
 
   const addExclusivityRule = () => {
@@ -812,12 +812,14 @@ export default function EditDealPage() {
                 >
                   {deleteDealMutation.isPending ? "Deleting..." : "Delete Deal"}
                 </Button>
-                <Link
-                  href={`/deals/${dealId}`}
-                  className={buttonVariants({ variant: "outline" })}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => router.push(`/deals/${dealId}`)}
+                  disabled={isSubmitting || deleteDealMutation.isPending}
                 >
                   Cancel
-                </Link>
+                </Button>
                 <Button
                   type="submit"
                   disabled={

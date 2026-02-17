@@ -21,12 +21,12 @@ function sendClientError(payload: ClientErrorPayload) {
       return;
     }
 
-    void fetch(url, {
+    fetch(url, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body,
       keepalive: true,
-    });
+    }).catch(() => {});
   } catch {
     // Swallow observability failures to avoid user impact.
   }

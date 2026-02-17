@@ -1,7 +1,5 @@
 "use client";
 
-import { toast } from "sonner";
-
 function getBrowserNotificationApi() {
   if (typeof window === "undefined") {
     return null;
@@ -18,11 +16,13 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
   const currentPermission = notificationApi.permission;
 
   if (currentPermission === "granted") {
+    localStorage.setItem("notification-permission-asked", "true");
     return "granted";
   }
 
   if (currentPermission === "denied") {
     // We can't trigger the native popup again if they already denied it
+    localStorage.setItem("notification-permission-asked", "true");
     return "denied";
   }
 
@@ -30,7 +30,6 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
     const permission = await notificationApi.requestPermission();
     
     localStorage.setItem("notification-permission-asked", "true");
-    localStorage.setItem("notification-permission-granted", permission === "granted" ? "true" : "false");
     
     return permission;
   } catch (error) {
@@ -44,7 +43,7 @@ export function hasAskedForPermission(): boolean {
   return localStorage.getItem("notification-permission-asked") === "true";
 }
 
-export function getStoredPermissionStatus(): string | null {
+export function getPermissionStatus(): string | null {
   const notificationApi = getBrowserNotificationApi();
   if (!notificationApi) {
     return null;

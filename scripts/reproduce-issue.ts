@@ -1,12 +1,14 @@
 import * as dotenv from "dotenv";
 import { sql } from "drizzle-orm";
-import { db } from "@/db";
-import { appRouter } from "@/server/api/root";
-import { TRPCError } from "@trpc/server";
 
 dotenv.config({ path: ".env.local" });
 
 async function main() {
+    const [{ db }, { appRouter }] = await Promise.all([
+        import("@/db"),
+        import("@/server/api/root"),
+    ]);
+
     const users = await db.execute(sql`select id from auth.users limit 1`);
     if (users.length === 0) {
         throw new Error("No users found");

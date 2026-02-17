@@ -7,8 +7,12 @@ import { toast } from "sonner";
 import { 
   requestNotificationPermission, 
   hasAskedForPermission, 
-  getStoredPermissionStatus 
+  getPermissionStatus, 
 } from "@/src/lib/notifications/requestPermission";
+import {
+  getReadyPushManager,
+  isPushNotificationsSupported,
+} from "@/src/lib/notifications/pushSupport";
 import {
   getAppNotificationsEnabled,
   setAppNotificationsEnabled,
@@ -53,7 +57,7 @@ export function NotificationPrompt() {
     // Logic: Only show if we haven't asked before and permission is still 'default'
     // Delay by 30 seconds to wait for user engagement
     const timer = setTimeout(() => {
-      const currentPermission = getStoredPermissionStatus();
+      const currentPermission = getPermissionStatus();
       
       if (!hasAskedForPermission() && currentPermission === "default") {
         setShowPrompt(true);
@@ -72,8 +76,8 @@ export function NotificationPrompt() {
     setIsEnabling(true);
 
     try {
-      if (!("serviceWorker" in navigator)) {
-        throw new Error("Service worker is not supported on this browser.");
+      if (!isPushNotificationsSupported()) {
+        throw new Error("Push notifications are not supported on this browser.");
       }
 
       const permission = await requestNotificationPermission();
@@ -91,10 +95,10 @@ export function NotificationPrompt() {
         return;
       }
 
-      const registration = await navigator.serviceWorker.ready;
-      let subscription = await registration.pushManager.getSubscription();
+      const pushManager = await getReadyPushManager();
+      let subscription = await pushManager.getSubscription();
       if (!subscription) {
-        subscription = await registration.pushManager.subscribe({
+        subscription = await pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(publicKey),
         });
@@ -114,7 +118,6 @@ export function NotificationPrompt() {
       });
 
       localStorage.setItem("notification-permission-asked", "true");
-      localStorage.setItem("notification-permission-granted", "true");
       setAppNotificationsEnabled(true);
       setShowPrompt(false);
       setIsDenied(false);

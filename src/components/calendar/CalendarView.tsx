@@ -76,6 +76,7 @@ function getEventKey(resource: CalendarEvent) {
 
 export default function CalendarView() {
     const router = useRouter();
+    const [isMobile, setIsMobile] = useState(false);
     
     // 1. State for preferences
     const [preferences, setPreferences] = useState<CalendarPreferences>(DEFAULT_PREFERENCES);
@@ -106,6 +107,19 @@ export default function CalendarView() {
                 console.error("Failed to parse calendar preferences", e);
             }
         }
+    }, []);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+
+        const mediaQuery = window.matchMedia("(max-width: 768px)");
+        const apply = () => {
+            setIsMobile(mediaQuery.matches);
+        };
+
+        apply();
+        mediaQuery.addEventListener("change", apply);
+        return () => mediaQuery.removeEventListener("change", apply);
     }, []);
 
     // Save preferences when changed
@@ -327,32 +341,46 @@ export default function CalendarView() {
         });
     }, [view]);
 
+    const availableViews = useMemo<View[]>(
+        () => (isMobile ? [Views.AGENDA, Views.WEEK, Views.DAY] : [...CALENDAR_VIEWS]),
+        [isMobile],
+    );
+
+    useEffect(() => {
+        if (!availableViews.some((value) => value === view)) {
+            setView(availableViews[0]);
+        }
+    }, [availableViews, view]);
+
     if (isLoading && calendarEvents.length === 0) {
         return <div className="p-8 text-center dash-text-muted">Loading calendar...</div>
     }
 
     return (
-        <div className="flex flex-col h-[calc(100vh-64px)] dash-bg-panel">
-            <div className="flex items-start justify-between dash-bg-card border-b dash-border px-4 py-3 shadow-sm">
-                <div className="flex-1">
+        <div className="flex h-full flex-col dash-bg-panel">
+            <div className="flex flex-col gap-2 border-b dash-border dash-bg-card px-3 py-3 shadow-sm sm:flex-row sm:items-start sm:justify-between sm:px-4">
+                <div className="flex-1 min-w-0">
                     <CalendarFilters
                         date={date}
                         setDate={onNavigate}
                         view={view}
                         setView={onView}
+                        availableViews={availableViews}
+                        compact={isMobile}
                         filters={filters}
                         setFilters={setFilters}
                     />
                 </div>
-                <div className="ml-4 mt-4">
+                <div className="self-end sm:ml-4 sm:mt-4">
                     <CalendarSettings preferences={preferences} setPreference={handleSetPreference} />
                 </div>
             </div>
 
-            <div className="flex-1 p-4 overflow-hidden">
+            <div className="flex-1 overflow-hidden p-2 sm:p-4">
                 <div
                     className={cn(
-                        "calendar-shell relative h-full dash-bg-card rounded-2xl shadow-xl border dash-border overflow-hidden",
+                        "calendar-shell relative h-full overflow-hidden border dash-border dash-bg-card shadow-xl",
+                        isMobile ? "rounded-xl" : "rounded-2xl",
                         preferences.eventDensity === 'compact' ? 'text-xs' : ''
                     )}
                     onTouchStart={onTouchStart}
@@ -415,14 +443,17 @@ export default function CalendarView() {
                                 <div className="space-y-1">
                                     <p className="text-[10px] uppercase font-bold tracking-widest dash-text-soft">Amount</p>
                                     <p className="text-sm font-bold gold-text">
-                                        {formatDealCurrency(selectedEvent.relatedAmount, { currency: 'USD' })}
+                                        {formatDealCurrency(selectedEvent.relatedAmount, {
+                                            currency: selectedEvent.currency,
+                                        })}
                                     </p>
                                 </div>
                             ) : null}
                         </div>
                         
                         <div className="pt-4 border-t dash-border">
-                            <button 
+                            <button
+                                type="button"
                                 onClick={() => {
                                     router.push(`/deals/${selectedEvent.dealId}`);
                                     setSelectedEvent(null);

@@ -177,25 +177,27 @@ export const brandsRouter = createTRPCRouter({
     .input(deleteBrandInputSchema)
     .mutation(async ({ ctx, input }) => {
       try {
-        const linkedDeals = await ctx.db.query.deals.findFirst({
-          where: and(eq(deals.brandId, input.id), eq(deals.userId, ctx.user.id)),
-          columns: { id: true },
+        const [deleted] = await ctx.db.transaction(async (tx) => {
+          const linkedDeals = await tx.query.deals.findFirst({
+            where: and(eq(deals.brandId, input.id), eq(deals.userId, ctx.user.id)),
+            columns: { id: true },
+          });
+
+          if (linkedDeals) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Cannot delete a brand with associated deals.",
+            });
+          }
+
+          return tx
+            .delete(brands)
+            .where(and(eq(brands.id, input.id), eq(brands.userId, ctx.user.id)))
+            .returning({
+              id: brands.id,
+              name: brands.name,
+            });
         });
-
-        if (linkedDeals) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Cannot delete a brand with associated deals.",
-          });
-        }
-
-        const [deleted] = await ctx.db
-          .delete(brands)
-          .where(and(eq(brands.id, input.id), eq(brands.userId, ctx.user.id)))
-          .returning({
-            id: brands.id,
-            name: brands.name,
-          });
 
         if (!deleted) {
           throw new TRPCError({

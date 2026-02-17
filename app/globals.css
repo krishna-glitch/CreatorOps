@@ -416,7 +416,7 @@ h1.dash-title {
   padding: 4px 8px;
 }
 
-.calendar-shell .rbc-now.rbc-btn-now {
+.calendar-shell .rbc-now {
   color: var(--shell-gold);
   font-weight: bold;
 }
@@ -444,4 +444,35 @@ h1.dash-title {
 .calendar-shell .rbc-agenda-content::-webkit-scrollbar-thumb {
   background-color: var(--shell-border-soft);
   border-radius: 10px;
+}
+
+@media (max-width: 768px) {
+  .calendar-shell .rbc-header {
+    padding: 8px 2px;
+    font-size: 0.6rem;
+    letter-spacing: 0.03em;
+  }
+
+  .calendar-shell .rbc-date-cell {
+    padding: 2px 4px;
+    font-size: 0.72rem;
+  }
+
+  .calendar-shell .rbc-event {
+    border-radius: 6px;
+    padding: 1px 3px;
+  }
+
+  .calendar-shell .rbc-event-label {
+    font-size: 0.62rem;
+  }
+
+  .calendar-shell .rbc-event-content {
+    font-size: 0.65rem;
+    line-height: 1.1;
+  }
+
+  .calendar-shell .rbc-agenda-view .rbc-agenda-table {
+    font-size: 0.75rem;
+  }
 }

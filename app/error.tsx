@@ -23,12 +23,12 @@ export default function GlobalError({
         userAgent: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
       });
 
-      void fetch("/api/observability/client-error", {
+      fetch("/api/observability/client-error", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body,
         keepalive: true,
-      });
+      }).catch(() => {});
     } catch {
       // Do not block UI on telemetry failure.
     }

@@ -13,6 +13,7 @@ const calendarEventSchema = z.object({
     eventType: z.enum(['deliverable', 'payment', 'reminder']),
     sourceId: z.string(),
     dealId: z.string(),
+    currency: z.enum(["USD", "INR"]),
     eventDate: z.date(),
     completedAt: z.date().nullable(),
     title: z.string(),
@@ -85,6 +86,7 @@ export const calendarRouter = createTRPCRouter({
             ce.event_type as "eventType",
             ce.source_id as "sourceId",
             ce.deal_id as "dealId",
+            d.currency as "currency",
             ce.event_date as "eventDate",
             ce.completed_at as "completedAt",
             ce.title,
@@ -106,6 +108,7 @@ export const calendarRouter = createTRPCRouter({
                 eventType: row.eventType as CalendarEventType, // Explicit cast needed
                 sourceId: row.sourceId,
                 dealId: row.dealId,
+                currency: row.currency === "INR" ? "INR" : "USD",
                 eventDate: new Date(row.eventDate),
                 completedAt: row.completedAt ? new Date(row.completedAt) : null,
                 title: row.title,
