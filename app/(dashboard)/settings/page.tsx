@@ -24,7 +24,18 @@ export default async function SettingsPage() {
     headers: new Headers(),
   });
 
-  const usage = await caller.mediaAssets.storageUsage();
+  let usage = {
+    totalBytesUsed: 0,
+    storageLimitBytes: 1024 * 1024 * 1024,
+    percentUsed: 0,
+    approachingLimit: false,
+  };
+
+  try {
+    usage = await caller.mediaAssets.storageUsage();
+  } catch (error) {
+    console.error("Failed to load storage usage for settings page", error);
+  }
   const metadata = (user.user_metadata ?? {}) as Record<string, unknown>;
   const fullName =
     (typeof metadata.full_name === "string" && metadata.full_name.trim().length > 0
@@ -32,7 +43,6 @@ export default async function SettingsPage() {
       : typeof metadata.name === "string" && metadata.name.trim().length > 0
         ? metadata.name.trim()
         : "") || undefined;
-  
   return (
     <div className="mx-auto w-full max-w-2xl px-2 py-4">
       <div className="mb-6">
