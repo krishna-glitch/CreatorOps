@@ -1,6 +1,9 @@
 "use client";
+"use no memo";
 
 import { useState, useCallback, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { keepPreviousData } from "@tanstack/react-query";
 import { Calendar, dateFnsLocalizer, View, Views } from "react-big-calendar";
 import withDragAndDrop from "react-big-calendar/lib/addons/dragAndDrop";
 import {
@@ -17,53 +20,22 @@ import {
     subWeeks,
 } from "date-fns";
 import * as locales from "date-fns/locale";
-import "react-big-calendar/lib/css/react-big-calendar.css";
-import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
 import { trpc } from "@/lib/trpc/client";
 import type { CalendarEvent } from "@/types/calendar";
 import { toast } from "sonner";
 import { CalendarFilters } from "./CalendarFilters";
 import { CalendarSettings } from "./CalendarSettings";
 import { BottomSheet } from "@/src/components/ui/BottomSheet";
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { getDealStatusTone, getStatusBadgeClasses } from "@/src/lib/utils/status-utils";
+import { formatDealCurrency } from "@/src/lib/utils/format-utils";
 
 // Setup DnD Calendar
 const DnDCalendar = withDragAndDrop(Calendar);
 const DnDCalendarAny = DnDCalendar as any;
-
-// Setup localizer
-const localizer = dateFnsLocalizer({
-    format,
-    parse,
-    startOfWeek,
-    getDay,
-    locales,
-});
-
-// Event style getter
-const eventStyleGetter = (event: object) => {
-    const resource = (event as { resource: CalendarEvent }).resource || (event as CalendarEvent); // fallback if resource not nested
-    const colorMap: Record<string, string> = {
-        blue: "#3b82f6",
-        green: "#22c55e",
-        red: "#ef4444",
-        yellow: "#eab308",
-        orange: "#f97316",
-        gray: "#6b7280",
-    };
-
-    const backgroundColor = colorMap[resource.color] || resource.color || "#3b82f6";
-
-    return {
-        style: {
-            backgroundColor,
-            borderRadius: "4px",
-            opacity: 0.9,
-            color: "white",
-            border: "0px",
-            display: "block",
-        },
-    };
-};
+const CALENDAR_VIEWS = [Views.MONTH, Views.WEEK, Views.DAY, Views.AGENDA];
+const CALENDAR_STYLE = { height: "100%" };
 
 type CalendarPreferences = {
     defaultView: View;
@@ -79,21 +51,57 @@ const DEFAULT_PREFERENCES: CalendarPreferences = {
     eventDensity: 'comfortable',
 };
 
+const COLOR_MAP: Record<string, string> = {
+    blue: "#3b82f6",
+    green: "#22c55e",
+    red: "#ef4444",
+    yellow: "#eab308",
+    orange: "#f97316",
+    gray: "#6b7280",
+};
+
+function mapServerEventsToCalendarEvents(events: CalendarEvent[]) {
+    return events.map((event: CalendarEvent) => ({
+        start: new Date(event.eventDate),
+        end: new Date(event.eventDate),
+        title: event.title,
+        allDay: true,
+        resource: event,
+    }));
+}
+
+function getEventKey(resource: CalendarEvent) {
+    return `${resource.eventType}:${resource.sourceId}`;
+}
+
 export default function CalendarView() {
-    // State for preferences
+    const router = useRouter();
+    
+    // 1. State for preferences
     const [preferences, setPreferences] = useState<CalendarPreferences>(DEFAULT_PREFERENCES);
-    // State for filters
+    
+    // 2. State for filters
     const [filters, setFilters] = useState({
         eventTypes: ['deliverable', 'payment', 'reminder'],
         status: 'all',
     });
+
+    // 3. View & Date State
+    const [view, setView] = useState<View>(DEFAULT_PREFERENCES.defaultView);
+    const [date, setDate] = useState(new Date());
+    const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+
+    // 4. Local state for optimistic date overrides
+    const [optimisticDateOverrides, setOptimisticDateOverrides] = useState<Record<string, number>>({});
 
     // Load preferences on mount
     useEffect(() => {
         const saved = localStorage.getItem('calendar-preferences');
         if (saved) {
             try {
-                setPreferences({ ...DEFAULT_PREFERENCES, ...JSON.parse(saved) });
+                const parsed = JSON.parse(saved);
+                setPreferences({ ...DEFAULT_PREFERENCES, ...parsed });
+                if (parsed.defaultView) setView(parsed.defaultView);
             } catch (e) {
                 console.error("Failed to parse calendar preferences", e);
             }
@@ -102,92 +110,41 @@ export default function CalendarView() {
 
     // Save preferences when changed
     const handleSetPreference = useCallback((key: string, value: any) => {
-        setPreferences(prev => {
+        setPreferences((prev) => {
+            if (prev[key as keyof CalendarPreferences] === value) {
+                return prev;
+            }
             const next = { ...prev, [key]: value };
             localStorage.setItem('calendar-preferences', JSON.stringify(next));
             return next;
         });
 
-        // If view changed in settings, update view state
         if (key === 'defaultView') {
-            setView(value as View);
+            setView((previousView) => (previousView === value ? previousView : (value as View)));
         }
     }, []);
 
-    const [view, setView] = useState<View>(preferences.defaultView);
-    const [date, setDate] = useState(new Date());
-    const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+    // Stable Event Style Getter
+    const eventStyleGetter = useCallback((event: any) => {
+        const resource = event.resource || event;
+        const backgroundColor = COLOR_MAP[resource.color] || resource.color || "#3b82f6";
 
-    // Update view if preference loads differently (initial load)
-    useEffect(() => {
-        setView(preferences.defaultView);
-    }, [preferences.defaultView]);
+        return {
+            style: {
+                backgroundColor,
+                borderRadius: "8px",
+                opacity: 0.9,
+                color: "white",
+                border: "0px",
+                display: "block",
+                padding: '2px 6px',
+                fontSize: '0.75rem',
+                fontWeight: '500',
+            },
+        };
+    }, []);
 
-    // Local state for optimistic updates
-    const [optimisticEvents, setOptimisticEvents] = useState<any[]>([]);
-
-    // Calculate range for query based on view and date
-    const { startDate, endDate } = useMemo(() => {
-        const start = new Date(date.getFullYear(), date.getMonth() - 1, 1);
-        const end = new Date(date.getFullYear(), date.getMonth() + 2, 0);
-        return { startDate: start, endDate: end };
-    }, [date]);
-
-    // Query
-    const { data, isLoading, refetch } = trpc.calendar.getEvents.useQuery({
-        startDate,
-        endDate,
-    });
-
-    // Mutation
-    const updateEventDateMutation = trpc.calendar.updateEventDate.useMutation();
-
-    // Sync data to local state when fetched
-    useEffect(() => {
-        if (data?.events) {
-            const mapped = data.events.map((event: CalendarEvent) => ({
-                start: new Date(event.eventDate),
-                end: new Date(event.eventDate),
-                title: event.title,
-                allDay: true,
-                resource: event,
-            }));
-            setOptimisticEvents(mapped);
-        }
-    }, [data]);
-
-    // Filter Logic
-    const filteredEvents = useMemo(() => {
-        return optimisticEvents.filter(event => {
-            const resource = event.resource as CalendarEvent;
-
-            // Event Type Filter
-            if (!filters.eventTypes.includes(resource.eventType)) {
-                return false;
-            }
-
-            // Status Filter
-            if (filters.status === 'upcoming') {
-                if (resource.completedAt) return false; // Must be incomplete
-                if (resource.status === 'POSTED' || resource.status === 'PAID') return false;
-            }
-            if (filters.status === 'completed') {
-                // Either completedAt is set OR status indicates completion
-                const isCompleted = resource.completedAt || resource.status === 'POSTED' || resource.status === 'PAID';
-                if (!isCompleted) return false;
-            }
-            if (filters.status === 'overdue') {
-                const isCompleted = resource.completedAt || resource.status === 'POSTED' || resource.status === 'PAID';
-                if (isCompleted) return false;
-                // Check if past due
-                if (new Date(resource.eventDate) >= new Date()) return false;
-            }
-
-            return true;
-        });
-    }, [optimisticEvents, filters]);
-
-    // Update localizer if week start changes
+    // Stable Localizer
     const currentLocalizer = useMemo(() => {
         return dateFnsLocalizer({
             format,
@@ -198,12 +155,96 @@ export default function CalendarView() {
         });
     }, [preferences.weekStartsOn]);
 
-    const onNavigate = useCallback((newDate: Date) => setDate(newDate), [setDate]);
-    const onView = useCallback((newView: View) => setView(newView), [setView]);
+    // Query Range
+    const { startDate, endDate } = useMemo(() => {
+        const start = new Date(date.getFullYear(), date.getMonth() - 1, 1);
+        const end = new Date(date.getFullYear(), date.getMonth() + 2, 0);
+        return { startDate: start, endDate: end };
+    }, [date]);
 
-    const handleSelectEvent = useCallback((event: { resource: CalendarEvent; title: string }) => {
-        setSelectedEvent(event.resource);
+    // API Query
+    const { data, isLoading, refetch } = trpc.calendar.getEvents.useQuery(
+        {
+            startDate,
+            endDate,
+        },
+        {
+            staleTime: 60_000,
+            placeholderData: keepPreviousData,
+        },
+    );
+
+    // API Mutation
+    const updateEventDateMutation = trpc.calendar.updateEventDate.useMutation();
+
+    const calendarEvents = useMemo(() => {
+        if (!data?.events) {
+            return [];
+        }
+
+        const mapped = mapServerEventsToCalendarEvents(data.events);
+        return mapped.map((event) => {
+            const override = optimisticDateOverrides[getEventKey(event.resource)];
+            if (!override) {
+                return event;
+            }
+
+            const dateValue = new Date(override);
+            return {
+                ...event,
+                start: dateValue,
+                end: dateValue,
+            };
+        });
+    }, [data?.events, optimisticDateOverrides]);
+
+    // Filter Logic
+    const filteredEvents = useMemo(() => {
+        return calendarEvents.filter(event => {
+            const resource = event.resource as CalendarEvent;
+
+            if (!filters.eventTypes.includes(resource.eventType)) {
+                return false;
+            }
+
+            if (filters.status === 'upcoming') {
+                if (resource.completedAt) return false;
+                if (resource.status === 'POSTED' || resource.status === 'PAID') return false;
+            }
+            if (filters.status === 'completed') {
+                const isCompleted = resource.completedAt || resource.status === 'POSTED' || resource.status === 'PAID';
+                if (!isCompleted) return false;
+            }
+            if (filters.status === 'overdue') {
+                const isCompleted = resource.completedAt || resource.status === 'POSTED' || resource.status === 'PAID';
+                if (isCompleted) return false;
+                if (new Date(resource.eventDate) >= new Date()) return false;
+            }
+
+            return true;
+        });
+    }, [calendarEvents, filters]);
+
+    const onNavigate = useCallback((newDate: Date) => {
+        setDate((currentDate) => (
+            currentDate.getTime() === newDate.getTime() ? currentDate : newDate
+        ));
     }, []);
+    const onView = useCallback((newView: View) => {
+        setView((currentView) => (currentView === newView ? currentView : newView));
+    }, []);
+
+    const handleSelectEvent = useCallback((event: any) => {
+        setSelectedEvent(event.resource || event);
+    }, []);
+
+    const startAccessor = useCallback((event: any) => new Date(event.start), []);
+    const endAccessor = useCallback((event: any) => new Date(event.end), []);
+    const draggableAccessor = useCallback((event: object) => {
+        const resource = (event as { resource: CalendarEvent }).resource;
+        return resource.status !== 'POSTED' && resource.status !== 'PAID';
+    }, []);
+    const closeEventSheet = useCallback(() => setSelectedEvent(null), []);
 
     const onEventDrop = useCallback(
         async ({ event, start }: { event: object; start: string | Date }) => {
@@ -211,8 +252,6 @@ export default function CalendarView() {
             const newDate = new Date(start);
             const todayStart = startOfDay(new Date());
 
-            // Validation: Don't allow dragging past/completed events?
-            // The user said: "Can't drag completed events (posted deliverables, paid payments)"
             if (resource.status === 'POSTED' || resource.status === 'PAID') {
                 toast.error(`Cannot reschedule ${resource.status.toLowerCase()} events`);
                 return;
@@ -223,19 +262,13 @@ export default function CalendarView() {
                 return;
             }
 
-            // Optimistic update
-            const originalEvents = [...optimisticEvents];
+            const eventKey = getEventKey(resource);
+            const previousOverride = optimisticDateOverrides[eventKey];
+            setOptimisticDateOverrides((current) => ({
+                ...current,
+                [eventKey]: newDate.getTime(),
+            }));
 
-            // Update local state immediately
-            const updatedEvents = originalEvents.map(e => {
-                if (e.resource.sourceId === resource.sourceId && e.resource.eventType === resource.eventType) {
-                    return { ...e, start: newDate, end: newDate };
-                }
-                return e;
-            });
-            setOptimisticEvents(updatedEvents);
-
-            // Show toast/indicator?
             const toastId = toast.loading("Rescheduling...");
 
             try {
@@ -246,71 +279,67 @@ export default function CalendarView() {
                 });
 
                 toast.success("Event rescheduled", { id: toastId });
-                // Refetch to ensure consistency (and update other derived data if any)
                 await refetch();
             } catch (error: any) {
                 console.error("DnD fail", error);
                 toast.error(error.message || "Failed to reschedule", { id: toastId });
-                // Revert
-                setOptimisticEvents(originalEvents);
+                setOptimisticDateOverrides((current) => {
+                    const next = { ...current };
+                    if (previousOverride === undefined) {
+                        delete next[eventKey];
+                    } else {
+                        next[eventKey] = previousOverride;
+                    }
+                    return next;
+                });
             }
         },
-        [optimisticEvents, updateEventDateMutation, refetch]
+        [optimisticDateOverrides, updateEventDateMutation, refetch]
     );
 
-    if (isLoading && optimisticEvents.length === 0) {
-        return <div className="p-8 text-center">Loading calendar...</div>
-    }
-
-    const navigateBySwipe = (direction: "left" | "right") => {
-        setDate((currentDate) => {
-            switch (view) {
-                case Views.MONTH:
-                    return direction === "left"
-                        ? addMonths(currentDate, 1)
-                        : subMonths(currentDate, 1);
-                case Views.WEEK:
-                    return direction === "left"
-                        ? addWeeks(currentDate, 1)
-                        : subWeeks(currentDate, 1);
-                case Views.DAY:
-                    return direction === "left"
-                        ? addDays(currentDate, 1)
-                        : subDays(currentDate, 1);
-                case Views.AGENDA:
-                    return direction === "left"
-                        ? addMonths(currentDate, 1)
-                        : subMonths(currentDate, 1);
-                default:
-                    return currentDate;
-            }
-        });
-    };
-
-    const onTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    const onTouchStart = useCallback((event: React.TouchEvent<HTMLDivElement>) => {
         const x = event.changedTouches[0]?.screenX ?? 0;
         event.currentTarget.dataset.swipeStartX = String(x);
-    };
+    }, []);
 
-    const onTouchEnd = (event: React.TouchEvent<HTMLDivElement>) => {
+    const onTouchEnd = useCallback((event: React.TouchEvent<HTMLDivElement>) => {
         const startX = Number(event.currentTarget.dataset.swipeStartX ?? "0");
         const endX = event.changedTouches[0]?.screenX ?? 0;
         const delta = endX - startX;
 
         if (Math.abs(delta) < 50) return;
-        if (delta > 0) navigateBySwipe("right");
-        if (delta < 0) navigateBySwipe("left");
-    };
+        
+        const direction = delta > 0 ? "right" : "left";
+        
+        setDate((currentDate) => {
+            switch (view) {
+                case Views.MONTH:
+                    return direction === "left" ? addMonths(currentDate, 1) : subMonths(currentDate, 1);
+                case Views.WEEK:
+                    return direction === "left" ? addWeeks(currentDate, 1) : subWeeks(currentDate, 1);
+                case Views.DAY:
+                    return direction === "left" ? addDays(currentDate, 1) : subDays(currentDate, 1);
+                case Views.AGENDA:
+                    return direction === "left" ? addMonths(currentDate, 1) : subMonths(currentDate, 1);
+                default:
+                    return currentDate;
+            }
+        });
+    }, [view]);
+
+    if (isLoading && calendarEvents.length === 0) {
+        return <div className="p-8 text-center dash-text-muted">Loading calendar...</div>
+    }
 
     return (
-        <div className="flex flex-col h-[calc(100vh-64px)]">
-            <div className="flex items-start justify-between bg-white border-b border-slate-200 px-4 py-2">
+        <div className="flex flex-col h-[calc(100vh-64px)] dash-bg-panel">
+            <div className="flex items-start justify-between dash-bg-card border-b dash-border px-4 py-3 shadow-sm">
                 <div className="flex-1">
                     <CalendarFilters
                         date={date}
-                        setDate={setDate}
+                        setDate={onNavigate}
                         view={view}
-                        setView={setView}
+                        setView={onView}
                         filters={filters}
                         setFilters={setFilters}
                     />
@@ -320,63 +349,89 @@ export default function CalendarView() {
                 </div>
             </div>
 
-            <div className="flex-1 p-4 bg-slate-50 overflow-hidden">
+            <div className="flex-1 p-4 overflow-hidden">
                 <div
-                    className={`relative h-full bg-white rounded-lg shadow ${preferences.eventDensity === 'compact' ? 'text-xs' : ''}`}
+                    className={cn(
+                        "calendar-shell relative h-full dash-bg-card rounded-2xl shadow-xl border dash-border overflow-hidden",
+                        preferences.eventDensity === 'compact' ? 'text-xs' : ''
+                    )}
                     onTouchStart={onTouchStart}
                     onTouchEnd={onTouchEnd}
                 >
                     <DnDCalendarAny
                         localizer={currentLocalizer}
                         events={filteredEvents}
-                        startAccessor={(e: any) => new Date(e.start)}
-                        endAccessor={(e: any) => new Date(e.end)}
-                        style={{ height: "100%" }}
+                        startAccessor={startAccessor}
+                        endAccessor={endAccessor}
+                        style={CALENDAR_STYLE}
                         view={view}
                         onView={onView}
                         date={date}
                         onNavigate={onNavigate}
-                        onSelectEvent={(e: any) => handleSelectEvent(e)}
+                        onSelectEvent={handleSelectEvent}
                         eventPropGetter={eventStyleGetter}
-                        views={[Views.MONTH, Views.WEEK, Views.DAY, Views.AGENDA]}
-
-                        // DnD props
+                        views={CALENDAR_VIEWS}
+                        toolbar={false}
                         onEventDrop={onEventDrop}
                         resizable={false}
-                        draggableAccessor={(event: object) => {
-                            const r = (event as { resource: CalendarEvent }).resource;
-                            return r.status !== 'POSTED' && r.status !== 'PAID';
-                        }}
+                        draggableAccessor={draggableAccessor}
                     />
                     {!isLoading && filteredEvents.length === 0 ? (
-                        <div className="absolute inset-0 flex items-center justify-center bg-white/70 pointer-events-none">
-                            <p className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
-                                No events
+                        <div className="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-black/50 backdrop-blur-[1px] pointer-events-none">
+                            <p className="rounded-xl border dash-border dash-bg-card px-6 py-3 text-sm dash-text-muted shadow-2xl font-bold uppercase tracking-widest">
+                                No Affairs Scheduled
                             </p>
                         </div>
                     ) : null}
                 </div>
             </div>
-            <BottomSheet
-                isOpen={selectedEvent !== null}
-                onClose={() => setSelectedEvent(null)}
-                title={selectedEvent?.title ?? "Event"}
-                showCloseButton
-            >
+            
+                <BottomSheet
+                    isOpen={selectedEvent !== null}
+                    onClose={closeEventSheet}
+                    title={selectedEvent?.title ?? "Event"}
+                    showCloseButton
+                >
                 {selectedEvent ? (
-                    <div className="space-y-2 text-sm">
-                        <p><span className="font-semibold">Type:</span> {selectedEvent.eventType}</p>
-                        <p><span className="font-semibold">Status:</span> {selectedEvent.status}</p>
-                        <p>
-                            <span className="font-semibold">Date:</span>{" "}
-                            {format(new Date(selectedEvent.eventDate), "PPP")}
-                        </p>
-                        {selectedEvent.relatedAmount !== null ? (
-                            <p>
-                                <span className="font-semibold">Amount:</span> ${selectedEvent.relatedAmount}
-                            </p>
-                        ) : null}
-                        <p className="text-xs text-slate-500">Deal: {selectedEvent.dealId}</p>
+                    <div className="space-y-6 pt-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <p className="text-[10px] uppercase font-bold tracking-widest dash-text-soft">Type</p>
+                                <p className="text-sm font-bold dash-text uppercase">{selectedEvent.eventType}</p>
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-[10px] uppercase font-bold tracking-widest dash-text-soft">Status</p>
+                                <div className="flex">
+                                    <Badge variant="outline" className={cn("text-[10px]", getStatusBadgeClasses(getDealStatusTone(selectedEvent.status)))}>
+                                        {selectedEvent.status}
+                                    </Badge>
+                                </div>
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-[10px] uppercase font-bold tracking-widest dash-text-soft">Date</p>
+                                <p className="text-sm font-bold dash-text">{format(new Date(selectedEvent.eventDate), "PPP")}</p>
+                            </div>
+                            {selectedEvent.relatedAmount !== null ? (
+                                <div className="space-y-1">
+                                    <p className="text-[10px] uppercase font-bold tracking-widest dash-text-soft">Amount</p>
+                                    <p className="text-sm font-bold gold-text">
+                                        {formatDealCurrency(selectedEvent.relatedAmount, { currency: 'USD' })}
+                                    </p>
+                                </div>
+                            ) : null}
+                        </div>
+                        
+                        <div className="pt-4 border-t dash-border">
+                            <button 
+                                onClick={() => {
+                                    router.push(`/deals/${selectedEvent.dealId}`);
+                                    setSelectedEvent(null);
+                                }}
+                                className="w-full dash-shell-primary-btn py-3 rounded-xl font-bold text-sm shadow-lg transition-transform active:scale-[0.98]"
+                            >
+                                View Detailed Deal
+                            </button>
+                        </div>
                     </div>
                 ) : null}
             </BottomSheet>

@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Check, ChevronsUpDown } from "lucide-react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
@@ -39,9 +40,13 @@ import {
 } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
-import { VoiceCommandButton } from "@/src/components/voice/VoiceCommandButton";
 import { useDefaultCurrency } from "@/src/hooks/useDefaultCurrency";
 import type { ParsedCommand } from "@/src/lib/voice/commandParser";
+
+const VoiceCommandButton = dynamic(
+  () => import("@/src/components/voice/VoiceCommandButton").then((mod) => mod.VoiceCommandButton),
+  { ssr: false },
+);
 
 const exclusivityRuleFormSchema = z
   .object({
@@ -182,12 +187,13 @@ export default function NewDealPage() {
   const [selectedBrandFallbackName, setSelectedBrandFallbackName] = useState<
     string | null
   >(null);
+  const [showExclusivityRules, setShowExclusivityRules] = useState(false);
 
   const { data: brands, isLoading: isLoadingBrands } =
     trpc.brands.list.useQuery({ limit: 100 });
 
   const createBrandMutation = trpc.brands.create.useMutation({
-    onSuccess: async (createdBrand) => {
+    onSuccess: (createdBrand) => {
       setSelectedBrandFallbackName(createdBrand.name);
       setBrandSearch("");
       setBrandPopoverOpen(false);
@@ -196,7 +202,7 @@ export default function NewDealPage() {
         shouldValidate: true,
       });
 
-      await trpcUtils.brands.list.invalidate();
+      void trpcUtils.brands.list.invalidate();
       toast.success("Brand created and selected.", { duration: 3000 });
     },
     onError: (error) => {
@@ -245,6 +251,7 @@ export default function NewDealPage() {
   };
 
   const addExclusivityRule = () => {
+    setShowExclusivityRules(true);
     exclusivityRulesArray.append({
       category_path: "",
       scope: "EXACT_CATEGORY",
@@ -654,16 +661,33 @@ export default function NewDealPage() {
                       Add one or more exclusivity constraints for this deal.
                     </p>
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={addExclusivityRule}
-                  >
-                    Add Rule
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() =>
+                        setShowExclusivityRules((current) => !current)
+                      }
+                    >
+                      {showExclusivityRules ? "Hide Rules" : "Show Rules"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={addExclusivityRule}
+                    >
+                      Add Rule
+                    </Button>
+                  </div>
                 </div>
 
-                {exclusivityRulesArray.fields.length === 0 ? (
+                {!showExclusivityRules ? (
+                  <p className="mt-4 text-sm text-muted-foreground">
+                    {exclusivityRulesArray.fields.length === 0
+                      ? "No exclusivity rules added yet."
+                      : `${exclusivityRulesArray.fields.length} rule(s) configured. Expand to edit.`}
+                  </p>
+                ) : exclusivityRulesArray.fields.length === 0 ? (
                   <p className="mt-4 text-sm text-muted-foreground">
                     No exclusivity rules added yet.
                   </p>

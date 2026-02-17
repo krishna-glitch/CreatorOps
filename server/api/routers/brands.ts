@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { and, eq, gte, ilike, lt, or } from "drizzle-orm";
 import { z } from "zod";
 import { brands } from "@/server/infrastructure/database/schema/brands";
+import { deals } from "@/server/infrastructure/database/schema/deals";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const listBrandsInputSchema = z.object({
@@ -22,6 +23,10 @@ const createBrandInputSchema = z.object({
 const updateBrandInputSchema = z.object({
   id: z.string().uuid(),
   name: z.string().trim().min(1).max(120),
+});
+
+const deleteBrandInputSchema = z.object({
+  id: z.string().uuid(),
 });
 
 export const brandsRouter = createTRPCRouter({
@@ -163,6 +168,51 @@ export const brandsRouter = createTRPCRouter({
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Could not update brand",
+          cause: error,
+        });
+      }
+    }),
+
+  delete: protectedProcedure
+    .input(deleteBrandInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const linkedDeals = await ctx.db.query.deals.findFirst({
+          where: and(eq(deals.brandId, input.id), eq(deals.userId, ctx.user.id)),
+          columns: { id: true },
+        });
+
+        if (linkedDeals) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Cannot delete a brand with associated deals.",
+          });
+        }
+
+        const [deleted] = await ctx.db
+          .delete(brands)
+          .where(and(eq(brands.id, input.id), eq(brands.userId, ctx.user.id)))
+          .returning({
+            id: brands.id,
+            name: brands.name,
+          });
+
+        if (!deleted) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Brand not found",
+          });
+        }
+
+        return deleted;
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Could not delete brand",
           cause: error,
         });
       }

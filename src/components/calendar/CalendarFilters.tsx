@@ -1,16 +1,10 @@
 "use client";
 
-import { Button } from "@/components/ui/button"; // Assuming standard button exists or I'll use raw generic if not
-// Checking `src/components/ui` earlier showed only BottomSheet, ContextMenu, QuickActionSheet. 
-// I should probably check if Button exists or just use standard HTML button with tailwind classes.
-// The user has `lucide-react` installed.
-
-import { ChevronLeft, ChevronRight, Filter } from "lucide-react";
-import { format, addMonths, subMonths, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addWeeks, subWeeks, addDays, subDays } from "date-fns";
+import { memo, useCallback, useMemo } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { format, addMonths, subMonths, startOfWeek, endOfWeek, addWeeks, subWeeks, addDays, subDays } from "date-fns";
 import { View, Views } from "react-big-calendar";
-import { cn } from "@/lib/utils"; // Assuming utils exists, common in shadcn
-// If not, I'll define a simple cn helper or just use string templates.
-// I'll check lib/utils existence shortly, but generic implementation is safer for now.
+import { cn } from "@/lib/utils";
 
 interface CalendarFiltersProps {
     date: Date;
@@ -24,7 +18,7 @@ interface CalendarFiltersProps {
     setFilters: (filters: { eventTypes: string[]; status: string }) => void;
 }
 
-export function CalendarFilters({
+export const CalendarFilters = memo(function CalendarFilters({
     date,
     setDate,
     view,
@@ -33,7 +27,7 @@ export function CalendarFilters({
     setFilters,
 }: CalendarFiltersProps) {
 
-    const handleNavigate = (action: 'PREV' | 'NEXT' | 'TODAY') => {
+    const handleNavigate = useCallback((action: 'PREV' | 'NEXT' | 'TODAY') => {
         if (action === 'TODAY') {
             setDate(new Date());
             return;
@@ -53,21 +47,21 @@ export function CalendarFilters({
                 setDate(action === 'NEXT' ? addMonths(date, 1) : subMonths(date, 1));
                 break;
         }
-    };
+    }, [date, setDate, view]);
 
-    const toggleEventType = (type: string) => {
+    const toggleEventType = useCallback((type: string) => {
         const current = filters.eventTypes;
         const next = current.includes(type)
             ? current.filter(t => t !== type)
             : [...current, type];
         setFilters({ ...filters, eventTypes: next });
-    };
+    }, [filters, setFilters]);
 
-    const setStatus = (status: string) => {
+    const setStatus = useCallback((status: string) => {
         setFilters({ ...filters, status });
-    };
+    }, [filters, setFilters]);
 
-    const dateLabel = () => {
+    const dateLabel = useMemo(() => {
         if (view === Views.MONTH) return format(date, 'MMMM yyyy');
         if (view === Views.WEEK) {
             const start = startOfWeek(date);
@@ -76,100 +70,112 @@ export function CalendarFilters({
         }
         if (view === Views.DAY) return format(date, 'EEEE, MMMM d, yyyy');
         return format(date, 'MMMM yyyy');
-    };
+    }, [date, view]);
 
     return (
-        <div className="flex flex-col gap-4 p-4 bg-white border-b border-slate-200">
+        <div className="flex flex-col gap-4 p-4 dash-bg-card border-b dash-border">
             {/* Top Row: Navigation & Main Controls */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
                     <button
                         onClick={() => handleNavigate('TODAY')}
-                        className="px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-md border border-slate-300"
+                        className="px-3 py-1.5 text-xs font-bold uppercase tracking-widest gold-text hover:opacity-80 transition-opacity"
                     >
                         Today
                     </button>
-                    <div className="flex items-center rounded-md border border-slate-300 bg-white">
-                        <button onClick={() => handleNavigate('PREV')} className="p-1.5 hover:bg-slate-100 text-slate-600">
+                    <div className="flex items-center rounded-xl border dash-border bg-white dark:bg-black/20 shadow-sm overflow-hidden">
+                        <button 
+                            onClick={() => handleNavigate('PREV')} 
+                            className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 dash-text-muted transition-colors"
+                            aria-label="Previous"
+                        >
                             <ChevronLeft className="w-4 h-4" />
                         </button>
-                        <button onClick={() => handleNavigate('NEXT')} className="p-1.5 hover:bg-slate-100 text-slate-600">
+                        <div className="w-px h-4 bg-slate-200 dark:bg-white/10" />
+                        <button 
+                            onClick={() => handleNavigate('NEXT')} 
+                            className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 dash-text-muted transition-colors"
+                            aria-label="Next"
+                        >
                             <ChevronRight className="w-4 h-4" />
                         </button>
                     </div>
-                    <span className="ml-2 text-lg font-semibold text-slate-800">
-                        {dateLabel()}
+                    <span className="ml-2 text-lg font-serif font-bold dash-text">
+                        {dateLabel}
                     </span>
                 </div>
 
-                {/* View Switcher (Desktop usually, but here simple text buttons for now) */}
-                {/* Actually settings popover might handle default view, but usually view switcher is on toolbar */}
-                <div className="hidden md:flex items-center bg-slate-100 rounded-lg p-1">
+                {/* View Switcher */}
+                <div className="flex items-center dash-bg-panel rounded-xl p-1 shadow-inner border dash-border">
                     {[Views.MONTH, Views.WEEK, Views.DAY, Views.AGENDA].map(v => (
                         <button
                             key={v}
                             onClick={() => setView(v)}
-                            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${view === v
-                                    ? 'bg-white text-brand-600 shadow-sm'
-                                    : 'text-slate-500 hover:text-slate-700'
-                                }`}
+                            className={cn(
+                                "px-3 py-1.5 text-[10px] uppercase font-bold tracking-widest rounded-lg transition-all",
+                                view === v
+                                    ? "pillowy-card gold-text bg-white dark:bg-black/40 shadow-sm"
+                                    : "dash-text-soft hover:dash-text"
+                            )}
                         >
-                            {v === Views.AGENDA ? 'Agenda' : v.charAt(0).toUpperCase() + v.slice(1)}
+                            {v === Views.AGENDA ? 'Agenda' : v}
                         </button>
                     ))}
                 </div>
             </div>
 
             {/* Second Row: Filters */}
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between pt-2">
 
                 {/* Event Types */}
-                <div className="flex items-center gap-4">
-                    <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                <div className="flex flex-wrap items-center gap-4">
+                    <label className="flex items-center gap-2 text-[10px] uppercase font-bold tracking-wider dash-text-muted cursor-pointer group">
                         <input
                             type="checkbox"
                             checked={filters.eventTypes.includes('deliverable')}
                             onChange={() => toggleEventType('deliverable')}
-                            className="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                            className="w-4 h-4 rounded border-slate-300 dark:border-white/10 text-brand-600 focus:ring-brand-500 bg-transparent"
                         />
-                        Deliverables
+                        <span className="group-hover:dash-text transition-colors">Deliverables</span>
                     </label>
-                    <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                    <label className="flex items-center gap-2 text-[10px] uppercase font-bold tracking-wider dash-text-muted cursor-pointer group">
                         <input
                             type="checkbox"
                             checked={filters.eventTypes.includes('payment')}
                             onChange={() => toggleEventType('payment')}
-                            className="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                            className="w-4 h-4 rounded border-slate-300 dark:border-white/10 text-brand-600 focus:ring-brand-500 bg-transparent"
                         />
-                        Payments
+                        <span className="group-hover:dash-text transition-colors">Payments</span>
                     </label>
-                    <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                    <label className="flex items-center gap-2 text-[10px] uppercase font-bold tracking-wider dash-text-muted cursor-pointer group">
                         <input
                             type="checkbox"
                             checked={filters.eventTypes.includes('reminder')}
                             onChange={() => toggleEventType('reminder')}
-                            className="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                            className="w-4 h-4 rounded border-slate-300 dark:border-white/10 text-brand-600 focus:ring-brand-500 bg-transparent"
                         />
-                        Reminders
+                        <span className="group-hover:dash-text transition-colors">Reminders</span>
                     </label>
                 </div>
 
                 {/* Status Pills */}
-                <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0">
+                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 w-full sm:w-auto">
                     {['all', 'upcoming', 'overdue', 'completed'].map((status) => (
                         <button
                             key={status}
                             onClick={() => setStatus(status)}
-                            className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors whitespace-nowrap ${filters.status === status
-                                    ? 'bg-slate-800 text-white border-slate-800'
-                                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
-                                }`}
+                            className={cn(
+                                "px-3 py-1 text-[10px] uppercase font-bold tracking-widest rounded-full border transition-all whitespace-nowrap",
+                                filters.status === status
+                                    ? "bg-slate-900 text-white border-slate-900 dark:bg-white dark:text-black dark:border-white"
+                                    : "dash-bg-card dash-text-muted dash-border hover:dash-text"
+                            )}
                         >
-                            {status.charAt(0).toUpperCase() + status.slice(1)}
+                            {status}
                         </button>
                     ))}
                 </div>
             </div>
         </div>
     );
-}
+});

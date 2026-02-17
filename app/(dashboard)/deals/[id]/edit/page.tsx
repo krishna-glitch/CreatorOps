@@ -1,10 +1,10 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Mic, MicOff } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -26,9 +26,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc/client";
-import { useDefaultCurrency } from "@/src/hooks/useDefaultCurrency";
-import { useVoiceCommandRecognition } from "@/src/hooks/useVoiceCommandRecognition";
-import { parseVoiceCommand } from "@/src/lib/voice/commandParser";
+import type { ParsedCommand } from "@/src/lib/voice/commandParser";
+
+const VoiceCommandButton = dynamic(
+  () => import("@/src/components/voice/VoiceCommandButton").then((mod) => mod.VoiceCommandButton),
+  { ssr: false },
+);
 
 const exclusivityRuleFormSchema = z
   .object({
@@ -157,7 +160,6 @@ export default function EditDealPage() {
   const router = useRouter();
   const trpcUtils = trpc.useUtils();
   const dealId = params?.id;
-  const { defaultCurrency } = useDefaultCurrency();
   const platformOptions = ["INSTAGRAM", "YOUTUBE", "TIKTOK"] as const;
 
   const { data: brands, isLoading: isLoadingBrands } =
@@ -254,6 +256,7 @@ export default function EditDealPage() {
   }, [dealQuery.data, form]);
 
   const addExclusivityRule = () => {
+    setShowExclusivityRules(true);
     exclusivityRulesArray.append({
       category_path: "",
       scope: "EXACT_CATEGORY",
@@ -319,29 +322,26 @@ export default function EditDealPage() {
   const hasBrands = brandItems.length > 0;
   const isSubmitting = updateDealMutation.isPending;
   const brandNames = brandItems.map((brand) => brand.name);
+  const [showExclusivityRules, setShowExclusivityRules] = useState(false);
 
-  const applyVoiceCommand = useCallback(
-    (transcript: string) => {
-      const command = parseVoiceCommand(
-        transcript,
-        brandNames,
-        defaultCurrency,
-      );
-
-      if (command.intent === "UPDATE_DEAL_STATUS") {
-        form.setValue("status", command.status, { shouldDirty: true });
-        toast.success(`Deal status set to ${command.status}.`, {
+  const executeVoiceCommand = useCallback(
+    async (command: ParsedCommand) => {
+      if (command.intent === "MARK_PAID") {
+        form.setValue("status", "PAID", { shouldDirty: true });
+        toast.success("Deal status set to PAID.", {
           duration: 2200,
         });
         return;
       }
 
       if (command.intent === "CREATE_DEAL") {
-        if (command.brandName) {
-          const matchedBrand = brandItems.find(
-            (brand) =>
-              brand.name.toLowerCase() === command.brandName?.toLowerCase(),
-          );
+        if (command.entities.brand) {
+          const matchedBrand =
+            brandItems.find(
+              (brand) =>
+                brand.name.toLowerCase() === command.entities.brand?.toLowerCase(),
+            ) ?? null;
+
           if (matchedBrand) {
             form.setValue("brand_id", matchedBrand.id, {
               shouldDirty: true,
@@ -350,17 +350,15 @@ export default function EditDealPage() {
           }
         }
 
-        if (command.title) {
-          form.setValue("title", command.title, { shouldDirty: true });
+        if (command.entities.amount && command.entities.amount > 0) {
+          form.setValue("total_value", command.entities.amount, {
+            shouldDirty: true,
+          });
         }
-        if (command.amount && command.amount > 0) {
-          form.setValue("total_value", command.amount, { shouldDirty: true });
-        }
-        if (command.currency) {
-          form.setValue("currency", command.currency, { shouldDirty: true });
-        }
-        if (command.status) {
-          form.setValue("status", command.status, { shouldDirty: true });
+        if (command.entities.currency) {
+          form.setValue("currency", command.entities.currency, {
+            shouldDirty: true,
+          });
         }
 
         toast.success("Voice command applied to edit form.", {
@@ -370,28 +368,18 @@ export default function EditDealPage() {
       }
 
       if (command.intent === "ADD_PAYMENT") {
-        toast.error(
-          "This command is for payments. Open Add Payment to use it.",
-          {
-            duration: 2800,
-          },
-        );
+        toast.error("This command is for payments. Open Add Payment to use it.", {
+          duration: 2800,
+        });
         return;
       }
 
-      toast.error("Command not recognized. Try: set status to agreed.", {
+      toast.error("Command not recognized. Try: set status to paid.", {
         duration: 2800,
       });
     },
-    [brandItems, brandNames, defaultCurrency, form],
+    [brandItems, form],
   );
-
-  const voice = useVoiceCommandRecognition({
-    language: "en-US",
-    onTranscript: (transcript) => {
-      applyVoiceCommand(transcript);
-    },
-  });
 
   if (!dealId) {
     return (
@@ -403,6 +391,11 @@ export default function EditDealPage() {
 
   return (
     <div className="mx-auto w-full max-w-4xl px-3 py-4 sm:px-6 sm:py-6">
+      <VoiceCommandButton
+        brandVocabulary={brandNames}
+        disabled={isSubmitting}
+        onExecuteCommand={executeVoiceCommand}
+      />
       <div className="rounded-2xl border dash-border dash-bg-card shadow-sm dash-border dash-bg-panel">
         <div className="border-b dash-border px-5 py-5 sm:px-8 dash-border">
           <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
@@ -414,37 +407,9 @@ export default function EditDealPage() {
           <p className="mt-1 text-sm text-muted-foreground">
             Update deal details and exclusivity rules.
           </p>
-          <div className="mt-4 rounded-lg border dash-border p-3 dash-border">
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={
-                  voice.isListening ? voice.stopListening : voice.startListening
-                }
-                disabled={!voice.isSupported}
-                className="h-9"
-              >
-                {voice.isListening ? (
-                  <>
-                    <MicOff className="mr-2 h-4 w-4" />
-                    Stop Listening
-                  </>
-                ) : (
-                  <>
-                    <Mic className="mr-2 h-4 w-4" />
-                    Voice Command
-                  </>
-                )}
-              </Button>
-              <p className="text-xs text-muted-foreground">
-                Try: "Set status to agreed."
-              </p>
-            </div>
-            {voice.error ? (
-              <p className="mt-2 text-xs text-red-600">{voice.error}</p>
-            ) : null}
-          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Tip: Tap the floating mic button to use voice commands.
+          </p>
         </div>
 
         {isLoadingDeal ? (
@@ -656,16 +621,33 @@ export default function EditDealPage() {
                         rules.
                       </p>
                     </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={addExclusivityRule}
-                    >
-                      Add Rule
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() =>
+                          setShowExclusivityRules((current) => !current)
+                        }
+                      >
+                        {showExclusivityRules ? "Hide Rules" : "Show Rules"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={addExclusivityRule}
+                      >
+                        Add Rule
+                      </Button>
+                    </div>
                   </div>
 
-                  {exclusivityRulesArray.fields.length === 0 ? (
+                  {!showExclusivityRules ? (
+                    <p className="mt-4 text-sm text-muted-foreground">
+                      {exclusivityRulesArray.fields.length === 0
+                        ? "No exclusivity rules for this deal."
+                        : `${exclusivityRulesArray.fields.length} rule(s) configured. Expand to edit.`}
+                    </p>
+                  ) : exclusivityRulesArray.fields.length === 0 ? (
                     <p className="mt-4 text-sm text-muted-foreground">
                       No exclusivity rules for this deal.
                     </p>

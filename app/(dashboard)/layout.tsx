@@ -1,4 +1,5 @@
 import { Search } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { DashboardSidebar } from "@/components/dashboard-sidebar";
@@ -7,10 +8,22 @@ import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/server";
 import { MobileNav } from "@/components/mobile-nav";
 import { MobileHeader } from "@/components/mobile-header";
-import { NotificationPopover } from "@/components/notification-popover";
-import { NotificationPrompt } from "@/src/components/notifications/NotificationPrompt";
 
-import { NotificationMessageHandler } from "@/src/components/notifications/NotificationMessageHandler";
+const NotificationPopover = dynamic(
+  () => import("@/components/notification-popover").then((mod) => mod.NotificationPopover),
+);
+const NotificationPrompt = dynamic(
+  () =>
+    import("@/src/components/notifications/NotificationPrompt").then(
+      (mod) => mod.NotificationPrompt,
+    ),
+);
+const NotificationMessageHandler = dynamic(
+  () =>
+    import("@/src/components/notifications/NotificationMessageHandler").then(
+      (mod) => mod.NotificationMessageHandler,
+    ),
+);
 
 export default async function DashboardLayout({
   children,

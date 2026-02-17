@@ -9,6 +9,10 @@ import {
   hasAskedForPermission, 
   getStoredPermissionStatus 
 } from "@/src/lib/notifications/requestPermission";
+import {
+  getAppNotificationsEnabled,
+  setAppNotificationsEnabled,
+} from "@/src/lib/notifications/preferences";
 import { motion, AnimatePresence } from "framer-motion";
 import { trpc } from "@/lib/trpc/client";
 
@@ -40,6 +44,12 @@ export function NotificationPrompt() {
 
   useEffect(() => {
     setMounted(true);
+    if (!getAppNotificationsEnabled()) {
+      setShowPrompt(false);
+      setIsDenied(false);
+      return;
+    }
+
     // Logic: Only show if we haven't asked before and permission is still 'default'
     // Delay by 30 seconds to wait for user engagement
     const timer = setTimeout(() => {
@@ -105,6 +115,7 @@ export function NotificationPrompt() {
 
       localStorage.setItem("notification-permission-asked", "true");
       localStorage.setItem("notification-permission-granted", "true");
+      setAppNotificationsEnabled(true);
       setShowPrompt(false);
       setIsDenied(false);
       toast.success("Notifications enabled.");

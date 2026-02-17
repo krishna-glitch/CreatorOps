@@ -68,9 +68,12 @@ const idempotencyMiddleware = t.middleware(async ({ ctx, next, path, type, input
   }
 
   const userId = ctx.user.id;
+  const serializedInput =
+    input === undefined ? "__TRPC_UNDEFINED_INPUT__" : JSON.stringify(input);
+
   const requestHash = crypto
     .createHash("sha256")
-    .update(JSON.stringify(input))
+    .update(serializedInput)
     .digest("hex");
 
   // 1. Check if key exists

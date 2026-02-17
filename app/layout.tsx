@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Playfair_Display, Plus_Jakarta_Sans } from "next/font/google";
 import { Toaster } from "sonner";
 import { PWAClient } from "@/components/pwa-client";
+import { ClientObservability } from "@/components/client-observability";
 import { TRPCProvider } from "@/lib/trpc/provider";
 import "./globals.css";
 
@@ -67,17 +68,21 @@ export default function RootLayout({
                   var prefersDark = supportsMatchMedia
                     ? window.matchMedia("(prefers-color-scheme: dark)").matches
                     : true;
-                  var theme = "dark";
+                  var themePreference = "system";
+                  var resolvedTheme = prefersDark ? "dark" : "light";
 
                   if (savedTheme === "light" || savedTheme === "dark") {
-                    theme = savedTheme;
-                  } else if (savedTheme === "system" || !savedTheme) {
-                    theme = prefersDark ? "dark" : "light";
+                    themePreference = savedTheme;
+                    resolvedTheme = savedTheme;
+                  } else {
+                    try {
+                      localStorage.setItem("creatorops-theme", "system");
+                    } catch (_) {}
                   }
 
-                  document.documentElement.classList.toggle("dark", theme === "dark");
-                  document.documentElement.setAttribute("data-theme", theme);
-                  document.documentElement.style.colorScheme = theme;
+                  document.documentElement.classList.toggle("dark", resolvedTheme === "dark");
+                  document.documentElement.setAttribute("data-theme", themePreference);
+                  document.documentElement.style.colorScheme = resolvedTheme;
                 } catch (_) {}
               })();
             `,
@@ -87,6 +92,7 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} ${plusJakarta.variable} antialiased font-sans`}>
         <TRPCProvider>
           {children}
+          <ClientObservability />
           <PWAClient />
           <div className="z-[var(--z-toast)] relative">
             <Toaster duration={3000} richColors />

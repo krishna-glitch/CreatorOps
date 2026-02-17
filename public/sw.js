@@ -1,4 +1,4 @@
-const CACHE_VERSION = "creatorops-v4";
+const CACHE_VERSION = "creatorops-v5";
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 const TRPC_QUERY_CACHE = `${CACHE_VERSION}-trpc-queries`;

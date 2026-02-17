@@ -12,6 +12,26 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     console.error("Critical app error:", error);
+    try {
+      const body = JSON.stringify({
+        type: "react_error_boundary",
+        message: error.message,
+        stack: error.stack,
+        digest: error.digest,
+        pathname:
+          typeof window !== "undefined" ? window.location.pathname : undefined,
+        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+      });
+
+      void fetch("/api/observability/client-error", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body,
+        keepalive: true,
+      });
+    } catch {
+      // Do not block UI on telemetry failure.
+    }
   }, [error]);
 
   return (
