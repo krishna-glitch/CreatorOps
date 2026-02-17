@@ -44,6 +44,12 @@ const restoreScriptVersionInput = z.object({
 });
 
 const STORAGE_LIMIT_BYTES = 1024 * 1024 * 1024; // 1GB free tier
+const STORAGE_USAGE_FALLBACK = {
+  totalBytesUsed: 0,
+  storageLimitBytes: STORAGE_LIMIT_BYTES,
+  percentUsed: 0,
+  approachingLimit: false,
+} as const;
 
 function extractPgErrorCode(error: unknown): string | null {
   if (!error || typeof error !== "object") {
@@ -86,14 +92,13 @@ export const mediaAssetsRouter = createTRPCRouter({
       };
     } catch (error) {
       const pgCode = extractPgErrorCode(error);
-      const message =
-        pgCode === "42P01"
-          ? "Media tables are missing. Please run the latest migrations."
-          : "Could not load storage usage right now.";
+      if (pgCode === "42P01") {
+        return STORAGE_USAGE_FALLBACK;
+      }
 
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
-        message,
+        message: "Could not load storage usage right now.",
         cause: error,
       });
     }
