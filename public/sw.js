@@ -113,19 +113,25 @@ self.addEventListener("notificationclick", (event) => {
   const data = notification.data || {};
   notification.close();
 
-  const resolveUrl = (raw) => new URL(raw || "/dashboard", self.location.origin);
+  const resolveUrl = (raw) =>
+    new URL(raw || "/dashboard", self.location.origin);
   const focusOrOpen = (target) =>
-    clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
-      for (const client of windowClients) {
-        const clientUrl = new URL(client.url);
-        if (clientUrl.origin === target.origin && clientUrl.pathname === target.pathname) {
-          return client.focus();
+    clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((windowClients) => {
+        for (const client of windowClients) {
+          const clientUrl = new URL(client.url);
+          if (
+            clientUrl.origin === target.origin &&
+            clientUrl.pathname === target.pathname
+          ) {
+            return client.focus();
+          }
         }
-      }
-      if (clients.openWindow) {
-        return clients.openWindow(target.toString());
-      }
-    });
+        if (clients.openWindow) {
+          return clients.openWindow(target.toString());
+        }
+      });
 
   if (action === "dismiss") {
     return;
@@ -140,26 +146,29 @@ self.addEventListener("notificationclick", (event) => {
   const functionalActions = ["mark_paid", "mark_posted", "mark_done", "snooze"];
   if (functionalActions.includes(action)) {
     event.waitUntil(
-      clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientsList) => {
-        // If app is already open, send message
-        if (clientsList.length > 0) {
-          clientsList[0].postMessage({
-            type: "NOTIFICATION_ACTION",
-            action,
-            data,
-          });
-          return clientsList[0].focus();
-        } 
-        
-        // If app is closed, open it with query params to execute action on mount
-        const url = resolveUrl(data.url);
-        url.searchParams.set("notif_action", action);
-        if (data.dealId) url.searchParams.set("dealId", data.dealId);
-        if (data.reminderId) url.searchParams.set("reminderId", data.reminderId);
-        if (data.paymentId) url.searchParams.set("paymentId", data.paymentId);
-        
-        return clients.openWindow(url.toString());
-      })
+      clients
+        .matchAll({ type: "window", includeUncontrolled: true })
+        .then((clientsList) => {
+          // If app is already open, send message
+          if (clientsList.length > 0) {
+            clientsList[0].postMessage({
+              type: "NOTIFICATION_ACTION",
+              action,
+              data,
+            });
+            return clientsList[0].focus();
+          }
+
+          // If app is closed, open it with query params to execute action on mount
+          const url = resolveUrl(data.url);
+          url.searchParams.set("notif_action", action);
+          if (data.dealId) url.searchParams.set("dealId", data.dealId);
+          if (data.reminderId)
+            url.searchParams.set("reminderId", data.reminderId);
+          if (data.paymentId) url.searchParams.set("paymentId", data.paymentId);
+
+          return clients.openWindow(url.toString());
+        }),
     );
   } else {
     // Default click behavior (no action button pressed)

@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -32,12 +32,70 @@ function getSeverityClassName(severity: "WARN" | "BLOCK") {
   return "border-transparent bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300";
 }
 
-function formatOverlapDetails(overlap: Record<string, unknown>) {
-  return JSON.stringify(overlap, null, 2);
+function toSafeDateLabel(value: unknown) {
+  if (typeof value !== "string") return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(
+    parsed,
+  );
+}
+
+function summarizeOverlap(overlap: Record<string, unknown>) {
+  const entries: Array<{ label: string; value: string }> = [];
+
+  const category =
+    typeof overlap.category === "object" && overlap.category !== null
+      ? (overlap.category as Record<string, unknown>)
+      : null;
+  if (category) {
+    const deliverable =
+      typeof category.deliverable === "string" ? category.deliverable : null;
+    const rule = typeof category.rule === "string" ? category.rule : null;
+    if (deliverable || rule) {
+      entries.push({
+        label: "Category overlap",
+        value: `${deliverable ?? "Unknown"} vs ${rule ?? "Unknown"}`,
+      });
+    }
+  }
+
+  const date =
+    typeof overlap.date === "object" && overlap.date !== null
+      ? (overlap.date as Record<string, unknown>)
+      : null;
+  if (date) {
+    const deliverableDate = toSafeDateLabel(date.deliverable_scheduled_at);
+    const ruleStart = toSafeDateLabel(date.rule_start_date);
+    const ruleEnd = toSafeDateLabel(date.rule_end_date);
+    if (deliverableDate || ruleStart || ruleEnd) {
+      entries.push({
+        label: "Date overlap",
+        value: `Deliverable ${deliverableDate ?? "unknown"} inside ${ruleStart ?? "unknown"} - ${ruleEnd ?? "unknown"}`,
+      });
+    }
+  }
+
+  const platforms =
+    typeof overlap.platforms === "object" && overlap.platforms !== null
+      ? (overlap.platforms as Record<string, unknown>)
+      : null;
+  if (platforms) {
+    const matched = Array.isArray(platforms.matched)
+      ? platforms.matched.filter((value): value is string => typeof value === "string")
+      : [];
+    if (matched.length > 0) {
+      entries.push({
+        label: "Platform overlap",
+        value: matched.join(", "),
+      });
+    }
+  }
+
+  return entries;
 }
 
 export default function ConflictsPage() {
-  const router = useRouter();
   const trpcUtils = trpc.useUtils();
   const [filter, setFilter] = useState<ConflictFilter>("ACTIVE");
 
@@ -101,7 +159,9 @@ export default function ConflictsPage() {
         </div>
 
         {conflictsQuery.isLoading ? (
-          <p className="mt-6 text-sm text-muted-foreground">Loading conflicts...</p>
+          <p className="mt-6 text-sm text-muted-foreground">
+            Loading conflicts...
+          </p>
         ) : conflictsQuery.error ? (
           <p className="mt-6 text-sm text-red-600">
             {getConflictsLoadErrorMessage(conflictsQuery.error)}
@@ -113,32 +173,22 @@ export default function ConflictsPage() {
         ) : (
           <div className="mt-6 space-y-4">
             {items.map((conflict) => {
-              const targetDealId = conflict.target_deal_id ?? conflict.conflicting_rule_deal_id;
+              const targetDealId =
+                conflict.target_deal_id ?? conflict.conflicting_rule_deal_id;
+              const dealHref = targetDealId ? `/deals/${targetDealId}` : null;
+              const overlapSummary = summarizeOverlap(conflict.overlap);
 
               return (
                 <article
                   key={conflict.id}
-                  className="cursor-pointer rounded-xl border dash-border p-4 transition-colors dash-bg-card dash-border dark:hover:bg-gray-900/40"
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`Open conflict ${conflict.id}`}
-                  onClick={() => {
-                    if (targetDealId) {
-                      router.push(`/deals/${targetDealId}`);
-                    }
-                  }}
-                  onKeyDown={(event) => {
-                    if (!targetDealId) return;
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      router.push(`/deals/${targetDealId}`);
-                    }
-                  }}
+                  className="rounded-xl border dash-border p-4 transition-colors dash-bg-card dash-border dark:hover:bg-gray-900/40"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <Badge className={getSeverityClassName(conflict.severity)}>
+                        <Badge
+                          className={getSeverityClassName(conflict.severity)}
+                        >
                           {conflict.severity}
                         </Badge>
                         <Badge variant="outline">{conflict.type}</Badge>
@@ -149,7 +199,9 @@ export default function ConflictsPage() {
                         ) : null}
                       </div>
                       <p className="mt-2 text-sm font-medium">
-                        {conflict.target_brand_name ?? conflict.conflicting_rule_brand_name ?? "Unknown Brand"}{" "}
+                        {conflict.target_brand_name ??
+                          conflict.conflicting_rule_brand_name ??
+                          "Unknown Brand"}{" "}
                         ·{" "}
                         {conflict.target_deal_title ??
                           conflict.conflicting_rule_deal_title ??
@@ -164,6 +216,14 @@ export default function ConflictsPage() {
                     </div>
 
                     <div className="flex items-center gap-2">
+                      {dealHref ? (
+                        <Link
+                          href={dealHref}
+                          className="inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium"
+                        >
+                          Open Deal
+                        </Link>
+                      ) : null}
                       {!conflict.auto_resolved ? (
                         <Button
                           type="button"
@@ -191,12 +251,25 @@ export default function ConflictsPage() {
                     <div className="flex items-center gap-2">
                       <AlertTriangle className="h-4 w-4 text-amber-600" />
                       <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                        Overlap Details
+                        Why this conflicts
                       </p>
                     </div>
-                    <pre className="mt-2 overflow-x-auto text-xs text-muted-foreground">
-                      {formatOverlapDetails(conflict.overlap)}
-                    </pre>
+                    {overlapSummary.length > 0 ? (
+                      <ul className="mt-2 space-y-1.5 text-xs text-muted-foreground">
+                        {overlapSummary.map((entry) => (
+                          <li key={`${conflict.id}-${entry.label}`}>
+                            <span className="font-medium text-foreground">
+                              {entry.label}:
+                            </span>{" "}
+                            {entry.value}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Detailed overlap data is unavailable for this conflict.
+                      </p>
+                    )}
                   </div>
 
                   <div className="mt-4">

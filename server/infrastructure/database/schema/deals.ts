@@ -29,6 +29,17 @@ export const deals = pgTable(
       .references(() => brands.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
     totalValue: decimal("total_value", { precision: 12, scale: 2 }),
+    compensationModel: text("compensation_model").default("FIXED").notNull(),
+    cashPercent: integer("cash_percent").default(100).notNull(),
+    affiliatePercent: integer("affiliate_percent").default(0).notNull(),
+    guaranteedCashValue: decimal("guaranteed_cash_value", {
+      precision: 12,
+      scale: 2,
+    }),
+    expectedAffiliateValue: decimal("expected_affiliate_value", {
+      precision: 12,
+      scale: 2,
+    }),
     currency: text("currency"),
     status: text("status"),
     revisionLimit: integer("revision_limit").default(2).notNull(),
@@ -56,6 +67,30 @@ export const deals = pgTable(
       revisionsUsedNonNegativeCheck: check(
         "deals_revisions_used_non_negative_check",
         sql`${table.revisionsUsed} >= 0`,
+      ),
+      cashPercentRangeCheck: check(
+        "deals_cash_percent_range_check",
+        sql`${table.cashPercent} >= 0 and ${table.cashPercent} <= 100`,
+      ),
+      affiliatePercentRangeCheck: check(
+        "deals_affiliate_percent_range_check",
+        sql`${table.affiliatePercent} >= 0 and ${table.affiliatePercent} <= 100`,
+      ),
+      compensationPercentTotalCheck: check(
+        "deals_compensation_percent_total_check",
+        sql`${table.cashPercent} + ${table.affiliatePercent} = 100`,
+      ),
+      compensationModelCheck: check(
+        "deals_compensation_model_check",
+        sql`${table.compensationModel} in ('FIXED', 'AFFILIATE', 'HYBRID')`,
+      ),
+      compensationModelPercentCheck: check(
+        "deals_compensation_model_percent_check",
+        sql`(
+          (${table.compensationModel} = 'FIXED' and ${table.cashPercent} = 100 and ${table.affiliatePercent} = 0) or
+          (${table.compensationModel} = 'AFFILIATE' and ${table.cashPercent} = 0 and ${table.affiliatePercent} = 100) or
+          (${table.compensationModel} = 'HYBRID' and ${table.cashPercent} > 0 and ${table.affiliatePercent} > 0)
+        )`,
       ),
     };
   },

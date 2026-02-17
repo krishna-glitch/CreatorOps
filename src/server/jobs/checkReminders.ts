@@ -1,19 +1,31 @@
 import { Queue, Worker } from "bullmq";
 import { addDays, addHours } from "date-fns";
-import { and, asc, eq, gte, inArray, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  lte,
+  ne,
+  or,
+  sql,
+} from "drizzle-orm";
 import { db } from "@/db";
 import { createAdminClient } from "@/lib/supabase/server";
-import {
-  generateRemindersForDeliverable,
-  generateRemindersForPayment,
-} from "@/src/server/domain/services/ReminderGenerator";
-import { sendReminderEmail } from "@/src/server/services/email/ResendEmailService";
 import { deliverables } from "@/server/infrastructure/database/schema/deliverables";
 import { payments } from "@/server/infrastructure/database/schema/payments";
 import { pushNotificationDeliveries } from "@/server/infrastructure/database/schema/pushNotificationDeliveries";
 import { pushSubscriptions } from "@/server/infrastructure/database/schema/pushSubscriptions";
 import { reminders } from "@/server/infrastructure/database/schema/reminders";
 import logger from "@/server/utils/logger";
+import {
+  generateRemindersForDeliverable,
+  generateRemindersForPayment,
+} from "@/src/server/domain/services/ReminderGenerator";
+import { sendReminderEmail } from "@/src/server/services/email/ResendEmailService";
 import {
   buildReminderNotificationPayload,
   isWebPushConfigured,
@@ -410,7 +422,9 @@ export async function runCheckRemindersJob(): Promise<CheckRemindersResult> {
             pushFailed += 1;
 
             const errorMessage =
-              pushError instanceof Error ? pushError.message : "Unknown push error";
+              pushError instanceof Error
+                ? pushError.message
+                : "Unknown push error";
 
             await db
               .insert(pushNotificationDeliveries)

@@ -37,13 +37,16 @@ export const deliverables = pgTable(
 );
 
 // Relations: Deliverable belongs to Deal
-export const deliverablesRelations = relations(deliverables, ({ one, many }) => ({
-  deal: one(deals, {
-    fields: [deliverables.dealId],
-    references: [deals.id],
+export const deliverablesRelations = relations(
+  deliverables,
+  ({ one, many }) => ({
+    deal: one(deals, {
+      fields: [deliverables.dealId],
+      references: [deals.id],
+    }),
+    feedbackItems: many(feedbackItems),
+    mediaAssets: many(mediaAssets),
+    reminders: many(reminders),
+    reworkCycles: many(reworkCycles),
   }),
-  feedbackItems: many(feedbackItems),
-  mediaAssets: many(mediaAssets),
-  reminders: many(reminders),
-  reworkCycles: many(reworkCycles),
-}));
+);

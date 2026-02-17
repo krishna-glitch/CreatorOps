@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { useDropzone, type FileRejection } from "react-dropzone";
+import { type FileRejection, useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
 
 const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024;
@@ -67,7 +67,9 @@ const IMAGE_ACCEPT = {
 
 const SCRIPT_ACCEPT = {
   "text/plain": [".txt", ".md"],
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [
+    ".docx",
+  ],
 } as const;
 
 const ASSET_OPTIONS: MediaAssetType[] = [
@@ -179,7 +181,10 @@ async function extractVideoMetadata(file: File) {
       : null;
 
     const thumbnailUrl = await new Promise<string | null>((resolve) => {
-      const targetTime = Math.min(0.1, Number.isFinite(video.duration) ? video.duration / 2 : 0.1);
+      const targetTime = Math.min(
+        0.1,
+        Number.isFinite(video.duration) ? video.duration / 2 : 0.1,
+      );
       video.currentTime = targetTime;
       video.onseeked = () => {
         const canvas = document.createElement("canvas");
@@ -331,13 +336,22 @@ export function FileUploader({
         onUploadSuccess?.(metadataInput);
       } catch (uploadError) {
         const message =
-          uploadError instanceof Error ? uploadError.message : "Upload failed. Please retry.";
+          uploadError instanceof Error
+            ? uploadError.message
+            : "Upload failed. Please retry.";
         setError(message);
       } finally {
         setIsUploading(false);
       }
     },
-    [assetType, deliverableId, getSignedUrl, maxSizeBytes, onUploadSuccess, saveMetadata],
+    [
+      assetType,
+      deliverableId,
+      getSignedUrl,
+      maxSizeBytes,
+      onUploadSuccess,
+      saveMetadata,
+    ],
   );
 
   const { getInputProps, getRootProps, isDragActive } = useDropzone({
@@ -355,7 +369,9 @@ export function FileUploader({
         <p className="text-sm font-medium">Upload Content File</p>
         <select
           value={assetType}
-          onChange={(event) => setAssetType(event.target.value as MediaAssetType)}
+          onChange={(event) =>
+            setAssetType(event.target.value as MediaAssetType)
+          }
           className="rounded-md border dash-border dash-bg-card px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
           disabled={isUploading}
         >
@@ -377,13 +393,20 @@ export function FileUploader({
       >
         <input {...getInputProps()} />
         <p className="text-sm font-medium">
-          {isDragActive ? "Drop file here" : "Drag & drop a file, or click to choose"}
+          {isDragActive
+            ? "Drop file here"
+            : "Drag & drop a file, or click to choose"}
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
           Max size: 100MB. Allowed types depend on selected asset.
         </p>
         <div className="mt-3">
-          <Button type="button" variant="outline" size="sm" disabled={isUploading}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={isUploading}
+          >
             Choose File
           </Button>
         </div>
@@ -397,7 +420,9 @@ export function FileUploader({
               style={{ width: `${progress}%` }}
             />
           </div>
-          <p className="text-xs text-muted-foreground">Uploading... {progress}%</p>
+          <p className="text-xs text-muted-foreground">
+            Uploading... {progress}%
+          </p>
         </div>
       ) : null}
 

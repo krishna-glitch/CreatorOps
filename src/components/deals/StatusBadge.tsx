@@ -1,6 +1,9 @@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { getDealStatusTone, getStatusBadgeClasses } from "@/src/lib/utils/status-utils";
+import {
+  getDealStatusTone,
+  getStatusBadgeClasses,
+} from "@/src/lib/utils/status-utils";
 
 type StatusBadgeProps = {
   status: string | null;
@@ -14,14 +17,14 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
   return (
     <Badge
       variant="outline"
-      className={cn(
-        getStatusBadgeClasses(tone),
-        className,
-      )}
+      className={cn(getStatusBadgeClasses(tone), className)}
     >
       {normalizedStatus}
     </Badge>
   );
 }
 
-export { formatDealCurrency, formatDealDate } from "@/src/lib/utils/format-utils";
+export {
+  formatDealCurrency,
+  formatDealDate,
+} from "@/src/lib/utils/format-utils";

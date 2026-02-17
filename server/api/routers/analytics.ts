@@ -53,7 +53,7 @@ const advancedAnalyticsInputSchema = z
   );
 
 const WON_STATUSES = ["AGREED", "PAID"] as const;
-const LOST_STATUSES = ["LOST", "DECLINED", "CANCELLED"] as const;
+const LOST_STATUSES = ["LOST", "DECLINED", "CANCELLED", "REJECTED"] as const;
 
 function getDefaultAdvancedAnalyticsRange(reference: Date) {
   const { start: monthStart, end: nextMonthStart } = getMonthWindow(reference);
@@ -182,12 +182,30 @@ export const analyticsRouter = createTRPCRouter({
       const [
         [paymentStats],
         [deliverableStats],
+        [dealStats],
         upcomingDeliverables,
         recentDeals,
         revenueByMonthRaw,
       ] = await Promise.all([
         ctx.db
           .select({
+            totalRevenueAllTime: sql<string>`
+              coalesce(
+                sum(
+                  case
+                    when ${payments.status} = 'PAID'
+                      or ${payments.paidAt} is not null
+                    then case
+                      when ${payments.amountUsd} is not null then ${payments.amountUsd}
+                      when ${payments.currency} = 'USD' then ${payments.amount}
+                      else 0
+                    end
+                    else 0
+                  end
+                ),
+                0
+              )
+            `,
             totalRevenueThisMonth: sql<string>`
               coalesce(
                 sum(
@@ -195,12 +213,30 @@ export const analyticsRouter = createTRPCRouter({
                     when ${payments.status} = 'PAID'
                       and ${payments.paidAt} >= ${monthStartIso}
                       and ${payments.paidAt} < ${nextMonthStartIso}
-                    then ${payments.amount}
+                    then case
+                      when ${payments.amountUsd} is not null then ${payments.amountUsd}
+                      when ${payments.currency} = 'USD' then ${payments.amount}
+                      else 0
+                    end
                     else 0
                   end
                 ),
                 0
               )
+            `,
+            unconvertedPaidCount: sql<number>`
+              coalesce(
+                sum(
+                  case
+                    when (${payments.status} = 'PAID' or ${payments.paidAt} is not null)
+                      and ${payments.amountUsd} is null
+                      and ${payments.currency} <> 'USD'
+                    then 1
+                    else 0
+                  end
+                ),
+                0
+              )::int
             `,
             totalOutstandingPayments: sql<string>`
               coalesce(
@@ -273,6 +309,24 @@ export const analyticsRouter = createTRPCRouter({
 
         ctx.db
           .select({
+            activeDealsCount: sql<number>`
+              coalesce(
+                sum(
+                  case
+                    when upper(coalesce(${deals.status}, '')) in ('AGREED', 'PAID')
+                    then 1
+                    else 0
+                  end
+                ),
+                0
+              )::int
+            `,
+          })
+          .from(deals)
+          .where(eq(deals.userId, userId)),
+
+        ctx.db
+          .select({
             id: deliverables.id,
             dealId: deliverables.dealId,
             platform: deliverables.platform,
@@ -318,7 +372,18 @@ export const analyticsRouter = createTRPCRouter({
         ctx.db
           .select({
             monthKey: sql<string>`to_char(date_trunc('month', ${payments.paidAt}), 'YYYY-MM')`,
-            revenue: sql<string>`coalesce(sum(${payments.amount}), 0)`,
+            revenue: sql<string>`
+              coalesce(
+                sum(
+                  case
+                    when ${payments.amountUsd} is not null then ${payments.amountUsd}
+                    when ${payments.currency} = 'USD' then ${payments.amount}
+                    else 0
+                  end
+                ),
+                0
+              )
+            `,
           })
           .from(payments)
           .innerJoin(deals, eq(payments.dealId, deals.id))
@@ -369,12 +434,16 @@ export const analyticsRouter = createTRPCRouter({
       );
 
       return {
+        totalRevenueAllTime: Number(paymentStats?.totalRevenueAllTime ?? "0"),
         totalRevenueThisMonth: Number(
           paymentStats?.totalRevenueThisMonth ?? "0",
         ),
+        hasUnconvertedPayments: (paymentStats?.unconvertedPaidCount ?? 0) > 0,
+        unconvertedPaymentsCount: paymentStats?.unconvertedPaidCount ?? 0,
         totalOutstandingPayments: Number(
           paymentStats?.totalOutstandingPayments ?? "0",
         ),
+        activeDealsCount: dealStats?.activeDealsCount ?? 0,
         upcomingDeliverablesCount:
           deliverableStats?.upcomingDeliverablesCount ?? 0,
         overdueItemsCount,
@@ -389,8 +458,12 @@ export const analyticsRouter = createTRPCRouter({
       });
 
       return {
+        totalRevenueAllTime: 0,
         totalRevenueThisMonth: 0,
+        hasUnconvertedPayments: false,
+        unconvertedPaymentsCount: 0,
         totalOutstandingPayments: 0,
+        activeDealsCount: 0,
         upcomingDeliverablesCount: 0,
         overdueItemsCount: 0,
         upcomingDeliverables: [],
@@ -398,6 +471,168 @@ export const analyticsRouter = createTRPCRouter({
         revenueTrend: emptyRevenueTrend,
       };
     }
+  }),
+  getMonthlyRevenue: protectedProcedure
+    .input(
+      z
+        .object({
+          start_date: z.string().datetime({ offset: true }).optional(),
+          end_date: z.string().datetime({ offset: true }).optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
+      const { start, end } = resolveAdvancedAnalyticsRange(input ?? {});
+      const monthBuckets = buildMonthBuckets(start, end);
+
+      const rows = await ctx.db
+        .select({
+          monthKey: sql<string>`to_char(date_trunc('month', ${payments.paidAt}), 'YYYY-MM')`,
+          revenue: sql<string>`
+            coalesce(
+              sum(
+                case
+                  when ${payments.amountUsd} is not null then ${payments.amountUsd}
+                  when ${payments.currency} = 'USD' then ${payments.amount}
+                  else 0
+                end
+              ),
+              0
+            )
+          `,
+          unconvertedCount: sql<number>`
+            coalesce(
+              sum(
+                case
+                  when ${payments.amountUsd} is null
+                    and ${payments.currency} <> 'USD'
+                  then 1
+                  else 0
+                end
+              ),
+              0
+            )::int
+          `,
+        })
+        .from(payments)
+        .innerJoin(deals, eq(payments.dealId, deals.id))
+        .where(
+          and(
+            eq(deals.userId, userId),
+            eq(payments.status, "PAID"),
+            gte(payments.paidAt, start),
+            lt(payments.paidAt, end),
+          ),
+        )
+        .groupBy(sql`date_trunc('month', ${payments.paidAt})`)
+        .orderBy(sql`date_trunc('month', ${payments.paidAt}) asc`);
+
+      const revenueByMonthMap = new Map(
+        rows.map((row) => [row.monthKey, Number(row.revenue)]),
+      );
+      const unconvertedByMonthMap = new Map(
+        rows.map((row) => [row.monthKey, row.unconvertedCount]),
+      );
+
+      const monthlyRevenue = monthBuckets.map((bucket) => ({
+        monthKey: bucket.monthKey,
+        label: bucket.label,
+        revenue: revenueByMonthMap.get(bucket.monthKey) ?? 0,
+        unconvertedCount: unconvertedByMonthMap.get(bucket.monthKey) ?? 0,
+      }));
+
+      const unconvertedCount = rows.reduce(
+        (total, row) => total + row.unconvertedCount,
+        0,
+      );
+
+      return {
+        monthlyRevenue,
+        hasUnconvertedPayments: unconvertedCount > 0,
+        unconvertedCount,
+      };
+    }),
+  getCurrencyBreakdown: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.user.id;
+
+    const rows = await ctx.db
+      .select({
+        currency: payments.currency,
+        totalOriginal: sql<string>`coalesce(sum(${payments.amount}), 0)`,
+        totalUsd: sql<string>`
+          sum(
+            case
+              when ${payments.amountUsd} is not null then ${payments.amountUsd}
+              when ${payments.currency} = 'USD' then ${payments.amount}
+              else null
+            end
+          )
+        `,
+        paymentCount: sql<number>`count(*)::int`,
+        convertedCount: sql<number>`
+          coalesce(
+            sum(
+              case
+                when ${payments.amountUsd} is not null
+                  or ${payments.currency} = 'USD'
+                then 1
+                else 0
+              end
+            ),
+            0
+          )::int
+        `,
+        unconvertedCount: sql<number>`
+          coalesce(
+            sum(
+              case
+                when ${payments.amountUsd} is null
+                  and ${payments.currency} <> 'USD'
+                then 1
+                else 0
+              end
+            ),
+            0
+          )::int
+        `,
+      })
+      .from(payments)
+      .innerJoin(deals, eq(payments.dealId, deals.id))
+      .where(and(eq(deals.userId, userId), eq(payments.status, "PAID")))
+      .groupBy(payments.currency)
+      .orderBy(asc(payments.currency));
+
+    const currencies = rows.map((row) => ({
+      currency: row.currency,
+      totalOriginal: Number(row.totalOriginal),
+      totalUsd: row.totalUsd === null ? null : Number(row.totalUsd),
+      paymentCount: row.paymentCount,
+      convertedCount: row.convertedCount,
+    }));
+
+    const totalUsdEquivalent = rows.reduce((sum, row) => {
+      if (row.totalUsd === null) {
+        return sum;
+      }
+      return sum + Number(row.totalUsd);
+    }, 0);
+
+    const unconvertedCount = rows.reduce(
+      (total, row) => total + row.unconvertedCount,
+      0,
+    );
+
+    return {
+      currencies,
+      totalUsdEquivalent,
+      hasUnconvertedPayments: unconvertedCount > 0,
+      unconvertedCount,
+      disclaimer:
+        unconvertedCount > 0
+          ? `⚠️ ${unconvertedCount} payment(s) in other currencies not included in total. Add exchange rates to see complete revenue.`
+          : null,
+    };
   }),
   getFeedbackInsights: protectedProcedure.query(async ({ ctx }) => {
     const userId = ctx.user.id;
@@ -663,7 +898,7 @@ export const analyticsRouter = createTRPCRouter({
               coalesce(
                 sum(
                   case
-                    when upper(coalesce(${deals.status}, '')) in ('LOST', 'DECLINED', 'CANCELLED')
+                    when upper(coalesce(${deals.status}, '')) in ('LOST', 'DECLINED', 'CANCELLED', 'REJECTED')
                     then 1
                     else 0
                   end
@@ -841,7 +1076,7 @@ export const analyticsRouter = createTRPCRouter({
               coalesce(
                 sum(
                   case
-                    when upper(coalesce(${deals.status}, '')) in ('LOST', 'DECLINED', 'CANCELLED')
+                    when upper(coalesce(${deals.status}, '')) in ('LOST', 'DECLINED', 'CANCELLED', 'REJECTED')
                     then 1
                     else 0
                   end

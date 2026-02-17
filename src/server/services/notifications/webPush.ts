@@ -35,7 +35,8 @@ function ensureConfigured() {
 
   const publicKey = process.env.VAPID_PUBLIC_KEY;
   const privateKey = process.env.VAPID_PRIVATE_KEY;
-  const subject = process.env.VAPID_SUBJECT ?? "mailto:support@creatorops.local";
+  const subject =
+    process.env.VAPID_SUBJECT ?? "mailto:support@creatorops.local";
 
   if (!hasValue(publicKey) || !hasValue(privateKey)) {
     return false;
@@ -43,7 +44,10 @@ function ensureConfigured() {
 
   const trimmedPublic = (publicKey as string).trim();
   const trimmedPrivate = (privateKey as string).trim();
-  if (!looksLikeBase64Url(trimmedPublic) || !looksLikeBase64Url(trimmedPrivate)) {
+  if (
+    !looksLikeBase64Url(trimmedPublic) ||
+    !looksLikeBase64Url(trimmedPrivate)
+  ) {
     console.error("Invalid VAPID key format");
     return false;
   }
@@ -70,7 +74,11 @@ export function isWebPushConfigured() {
 }
 
 export function getPublicVapidKey() {
-  return process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? process.env.VAPID_PUBLIC_KEY ?? null;
+  return (
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ??
+    process.env.VAPID_PUBLIC_KEY ??
+    null
+  );
 }
 
 function getPriorityTone(priority: string) {
@@ -87,7 +95,9 @@ function getPriorityTone(priority: string) {
   };
 }
 
-export function buildReminderNotificationPayload(reminder: ReminderPushPayload) {
+export function buildReminderNotificationPayload(
+  reminder: ReminderPushPayload,
+) {
   const tone = getPriorityTone(reminder.priority);
   const actions =
     reminder.deliverableId !== null

@@ -1,5 +1,13 @@
 import { sql } from "drizzle-orm";
-import { index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import {
+  index,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { authUsers } from "./auth";
 
 export const idempotencyKeys = pgTable(

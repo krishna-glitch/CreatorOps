@@ -1,10 +1,18 @@
-export type DealStatus = "INBOUND" | "NEGOTIATING" | "AGREED" | "PAID" | "CANCELLED";
+export type DealStatus =
+  | "INBOUND"
+  | "NEGOTIATING"
+  | "AGREED"
+  | "PAID"
+  | "CANCELLED"
+  | "REJECTED";
 
-export function getDealStatusTone(status: string | null): "green" | "yellow" | "red" | "blue" {
+export function getDealStatusTone(
+  status: string | null,
+): "green" | "yellow" | "red" | "blue" {
   if (status === "PAID" || status === "AGREED") {
     return "green";
   }
-  if (status === "CANCELLED") {
+  if (status === "CANCELLED" || status === "REJECTED") {
     return "red";
   }
   if (status === "NEGOTIATING") {
@@ -13,7 +21,9 @@ export function getDealStatusTone(status: string | null): "green" | "yellow" | "
   return "blue";
 }
 
-export function getStatusBadgeClasses(tone: "green" | "yellow" | "red" | "blue") {
+export function getStatusBadgeClasses(
+  tone: "green" | "yellow" | "red" | "blue",
+) {
   if (tone === "green") {
     return "border-emerald-200 bg-emerald-100 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300";
   }

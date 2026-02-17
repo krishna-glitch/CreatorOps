@@ -1,8 +1,8 @@
+import logger from "@/server/utils/logger";
 import {
   scheduleCheckRemindersJob,
   startCheckRemindersWorker,
 } from "@/src/server/jobs/checkReminders";
-import logger from "@/server/utils/logger";
 
 async function main() {
   startCheckRemindersWorker();

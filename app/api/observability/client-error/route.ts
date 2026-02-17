@@ -60,7 +60,11 @@ function isSameOriginRequest(request: Request) {
   const host = request.headers.get("host");
   if (!origin || !host) {
     const fetchSite = request.headers.get("sec-fetch-site");
-    return fetchSite === "same-origin" || fetchSite === "same-site" || fetchSite === "none";
+    return (
+      fetchSite === "same-origin" ||
+      fetchSite === "same-site" ||
+      fetchSite === "none"
+    );
   }
 
   const protocol = request.headers.get("x-forwarded-proto") ?? "https";
@@ -86,19 +90,34 @@ export async function POST(request: Request) {
 
   const ip = getClientIp(request);
   if (isRateLimited(ip)) {
-    return Response.json({ ok: false, error: "Too Many Requests" }, { status: 429 });
+    return Response.json(
+      { ok: false, error: "Too Many Requests" },
+      { status: 429 },
+    );
   }
 
   const contentLengthHeader = request.headers.get("content-length");
-  const contentLength = contentLengthHeader ? Number(contentLengthHeader) : null;
-  if (contentLength !== null && Number.isFinite(contentLength) && contentLength > MAX_ERROR_PAYLOAD_BYTES) {
-    return Response.json({ ok: false, error: "Payload Too Large" }, { status: 413 });
+  const contentLength = contentLengthHeader
+    ? Number(contentLengthHeader)
+    : null;
+  if (
+    contentLength !== null &&
+    Number.isFinite(contentLength) &&
+    contentLength > MAX_ERROR_PAYLOAD_BYTES
+  ) {
+    return Response.json(
+      { ok: false, error: "Payload Too Large" },
+      { status: 413 },
+    );
   }
 
   try {
     const rawBody = await request.text();
     if (rawBody.length > MAX_ERROR_PAYLOAD_BYTES) {
-      return Response.json({ ok: false, error: "Payload Too Large" }, { status: 413 });
+      return Response.json(
+        { ok: false, error: "Payload Too Large" },
+        { status: 413 },
+      );
     }
 
     const payload = JSON.parse(rawBody) as ClientErrorPayload;

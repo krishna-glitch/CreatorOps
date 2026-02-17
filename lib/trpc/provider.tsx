@@ -40,7 +40,9 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
           url: `${getBaseUrl()}/api/trpc`,
           transformer: superjson,
           headers({ opList }) {
-            const hasMutation = opList.some((operation) => operation.type === "mutation");
+            const hasMutation = opList.some(
+              (operation) => operation.type === "mutation",
+            );
 
             if (!hasMutation) {
               return {};

@@ -28,9 +28,9 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
 
   try {
     const permission = await notificationApi.requestPermission();
-    
+
     localStorage.setItem("notification-permission-asked", "true");
-    
+
     return permission;
   } catch (error) {
     console.error("Failed to request permission:", error);

@@ -30,8 +30,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Conflict } from "@/src/server/domain/services/ConflictDetector";
 import { trpc } from "@/lib/trpc/client";
+import type { Conflict } from "@/src/server/domain/services/ConflictDetector";
 
 const deliverableFormSchema = z.object({
   category_path: z.string().trim().min(1, "Category is required"),
@@ -77,17 +77,25 @@ export function DeliverableForm({
 }: DeliverableFormProps) {
   const trpcUtils = trpc.useUtils();
   const [pendingConflicts, setPendingConflicts] = useState<Conflict[]>([]);
-  const [deliverableDraftId, setDeliverableDraftId] = useState<string | null>(null);
-  const [conflictSessionId, setConflictSessionId] = useState<string | null>(null);
-  const [pendingValues, setPendingValues] = useState<DeliverableFormValues | null>(null);
+  const [deliverableDraftId, setDeliverableDraftId] = useState<string | null>(
+    null,
+  );
+  const [conflictSessionId, setConflictSessionId] = useState<string | null>(
+    null,
+  );
+  const [pendingValues, setPendingValues] =
+    useState<DeliverableFormValues | null>(null);
 
   const createDeliverableMutation = trpc.deliverables.create.useMutation({
     onSuccess: async (result) => {
       if (result.requires_acknowledgement) {
         setPendingConflicts(result.conflicts);
-        toast.warning("Exclusivity conflicts detected. Review before proceeding.", {
-          duration: 3500,
-        });
+        toast.warning(
+          "Exclusivity conflicts detected. Review before proceeding.",
+          {
+            duration: 3500,
+          },
+        );
         return;
       }
 
@@ -196,7 +204,9 @@ export function DeliverableForm({
 
   const handleReschedule = () => {
     setPendingConflicts([]);
-    toast.info("Update the scheduled date and submit again.", { duration: 2500 });
+    toast.info("Update the scheduled date and submit again.", {
+      duration: 2500,
+    });
   };
 
   return (
@@ -210,7 +220,10 @@ export function DeliverableForm({
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-2">
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="space-y-4 pt-2"
+          >
             {pendingConflicts.length > 0 ? (
               <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-900">
                 <p className="text-sm font-semibold">Exclusivity Warning</p>
@@ -224,10 +237,12 @@ export function DeliverableForm({
                       className="rounded border border-amber-300/70 dash-bg-card p-2"
                     >
                       <p className="text-xs font-medium">
-                        Rule: {conflict.overlap.category.rule} ({conflict.overlap.category.scope})
+                        Rule: {conflict.overlap.category.rule} (
+                        {conflict.overlap.category.scope})
                       </p>
                       <p className="text-xs">
-                        Platform overlap: {conflict.overlap.platforms.matched.join(", ")}
+                        Platform overlap:{" "}
+                        {conflict.overlap.platforms.matched.join(", ")}
                       </p>
                       <ul className="mt-1 list-disc pl-4 text-xs">
                         {conflict.suggested_resolutions.map((item) => (
@@ -370,7 +385,10 @@ export function DeliverableForm({
                   </Button>
                 </>
               ) : null}
-              <Button type="submit" loading={createDeliverableMutation.isPending}>
+              <Button
+                type="submit"
+                loading={createDeliverableMutation.isPending}
+              >
                 Add Deliverable
               </Button>
             </DialogFooter>

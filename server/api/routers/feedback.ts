@@ -115,7 +115,9 @@ export const feedbackRouter = createTRPCRouter({
 
       return ctx.db.transaction(async (tx) => {
         const now = new Date();
-        const receivedAt = input.received_at ? new Date(input.received_at) : now;
+        const receivedAt = input.received_at
+          ? new Date(input.received_at)
+          : now;
 
         const [createdFeedback] = await tx
           .insert(feedbackItems)
@@ -216,7 +218,8 @@ export const feedbackRouter = createTRPCRouter({
           };
 
           if (updatedDeal.revisionsUsed >= updatedDeal.revisionLimit) {
-            const atLimit = updatedDeal.revisionsUsed === updatedDeal.revisionLimit;
+            const atLimit =
+              updatedDeal.revisionsUsed === updatedDeal.revisionLimit;
             warningAlert = {
               level: atLimit ? "YELLOW_WARNING" : "RED_ALERT",
               title: atLimit
@@ -384,7 +387,10 @@ export const feedbackRouter = createTRPCRouter({
         },
       });
 
-      if (!existingCycle || existingCycle.deliverable.deal.userId !== ctx.user.id) {
+      if (
+        !existingCycle ||
+        existingCycle.deliverable.deal.userId !== ctx.user.id
+      ) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Rework cycle not found",
@@ -430,8 +436,7 @@ export const feedbackRouter = createTRPCRouter({
 
       const [summary] = await ctx.db
         .select({
-          totalRevisionTimeMinutes:
-            sql<number>`coalesce(sum(${reworkCycles.timeSpentMinutes}), 0)::int`,
+          totalRevisionTimeMinutes: sql<number>`coalesce(sum(${reworkCycles.timeSpentMinutes}), 0)::int`,
         })
         .from(reworkCycles)
         .innerJoin(

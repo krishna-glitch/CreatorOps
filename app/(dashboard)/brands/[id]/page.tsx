@@ -55,7 +55,9 @@ export default function BrandDetailPage() {
       toast.success("Brand updated.", { duration: 3000 });
     },
     onError: (error) => {
-      toast.error(error.message || "Could not update brand", { duration: 3000 });
+      toast.error(error.message || "Could not update brand", {
+        duration: 3000,
+      });
     },
   });
 
@@ -70,7 +72,9 @@ export default function BrandDetailPage() {
       window.location.href = "/brands";
     },
     onError: (error) => {
-      toast.error(error.message || "Could not delete brand", { duration: 3000 });
+      toast.error(error.message || "Could not delete brand", {
+        duration: 3000,
+      });
     },
   });
 
@@ -105,7 +109,7 @@ export default function BrandDetailPage() {
     }
 
     const confirmed = window.confirm(
-      `Delete brand \"${brand.name}\"? This cannot be undone.`,
+      `Delete brand "${brand.name}"? This cannot be undone.`,
     );
     if (!confirmed) {
       return;
@@ -136,7 +140,9 @@ export default function BrandDetailPage() {
             </p>
 
             {isLoadingBrand ? (
-              <p className="mt-2 text-sm text-muted-foreground">Loading brand...</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Loading brand...
+              </p>
             ) : brandError ? (
               <p className="mt-2 text-sm text-red-600">
                 Could not load brand details.
@@ -158,7 +164,10 @@ export default function BrandDetailPage() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Link href="/brands" className={buttonVariants({ variant: "outline" })}>
+            <Link
+              href="/brands"
+              className={buttonVariants({ variant: "outline" })}
+            >
               Back to Brands
             </Link>
 
@@ -177,7 +186,8 @@ export default function BrandDetailPage() {
                     type="button"
                     onClick={handleSave}
                     disabled={
-                      updateBrandMutation.isPending || draftName.trim().length === 0
+                      updateBrandMutation.isPending ||
+                      draftName.trim().length === 0
                     }
                     className={buttonVariants()}
                   >
@@ -244,7 +254,9 @@ export default function BrandDetailPage() {
           <h2 className="text-sm font-medium">Associated Deals</h2>
 
           {dealsQuery.isLoading ? (
-            <p className="mt-3 text-sm text-muted-foreground">Loading deals...</p>
+            <p className="mt-3 text-sm text-muted-foreground">
+              Loading deals...
+            </p>
           ) : dealsQuery.error ? (
             <p className="mt-3 text-sm text-red-600">
               Could not load associated deals.

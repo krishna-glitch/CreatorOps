@@ -1,9 +1,12 @@
-import * as dotenv from "dotenv";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { and, count, desc, eq } from "drizzle-orm";
-import { formatDealCurrency, formatDealDate } from "@/src/components/deals/StatusBadge";
+import * as dotenv from "dotenv";
+import { count, desc, eq } from "drizzle-orm";
+import {
+  formatDealCurrency,
+  formatDealDate,
+} from "@/src/components/deals/StatusBadge";
 
 dotenv.config({ path: ".env.local" });
 
@@ -119,7 +122,12 @@ async function main() {
   let cursor: string | null = null;
   let cursorId: string | null = null;
   const pageSize = 20;
-  const listed: Array<{ id: string; userId: string; createdAt: Date; brandName: string | null }> = [];
+  const listed: Array<{
+    id: string;
+    userId: string;
+    createdAt: Date;
+    brandName: string | null;
+  }> = [];
   let hasMore = true;
   let loadMoreAppeared = false;
 
@@ -148,7 +156,9 @@ async function main() {
     cursorId = response.nextCursorId ?? null;
 
     if (response.hasMore && !response.nextCursor) {
-      throw new Error("Pagination contract invalid: hasMore=true but nextCursor=null");
+      throw new Error(
+        "Pagination contract invalid: hasMore=true but nextCursor=null",
+      );
     }
   }
 
@@ -157,10 +167,15 @@ async function main() {
 
   addCheck(
     "Deals list shows all user deals",
-    listedIds.size === allIds.size && [...allIds].every((id) => listedIds.has(id)),
+    listedIds.size === allIds.size &&
+      [...allIds].every((id) => listedIds.has(id)),
     `listed=${listedIds.size}, db=${allIds.size}`,
   );
-  addCheck("Pagination works (Load More button)", loadMoreAppeared, `page_size=${pageSize}`);
+  addCheck(
+    "Pagination works (Load More button)",
+    loadMoreAppeared,
+    `page_size=${pageSize}`,
+  );
   addCheck(
     "Status badges color-coded correctly",
     true,
@@ -168,12 +183,14 @@ async function main() {
   );
   addCheck(
     "Currency formatted properly ($1,500.00)",
-    formatDealCurrency("1500", { currency: "USD", locale: "en-US" }) === "$1,500.00",
+    formatDealCurrency("1500", { currency: "USD", locale: "en-US" }) ===
+      "$1,500.00",
     `got=${formatDealCurrency("1500", { currency: "USD", locale: "en-US" })}`,
   );
   addCheck(
     "Dates formatted nicely",
-    formatDealDate("2025-02-15T12:00:00.000Z", { locale: "en-US" }) === "Feb 15, 2025",
+    formatDealDate("2025-02-15T12:00:00.000Z", { locale: "en-US" }) ===
+      "Feb 15, 2025",
     `got=${formatDealDate("2025-02-15T12:00:00.000Z", { locale: "en-US" })}`,
   );
 
@@ -204,12 +221,20 @@ async function main() {
       `deal_id=${detail.id}`,
     );
   } else {
-    addCheck("Deal detail fetch works", false, "No deals returned for detail check.");
+    addCheck(
+      "Deal detail fetch works",
+      false,
+      "No deals returned for detail check.",
+    );
   }
 
   try {
     await caller.deals.getById({ id: randomUUID() });
-    addCheck("404 page shows for invalid deal ID", false, "Expected NOT_FOUND but got success.");
+    addCheck(
+      "404 page shows for invalid deal ID",
+      false,
+      "Expected NOT_FOUND but got success.",
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const detailPageCode = await readFile(

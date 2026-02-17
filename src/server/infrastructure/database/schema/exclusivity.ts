@@ -1,7 +1,7 @@
 export {
+  conflictSeverityEnum,
   conflicts,
   conflictsRelations,
-  conflictSeverityEnum,
   conflictTypeEnum,
   exclusivityPlatformEnum,
   exclusivityRegionEnum,

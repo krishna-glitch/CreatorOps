@@ -22,46 +22,97 @@ const dealStatusSchema = z.enum([
   "POSTED",
   "PAID",
   "CANCELLED",
+  "REJECTED",
 ]);
 
-const createDealInputSchema = z.object({
-  brand_id: z.string().uuid(),
-  title: z.string().trim().min(1).max(200),
-  total_value: z.number().positive().finite(),
-  currency: z.enum(["USD", "INR"]),
-  status: dealStatusSchema,
-  revision_limit: z.number().int().min(1).max(20).default(2),
-  exclusivity_rules: z
-    .array(
-      z
-        .object({
-          category_path: z.string().trim().min(1).max(200),
-          scope: z.enum(["EXACT_CATEGORY", "PARENT_CATEGORY"]),
-          start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-          end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-          platforms: z
-            .array(z.enum(["INSTAGRAM", "YOUTUBE", "TIKTOK"]))
-            .min(1)
-            .max(3),
-          regions: z
-            .array(z.enum(["US", "IN", "GLOBAL"]))
-            .min(1)
-            .max(3)
-            .default(["GLOBAL"]),
-          notes: z.string().trim().max(1000).optional(),
-        })
-        .refine(
-          (value) =>
-            new Date(value.end_date).getTime() >
-            new Date(value.start_date).getTime(),
-          {
-            message: "End date must be after start date",
-            path: ["end_date"],
-          },
-        ),
-    )
-    .default([]),
-});
+const dealCompensationModelSchema = z.enum(["FIXED", "AFFILIATE", "HYBRID"]);
+
+const createDealInputSchema = z
+  .object({
+    brand_id: z.string().uuid(),
+    title: z.string().trim().min(1).max(200),
+    total_value: z.number().positive().finite(),
+    currency: z.enum(["USD", "INR"]),
+    status: dealStatusSchema,
+    compensation_model: dealCompensationModelSchema.default("FIXED"),
+    cash_percent: z.number().int().min(0).max(100).default(100),
+    affiliate_percent: z.number().int().min(0).max(100).default(0),
+    guaranteed_cash_value: z.number().nonnegative().finite().optional(),
+    expected_affiliate_value: z.number().nonnegative().finite().optional(),
+    revision_limit: z.number().int().min(1).max(20).default(2),
+    exclusivity_rules: z
+      .array(
+        z
+          .object({
+            category_path: z.string().trim().min(1).max(200),
+            scope: z.enum(["EXACT_CATEGORY", "PARENT_CATEGORY"]),
+            start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+            end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+            platforms: z
+              .array(z.enum(["INSTAGRAM", "YOUTUBE", "TIKTOK"]))
+              .min(1)
+              .max(3),
+            regions: z
+              .array(z.enum(["US", "IN", "GLOBAL"]))
+              .min(1)
+              .max(3)
+              .default(["GLOBAL"]),
+            notes: z.string().trim().max(1000).optional(),
+          })
+          .refine(
+            (value) =>
+              new Date(value.end_date).getTime() >
+              new Date(value.start_date).getTime(),
+            {
+              message: "End date must be after start date",
+              path: ["end_date"],
+            },
+          ),
+      )
+      .default([]),
+  })
+  .superRefine((input, ctx) => {
+    if (input.cash_percent + input.affiliate_percent !== 100) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["cash_percent"],
+        message: "Cash and affiliate percentages must add up to 100.",
+      });
+    }
+
+    if (
+      input.compensation_model === "FIXED" &&
+      (input.cash_percent !== 100 || input.affiliate_percent !== 0)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["compensation_model"],
+        message: "FIXED deals must be 100% cash.",
+      });
+    }
+
+    if (
+      input.compensation_model === "AFFILIATE" &&
+      (input.cash_percent !== 0 || input.affiliate_percent !== 100)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["compensation_model"],
+        message: "AFFILIATE deals must be 100% affiliate.",
+      });
+    }
+
+    if (
+      input.compensation_model === "HYBRID" &&
+      (input.cash_percent <= 0 || input.affiliate_percent <= 0)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["compensation_model"],
+        message: "HYBRID deals must include both cash and affiliate shares.",
+      });
+    }
+  });
 
 const updateDealInputSchema = createDealInputSchema.extend({
   id: z.string().uuid(),
@@ -385,6 +436,14 @@ export const dealsRouter = createTRPCRouter({
               name: true,
             },
           },
+          deliverables: {
+            columns: {
+              id: true,
+              scheduledAt: true,
+              postedAt: true,
+              status: true,
+            },
+          },
         },
         orderBy: (dealsTable, { desc }) => [
           desc(dealsTable.createdAt),
@@ -487,9 +546,9 @@ export const dealsRouter = createTRPCRouter({
           error instanceof ExternalServiceError
             ? error
             : new ExternalServiceError(
-              "Groq",
-              error instanceof Error ? error : undefined,
-            );
+                "Groq",
+                error instanceof Error ? error : undefined,
+              );
 
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
@@ -539,6 +598,13 @@ export const dealsRouter = createTRPCRouter({
               brandId: input.brand_id,
               title: input.title,
               totalValue: input.total_value.toString(),
+              compensationModel: input.compensation_model,
+              cashPercent: input.cash_percent,
+              affiliatePercent: input.affiliate_percent,
+              guaranteedCashValue:
+                input.guaranteed_cash_value?.toString() ?? null,
+              expectedAffiliateValue:
+                input.expected_affiliate_value?.toString() ?? null,
               currency: input.currency,
               status: input.status,
               revisionLimit: input.revision_limit,
@@ -665,6 +731,13 @@ export const dealsRouter = createTRPCRouter({
               brandId: input.brand_id,
               title: input.title,
               totalValue: input.total_value.toString(),
+              compensationModel: input.compensation_model,
+              cashPercent: input.cash_percent,
+              affiliatePercent: input.affiliate_percent,
+              guaranteedCashValue:
+                input.guaranteed_cash_value?.toString() ?? null,
+              expectedAffiliateValue:
+                input.expected_affiliate_value?.toString() ?? null,
               currency: input.currency,
               status: input.status,
               revisionLimit: input.revision_limit,
@@ -836,7 +909,9 @@ export const dealsRouter = createTRPCRouter({
 
         await ctx.db.transaction(async (tx) => {
           // Delete related records (cascade might handle this, but explicit is safer for some relations)
-          await tx.delete(exclusivityRules).where(eq(exclusivityRules.dealId, input.id));
+          await tx
+            .delete(exclusivityRules)
+            .where(eq(exclusivityRules.dealId, input.id));
           await tx.delete(payments).where(eq(payments.dealId, input.id));
 
           await tx

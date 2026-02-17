@@ -1,18 +1,22 @@
 "use client";
 
 import { Bell, Check, Clock } from "lucide-react";
-import { trpc } from "@/lib/trpc/client";
-import { Button } from "@/components/ui/button";
-import { formatDealDate, formatTime } from "@/src/lib/utils/format-utils";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { trpc } from "@/lib/trpc/client";
+import { cn } from "@/lib/utils";
+import { formatDealDate, formatTime } from "@/src/lib/utils/format-utils";
 
 export function NotificationPopover() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement | null>(null);
   const utils = trpc.useUtils();
   const remindersQuery = trpc.reminders.listOpen.useQuery(undefined, {
     staleTime: 15_000,
@@ -33,64 +37,34 @@ export function NotificationPopover() {
   const reminders = remindersQuery.data ?? [];
   const hasNotifications = reminders.length > 0;
 
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    const onPointerDown = (event: MouseEvent) => {
-      if (!rootRef.current) {
-        return;
-      }
-      if (!rootRef.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    };
-
-    const onEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", onPointerDown);
-    window.addEventListener("keydown", onEscape);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      window.removeEventListener("keydown", onEscape);
-    };
-  }, [open]);
-
   return (
-    <div ref={rootRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((current) => !current)}
-        className={cn(
-          "dash-shell-icon-btn relative inline-flex h-9 w-9 items-center justify-center rounded-lg border md:h-8 md:w-8",
-          "border-border bg-background shadow-sm",
-        )}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        aria-label="Notifications"
-      >
-        <Bell className="h-5 w-5 md:h-4 md:w-4" />
-        {hasNotifications && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-3 w-3">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
-            <span className="relative inline-flex h-3 w-3 rounded-full bg-red-500" />
-          </span>
-        )}
-        <span className="sr-only">Notifications</span>
-      </button>
-      {open ? (
-        <div
-          role="dialog"
-          aria-label="Notifications panel"
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
           className={cn(
-            "dash-card absolute right-0 top-full z-[70] mt-2 w-80 overflow-hidden rounded-md border p-0 shadow-md",
+            "dash-shell-icon-btn relative inline-flex h-9 w-9 items-center justify-center rounded-lg border md:h-8 md:w-8",
+            "border-border bg-background shadow-sm",
           )}
+          aria-label="Notifications"
         >
+          <Bell className="h-5 w-5 md:h-4 md:w-4" />
+          {hasNotifications && (
+            <span className="absolute -right-0.5 -top-0.5 flex h-3 w-3">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+              <span className="relative inline-flex h-3 w-3 rounded-full bg-red-500" />
+            </span>
+          )}
+          <span className="sr-only">Notifications</span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        sideOffset={8}
+        className={cn(
+          "dash-card z-[var(--z-sheet)] w-80 overflow-hidden rounded-md border p-0 shadow-md",
+        )}
+      >
           <div className="flex items-center justify-between border-b px-4 py-2">
             <h3 className="font-semibold">Notifications</h3>
             <Badge variant="secondary">{reminders.length}</Badge>
@@ -167,8 +141,7 @@ export function NotificationPopover() {
               </div>
             )}
           </div>
-        </div>
-      ) : null}
-    </div>
+      </PopoverContent>
+    </Popover>
   );
 }

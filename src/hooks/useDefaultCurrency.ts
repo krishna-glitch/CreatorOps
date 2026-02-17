@@ -2,17 +2,16 @@
 
 import { useEffect, useState } from "react";
 import {
-  DEFAULT_CURRENCY_STORAGE_KEY,
   DEFAULT_CURRENCY_CHANGED_EVENT,
+  DEFAULT_CURRENCY_STORAGE_KEY,
   type DefaultCurrency,
   getStoredDefaultCurrency,
   setStoredDefaultCurrency,
 } from "@/src/lib/preferences/defaultCurrency";
 
 export function useDefaultCurrency() {
-  const [defaultCurrency, setDefaultCurrencyState] = useState<DefaultCurrency>(
-    "USD",
-  );
+  const [defaultCurrency, setDefaultCurrencyState] =
+    useState<DefaultCurrency>("USD");
 
   useEffect(() => {
     setDefaultCurrencyState(getStoredDefaultCurrency());
@@ -27,7 +26,10 @@ export function useDefaultCurrency() {
     };
 
     window.addEventListener("storage", onStorage);
-    window.addEventListener(DEFAULT_CURRENCY_CHANGED_EVENT, onPreferenceChanged);
+    window.addEventListener(
+      DEFAULT_CURRENCY_CHANGED_EVENT,
+      onPreferenceChanged,
+    );
     return () => {
       window.removeEventListener("storage", onStorage);
       window.removeEventListener(

@@ -3,8 +3,16 @@
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { FileUploader, type MediaAssetType } from "@/src/components/media/FileUploader";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  FileUploader,
+  type MediaAssetType,
+} from "@/src/components/media/FileUploader";
 import { ScriptEditor } from "@/src/components/media/ScriptEditor";
 
 type MediaAssetStatus =
@@ -122,7 +130,8 @@ export function DeliverableMediaSection({
   saveMetadata,
 }: DeliverableMediaSectionProps) {
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [uploadAssetType, setUploadAssetType] = useState<MediaAssetType>("RAW_VIDEO");
+  const [uploadAssetType, setUploadAssetType] =
+    useState<MediaAssetType>("RAW_VIDEO");
   const [scriptEditorOpen, setScriptEditorOpen] = useState(false);
   const [deletingAssetId, setDeletingAssetId] = useState<string | null>(null);
   const [actingAssetId, setActingAssetId] = useState<string | null>(null);
@@ -131,7 +140,9 @@ export function DeliverableMediaSection({
 
   const grouped = useMemo(() => {
     const map = new Map<MediaAssetType, MediaAssetItem[]>();
-    DISPLAY_GROUPS.forEach((group) => map.set(group.type, []));
+    DISPLAY_GROUPS.forEach((group) => {
+      map.set(group.type, []);
+    });
 
     for (const asset of assets) {
       if (!map.has(asset.assetType)) {
@@ -152,7 +163,12 @@ export function DeliverableMediaSection({
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">Content Files</h3>
         <div className="flex items-center gap-2">
-          <Button type="button" size="sm" variant="outline" onClick={() => setScriptEditorOpen(true)}>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => setScriptEditorOpen(true)}
+          >
             Write Script
           </Button>
           <Button type="button" size="sm" onClick={() => setUploadOpen(true)}>
@@ -183,9 +199,13 @@ export function DeliverableMediaSection({
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex min-w-0 items-center gap-2">
-                        <p className="truncate text-sm font-medium">{asset.fileName}</p>
+                        <p className="truncate text-sm font-medium">
+                          {asset.fileName}
+                        </p>
                         <Badge variant="outline">v{asset.versionNumber}</Badge>
-                        <Badge className={getStatusBadgeClassName(asset.status)}>
+                        <Badge
+                          className={getStatusBadgeClassName(asset.status)}
+                        >
                           {asset.status}
                         </Badge>
                       </div>
@@ -207,7 +227,8 @@ export function DeliverableMediaSection({
 
                     {group.type === "SCRIPT" ? (
                       <pre className="mt-2 max-h-28 overflow-auto whitespace-pre-wrap rounded-md border dash-border dash-bg-card p-2 text-xs dash-border dark:bg-gray-900">
-                        {getScriptPreview(asset.scriptPreview) ?? "No preview available."}
+                        {getScriptPreview(asset.scriptPreview) ??
+                          "No preview available."}
                       </pre>
                     ) : null}
 
@@ -227,7 +248,9 @@ export function DeliverableMediaSection({
                         type="button"
                         size="sm"
                         variant="outline"
-                        onClick={async () => onDownloadAsset(asset.id, asset.filePath)}
+                        onClick={async () =>
+                          onDownloadAsset(asset.id, asset.filePath)
+                        }
                       >
                         Download
                       </Button>
@@ -265,7 +288,8 @@ export function DeliverableMediaSection({
                           Submit for Approval
                         </Button>
                       ) : null}
-                      {asset.status === "SUBMITTED_FOR_REVIEW" && onApproveAsset ? (
+                      {asset.status === "SUBMITTED_FOR_REVIEW" &&
+                      onApproveAsset ? (
                         <Button
                           type="button"
                           size="sm"
@@ -283,7 +307,8 @@ export function DeliverableMediaSection({
                           Approve
                         </Button>
                       ) : null}
-                      {asset.status === "SUBMITTED_FOR_REVIEW" && onRejectAsset ? (
+                      {asset.status === "SUBMITTED_FOR_REVIEW" &&
+                      onRejectAsset ? (
                         <Button
                           type="button"
                           size="sm"
@@ -327,7 +352,8 @@ export function DeliverableMediaSection({
                         Approval Timeline
                       </p>
                       <div className="mt-2 space-y-1">
-                        {(asset.approvalTimeline && asset.approvalTimeline.length > 0
+                        {(asset.approvalTimeline &&
+                        asset.approvalTimeline.length > 0
                           ? asset.approvalTimeline
                           : [
                               {
@@ -354,11 +380,15 @@ export function DeliverableMediaSection({
                             key={event.id}
                             className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
                           >
-                            <Badge className={getStatusBadgeClassName(event.status)}>
+                            <Badge
+                              className={getStatusBadgeClassName(event.status)}
+                            >
                               {event.status}
                             </Badge>
                             <span>{toLocalDate(event.at)}</span>
-                            {event.actorLabel ? <span>• {event.actorLabel}</span> : null}
+                            {event.actorLabel ? (
+                              <span>• {event.actorLabel}</span>
+                            ) : null}
                             {event.notes ? <span>• {event.notes}</span> : null}
                           </div>
                         ))}
@@ -452,7 +482,11 @@ export function DeliverableMediaSection({
               </Button>
               <Button
                 type="button"
-                disabled={!rejectTarget || !onRejectAsset || actingAssetId === rejectTarget?.id}
+                disabled={
+                  !rejectTarget ||
+                  !onRejectAsset ||
+                  actingAssetId === rejectTarget?.id
+                }
                 onClick={async () => {
                   if (!rejectTarget || !onRejectAsset) {
                     return;

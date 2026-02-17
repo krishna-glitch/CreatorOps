@@ -1,7 +1,7 @@
 "use client";
 
-import type { KeyboardEvent, ReactNode } from "react";
 import { Check, X } from "lucide-react";
+import type { KeyboardEvent, ReactNode } from "react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc/client";
@@ -16,7 +16,8 @@ type DealStatusForUndo =
   | "NEGOTIATING"
   | "AGREED"
   | "PAID"
-  | "CANCELLED";
+  | "CANCELLED"
+  | "REJECTED";
 
 type SwipeableDealCardProps = {
   deal: {
@@ -47,7 +48,8 @@ function isDealStatusForUndo(value: string | null): value is DealStatusForUndo {
     value === "NEGOTIATING" ||
     value === "AGREED" ||
     value === "PAID" ||
-    value === "CANCELLED"
+    value === "CANCELLED" ||
+    value === "REJECTED"
   );
 }
 
@@ -61,12 +63,13 @@ export function SwipeableDealCard({
   className,
   gestureDisabled = false,
 }: SwipeableDealCardProps) {
-  const cardRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLButtonElement>(null);
   const [announceText, setAnnounceText] = useState("");
   const [isCompleting, setIsCompleting] = useState(false);
   const [completionDirection, setCompletionDirection] =
     useState<SwipeDirection>(null);
   const [snapBack, setSnapBack] = useState(false);
+  const resetGestureRef = useRef<() => void>(() => {});
 
   const trpcUtils = trpc.useUtils();
   const updateStatusMutation = trpc.deals.updateStatus.useMutation({
@@ -81,7 +84,10 @@ export function SwipeableDealCard({
   });
 
   const canSwipeRight = deal.status !== "PAID";
-  const canSwipeLeft = deal.status !== "PAID" && deal.status !== "CANCELLED";
+  const canSwipeLeft =
+    deal.status !== "PAID" &&
+    deal.status !== "CANCELLED" &&
+    deal.status !== "REJECTED";
   const swipeDisabled = !canSwipeLeft && !canSwipeRight;
   const isSwipeBlocked =
     gestureDisabled || isCompleting || updateStatusMutation.isPending;
@@ -96,15 +102,24 @@ export function SwipeableDealCard({
       const direction = status === "PAID" ? "right" : "left";
       setCompletionDirection(direction);
       setIsCompleting(true);
-      
-      const successMessage = status === "PAID" ? "Deal marked as paid." : "Deal marked as cancelled.";
+
+      const successMessage =
+        status === "PAID"
+          ? "Deal marked as paid."
+          : "Deal marked as cancelled.";
       setAnnounceText(successMessage);
 
       triggerHaptic(200, [50, 50, 50, 50, 50]);
 
       try {
         await updateStatusMutation.mutateAsync({ id: deal.id, status });
-        
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem(
+            "creatorops.onboarding.used_swipe",
+            "true",
+          );
+        }
+
         // Show Undo Toast
         toast.success(successMessage, {
           duration: 4000,
@@ -121,7 +136,7 @@ export function SwipeableDealCard({
                   status: previousStatus,
                 });
                 toast.info("Action reverted.");
-              } catch (e) {
+              } catch (_e) {
                 toast.error("Failed to undo.");
               }
             },
@@ -133,11 +148,11 @@ export function SwipeableDealCard({
         window.setTimeout(() => {
           setIsCompleting(false);
           setCompletionDirection(null);
-          resetGesture();
+          resetGestureRef.current();
         }, 220);
       }
     },
-    [deal.id, deal.status, onStatusUpdated, updateStatusMutation],
+    [deal.id, deal.status, updateStatusMutation],
   );
 
   const {
@@ -162,7 +177,9 @@ export function SwipeableDealCard({
       if (swipeDisabled) {
         // Provide subtle feedback that swiping is disabled
         triggerHaptic(30, [10]);
-        toast.info(`Deal is already ${deal.status?.toLowerCase()}.`, { duration: 1500 });
+        toast.info(`Deal is already ${deal.status?.toLowerCase()}.`, {
+          duration: 1500,
+        });
         return false;
       }
       if (activeCardId && activeCardId !== deal.id) {
@@ -187,6 +204,7 @@ export function SwipeableDealCard({
       void completeAction("CANCELLED");
     },
   });
+  resetGestureRef.current = resetGesture;
 
   const cardWidth = cardRef.current?.getBoundingClientRect().width ?? 320;
   const completionOffset =
@@ -200,7 +218,7 @@ export function SwipeableDealCard({
   const backgroundOpacity = Math.min(1, swipeProgress / 0.6);
   // Smooth icon scaling from 0 to 1 based on progress
   const iconScale = Math.min(1, swipeProgress / 0.4);
-  
+
   const actionLabel =
     previewAction === "PAID"
       ? "Mark as Paid"
@@ -231,7 +249,7 @@ export function SwipeableDealCard({
   }, [gestureDisabled, hasMoved, isCompleting, isDragging, onOpen]);
 
   const onKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLDivElement>) => {
+    (event: KeyboardEvent<HTMLButtonElement>) => {
       if (gestureDisabled) {
         return;
       }
@@ -298,10 +316,9 @@ export function SwipeableDealCard({
         </div>
       </div>
 
-      <div
+      <button
+        type="button"
         ref={cardRef}
-        role="button"
-        tabIndex={0}
         aria-label={deal.title ? `Deal ${deal.title}` : "Deal card"}
         onClick={onClick}
         onKeyDown={onKeyDown}
@@ -313,7 +330,9 @@ export function SwipeableDealCard({
           "dash-border dash-bg-card relative z-10 touch-pan-y border select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--shell-gold)] transition-shadow",
           gestureDisabled && "opacity-90",
           isDragging && "shadow-lg scale-[1.01] z-20",
-          isExecuteThresholdReached && isDragging && "-translate-y-0.5 shadow-xl",
+          isExecuteThresholdReached &&
+            isDragging &&
+            "-translate-y-0.5 shadow-xl",
           "contrast-more:border-black",
         )}
         style={{
@@ -324,11 +343,11 @@ export function SwipeableDealCard({
         }}
       >
         {children}
-      </div>
+      </button>
 
-      <p className="sr-only" role="status" aria-live="polite">
+      <output className="sr-only" aria-live="polite">
         {announceText}
-      </p>
+      </output>
     </div>
   );
 }

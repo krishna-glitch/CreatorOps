@@ -27,7 +27,7 @@ export function PWAClient() {
     }
 
     let mounted = true;
-    
+
     const handleControllerChange = () => {
       if (!mounted) return;
       window.location.reload();

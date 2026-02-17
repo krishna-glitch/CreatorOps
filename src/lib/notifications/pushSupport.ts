@@ -5,7 +5,9 @@ export function isPushNotificationsSupported() {
     return false;
   }
 
-  return "serviceWorker" in navigator && typeof window.PushManager === "function";
+  return (
+    "serviceWorker" in navigator && typeof window.PushManager === "function"
+  );
 }
 
 export async function getReadyPushManager() {

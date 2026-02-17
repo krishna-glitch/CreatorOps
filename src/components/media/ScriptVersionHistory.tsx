@@ -129,7 +129,9 @@ export function ScriptVersionHistory({
         version: -1,
         content: currentContent,
         saved_at: new Date().toISOString(),
-        word_count: currentContent.trim() ? currentContent.trim().split(/\s+/).length : 0,
+        word_count: currentContent.trim()
+          ? currentContent.trim().split(/\s+/).length
+          : 0,
       } satisfies ScriptVersion;
     }
 
@@ -144,7 +146,11 @@ export function ScriptVersionHistory({
   }, [fromVersion, toVersion]);
 
   if (versionsQuery.isLoading) {
-    return <p className="text-sm text-muted-foreground">Loading version history...</p>;
+    return (
+      <p className="text-sm text-muted-foreground">
+        Loading version history...
+      </p>
+    );
   }
 
   if (versionsQuery.error) {
@@ -156,7 +162,9 @@ export function ScriptVersionHistory({
   }
 
   if (versions.length === 0) {
-    return <p className="text-sm text-muted-foreground">No saved versions yet.</p>;
+    return (
+      <p className="text-sm text-muted-foreground">No saved versions yet.</p>
+    );
   }
 
   return (
@@ -172,8 +180,8 @@ export function ScriptVersionHistory({
             <div className="space-y-0.5">
               <p className="font-medium">v{version.version}</p>
               <p className="text-xs text-muted-foreground">
-                Saved at {formatTime(version.saved_at)} • {version.word_count} words (
-                {getWordDeltaLabel(version, versions[index + 1])})
+                Saved at {formatTime(version.saved_at)} • {version.word_count}{" "}
+                words ({getWordDeltaLabel(version, versions[index + 1])})
               </p>
             </div>
 
@@ -208,13 +216,17 @@ export function ScriptVersionHistory({
       </div>
 
       <div className="space-y-3 rounded-md border dash-border dash-bg-card p-3 dark:border-gray-900 dash-bg-panel">
-        <p className="text-xs font-medium text-muted-foreground">Compare Versions</p>
+        <p className="text-xs font-medium text-muted-foreground">
+          Compare Versions
+        </p>
         <div className="flex flex-wrap items-center gap-2">
           <select
             className="rounded-md border dash-border dash-bg-card px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
             value={compareFrom ?? ""}
             onChange={(event) =>
-              setCompareFrom(event.target.value ? Number(event.target.value) : null)
+              setCompareFrom(
+                event.target.value ? Number(event.target.value) : null,
+              )
             }
           >
             <option value="">From version</option>
@@ -229,7 +241,9 @@ export function ScriptVersionHistory({
             className="rounded-md border dash-border dash-bg-card px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
             value={compareTo ?? ""}
             onChange={(event) =>
-              setCompareTo(event.target.value ? Number(event.target.value) : null)
+              setCompareTo(
+                event.target.value ? Number(event.target.value) : null,
+              )
             }
           >
             <option value="">To version</option>
@@ -263,11 +277,11 @@ export function ScriptVersionHistory({
           </pre>
         ) : (
           <p className="text-xs text-muted-foreground">
-            Choose two versions (or compare a version to current editor content).
+            Choose two versions (or compare a version to current editor
+            content).
           </p>
         )}
       </div>
     </section>
   );
 }
-

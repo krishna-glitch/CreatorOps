@@ -65,12 +65,8 @@
           "tableFrom": "brands",
           "tableTo": "users",
           "schemaTo": "auth",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -196,12 +192,8 @@
           "tableFrom": "deals",
           "tableTo": "users",
           "schemaTo": "auth",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -209,12 +201,8 @@
           "name": "deals_brand_id_brands_id_fk",
           "tableFrom": "deals",
           "tableTo": "brands",
-          "columnsFrom": [
-            "brand_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["brand_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }

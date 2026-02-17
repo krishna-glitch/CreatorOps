@@ -1,9 +1,8 @@
 "use client";
 
-import React from "react";
-import { BottomSheet } from "./BottomSheet";
-import { CheckCircle2, XCircle, Clock, CreditCard } from "lucide-react";
+import { CheckCircle2, Clock, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BottomSheet } from "./BottomSheet";
 
 interface QuickActionSheetProps {
   isOpen: boolean;
@@ -46,12 +45,14 @@ export function QuickActionSheet({
     <BottomSheet isOpen={isOpen} onClose={onClose} title="Quick Actions">
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Update status for <span className="font-medium text-foreground">{dealTitle}</span>
+          Update status for{" "}
+          <span className="font-medium text-foreground">{dealTitle}</span>
         </p>
-        
+
         <div className="grid gap-3">
           {actions.map((action) => (
             <button
+              type="button"
               key={action.id}
               onClick={() => {
                 onAction(action.id as any);
@@ -59,18 +60,28 @@ export function QuickActionSheet({
               }}
               className="flex w-full items-center gap-4 rounded-2xl border border-gray-100 bg-white p-4 text-left transition-all active:scale-[0.98] active:bg-gray-50 dark:border-gray-800 dark:bg-gray-900 dark:active:bg-gray-800"
             >
-              <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl", action.color)}>
+              <div
+                className={cn(
+                  "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl",
+                  action.color,
+                )}
+              >
                 <action.icon className="h-6 w-6" />
               </div>
               <div className="flex-1">
-                <p className="font-semibold text-gray-900 dark:text-gray-100">{action.label}</p>
-                <p className="text-xs text-muted-foreground">{action.description}</p>
+                <p className="font-semibold text-gray-900 dark:text-gray-100">
+                  {action.label}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {action.description}
+                </p>
               </div>
             </button>
           ))}
         </div>
 
         <button
+          type="button"
           onClick={onClose}
           className="mt-2 w-full rounded-2xl py-4 text-sm font-medium text-muted-foreground hover:text-foreground"
         >

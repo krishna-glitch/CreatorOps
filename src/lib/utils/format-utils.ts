@@ -1,6 +1,6 @@
 export function formatDealCurrency(
   value: string | number | null | undefined,
-  options: { currency: string | null; locale?: string; compact?: boolean }
+  options: { currency: string | null; locale?: string; compact?: boolean },
 ) {
   if (value === null || value === undefined || value === "") {
     return "N/A";
@@ -22,7 +22,7 @@ export function formatDealCurrency(
 
 export function formatDealDate(
   value: Date | string,
-  options: { locale?: string; includeTime?: boolean } = {}
+  options: { locale?: string; includeTime?: boolean } = {},
 ) {
   const parsed = typeof value === "string" ? new Date(value) : value;
 
@@ -40,7 +40,10 @@ export function formatDealDate(
         year: "numeric",
       };
 
-  return new Intl.DateTimeFormat(options.locale ?? "en-US", formatOptions).format(parsed);
+  return new Intl.DateTimeFormat(
+    options.locale ?? "en-US",
+    formatOptions,
+  ).format(parsed);
 }
 
 export function formatDayLabel(value: Date, now: Date) {

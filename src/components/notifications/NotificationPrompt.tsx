@@ -1,24 +1,24 @@
 "use client";
 
+import { AnimatePresence, motion } from "framer-motion";
+import { Bell, Info, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Bell, X, Info } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { 
-  requestNotificationPermission, 
-  hasAskedForPermission, 
-  getPermissionStatus, 
-} from "@/src/lib/notifications/requestPermission";
+import { Button } from "@/components/ui/button";
+import { trpc } from "@/lib/trpc/client";
+import {
+  getAppNotificationsEnabled,
+  setAppNotificationsEnabled,
+} from "@/src/lib/notifications/preferences";
 import {
   getReadyPushManager,
   isPushNotificationsSupported,
 } from "@/src/lib/notifications/pushSupport";
 import {
-  getAppNotificationsEnabled,
-  setAppNotificationsEnabled,
-} from "@/src/lib/notifications/preferences";
-import { motion, AnimatePresence } from "framer-motion";
-import { trpc } from "@/lib/trpc/client";
+  getPermissionStatus,
+  hasAskedForPermission,
+  requestNotificationPermission,
+} from "@/src/lib/notifications/requestPermission";
 
 function urlBase64ToUint8Array(base64String: string) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -58,7 +58,7 @@ export function NotificationPrompt() {
     // Delay by 30 seconds to wait for user engagement
     const timer = setTimeout(() => {
       const currentPermission = getPermissionStatus();
-      
+
       if (!hasAskedForPermission() && currentPermission === "default") {
         setShowPrompt(true);
       } else if (currentPermission === "denied") {
@@ -77,14 +77,18 @@ export function NotificationPrompt() {
 
     try {
       if (!isPushNotificationsSupported()) {
-        throw new Error("Push notifications are not supported on this browser.");
+        throw new Error(
+          "Push notifications are not supported on this browser.",
+        );
       }
 
       const permission = await requestNotificationPermission();
       if (permission !== "granted") {
         setIsDenied(permission === "denied");
         if (permission === "denied") {
-          toast.error("Notifications are blocked. Enable them in browser settings.");
+          toast.error(
+            "Notifications are blocked. Enable them in browser settings.",
+          );
         }
         return;
       }
@@ -124,7 +128,9 @@ export function NotificationPrompt() {
       toast.success("Notifications enabled.");
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Could not enable notifications.";
+        error instanceof Error
+          ? error.message
+          : "Could not enable notifications.";
       toast.error(message);
     } finally {
       setIsEnabling(false);
@@ -156,10 +162,12 @@ export function NotificationPrompt() {
                   Notifications are blocked
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  Open your browser site settings and allow notifications for this app, then refresh.
+                  Open your browser site settings and allow notifications for
+                  this app, then refresh.
                 </p>
               </div>
               <button
+                type="button"
                 onClick={() => setIsDenied(false)}
                 className="text-muted-foreground hover:text-foreground transition-colors"
               >
@@ -187,10 +195,12 @@ export function NotificationPrompt() {
                   Stay on top of deadlines
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  Get notified when content is due, payments arrive, and more. Never miss a brand follow-up.
+                  Get notified when content is due, payments arrive, and more.
+                  Never miss a brand follow-up.
                 </p>
               </div>
-              <button 
+              <button
+                type="button"
                 onClick={handleDismiss}
                 className="text-muted-foreground hover:text-foreground transition-colors"
               >
@@ -199,15 +209,17 @@ export function NotificationPrompt() {
             </div>
 
             <div className="mt-5 flex gap-3">
-              <Button 
-                onClick={handleEnable} 
+              <Button
+                onClick={handleEnable}
                 disabled={isEnabling || subscribeMutation.isPending}
                 className="flex-1 dash-shell-primary-btn h-10 rounded-xl font-bold"
               >
-                {isEnabling || subscribeMutation.isPending ? "Enabling..." : "Enable"}
+                {isEnabling || subscribeMutation.isPending
+                  ? "Enabling..."
+                  : "Enable"}
               </Button>
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 onClick={handleDismiss}
                 className="flex-1 h-10 rounded-xl"
               >

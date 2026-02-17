@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RefObject, TouchEventHandler } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   calculateSwipeProgress,
   shouldExecuteAction,
@@ -137,7 +137,10 @@ export function useSwipeGesture({
   const finishGesture = useCallback(
     (executed: boolean, velocityX: number) => {
       const latestDeltaX = deltaXRef.current;
-      const progress = calculateSwipeProgress(latestDeltaX, cardWidthRef.current);
+      const progress = calculateSwipeProgress(
+        latestDeltaX,
+        cardWidthRef.current,
+      );
       const direction: SwipeDirection =
         latestDeltaX > 0 ? "right" : latestDeltaX < 0 ? "left" : null;
       const action: SwipeAction =
@@ -283,11 +286,7 @@ export function useSwipeGesture({
 
       const crossedThreshold = shouldExecuteAction(progress, threshold);
 
-      if (
-        !executeHapticRef.current &&
-        crossedThreshold &&
-        direction
-      ) {
+      if (!executeHapticRef.current && crossedThreshold && direction) {
         executeHapticRef.current = true;
         triggerHaptic(100, [100, 40, 100]);
       } else if (!crossedThreshold && executeHapticRef.current) {
@@ -306,51 +305,47 @@ export function useSwipeGesture({
     ],
   );
 
-  const handleTouchEnd = useCallback<TouchEventHandler<HTMLElement>>(
-    () => {
-      if (!isDragging) {
-        return;
-      }
+  const handleTouchEnd = useCallback<TouchEventHandler<HTMLElement>>(() => {
+    if (!isDragging) {
+      return;
+    }
 
-      const elapsedMs = Math.max(1, latestTimeRef.current - startTimeRef.current);
-      const velocityX = (latestXRef.current - startXRef.current) / elapsedMs;
-      const latestDeltaX = deltaXRef.current;
-      const progress = calculateSwipeProgress(latestDeltaX, cardWidthRef.current);
+    const elapsedMs = Math.max(1, latestTimeRef.current - startTimeRef.current);
+    const velocityX = (latestXRef.current - startXRef.current) / elapsedMs;
+    const latestDeltaX = deltaXRef.current;
+    const progress = calculateSwipeProgress(latestDeltaX, cardWidthRef.current);
 
-      const direction: SwipeDirection =
-        latestDeltaX > 0 ? "right" : latestDeltaX < 0 ? "left" : null;
+    const direction: SwipeDirection =
+      latestDeltaX > 0 ? "right" : latestDeltaX < 0 ? "left" : null;
 
-      const directionAllowed =
-        (direction === "right" && canSwipeRight) ||
-        (direction === "left" && canSwipeLeft);
+    const directionAllowed =
+      (direction === "right" && canSwipeRight) ||
+      (direction === "left" && canSwipeLeft);
 
-      const crossedExecuteThreshold = shouldExecuteAction(progress, threshold);
-      const isFastSwipe =
-        progress >= previewThreshold && Math.abs(velocityX) >= velocityThreshold;
-      const executed = Boolean(directionAllowed && (crossedExecuteThreshold || isFastSwipe));
+    const crossedExecuteThreshold = shouldExecuteAction(progress, threshold);
+    const isFastSwipe =
+      progress >= previewThreshold && Math.abs(velocityX) >= velocityThreshold;
+    const executed = Boolean(
+      directionAllowed && (crossedExecuteThreshold || isFastSwipe),
+    );
 
-      finishGesture(executed, velocityX);
-    },
-    [
-      canSwipeLeft,
-      canSwipeRight,
-      finishGesture,
-      isDragging,
-      previewThreshold,
-      threshold,
-      velocityThreshold,
-    ],
-  );
+    finishGesture(executed, velocityX);
+  }, [
+    canSwipeLeft,
+    canSwipeRight,
+    finishGesture,
+    isDragging,
+    previewThreshold,
+    threshold,
+    velocityThreshold,
+  ]);
 
-  const handleTouchCancel = useCallback<TouchEventHandler<HTMLElement>>(
-    () => {
-      if (!isDragging) {
-        return;
-      }
-      finishGesture(false, 0);
-    },
-    [finishGesture, isDragging],
-  );
+  const handleTouchCancel = useCallback<TouchEventHandler<HTMLElement>>(() => {
+    if (!isDragging) {
+      return;
+    }
+    finishGesture(false, 0);
+  }, [finishGesture, isDragging]);
 
   const previewAction = useMemo<SwipeAction>(() => {
     if (swipeProgress < previewThreshold || !swipeDirection) {

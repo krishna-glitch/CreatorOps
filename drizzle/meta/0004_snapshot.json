@@ -84,12 +84,8 @@
           "tableFrom": "brands",
           "tableTo": "users",
           "schemaTo": "auth",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -224,12 +220,8 @@
           "name": "conflicts_conflicting_rule_id_exclusivity_rules_id_fk",
           "tableFrom": "conflicts",
           "tableTo": "exclusivity_rules",
-          "columnsFrom": [
-            "conflicting_rule_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["conflicting_rule_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -384,12 +376,8 @@
           "tableFrom": "deals",
           "tableTo": "users",
           "schemaTo": "auth",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -397,12 +385,8 @@
           "name": "deals_brand_id_brands_id_fk",
           "tableFrom": "deals",
           "tableTo": "brands",
-          "columnsFrom": [
-            "brand_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["brand_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -514,12 +498,8 @@
           "name": "deliverables_deal_id_deals_id_fk",
           "tableFrom": "deliverables",
           "tableTo": "deals",
-          "columnsFrom": [
-            "deal_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["deal_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -615,12 +595,8 @@
           "name": "exclusivity_rules_deal_id_deals_id_fk",
           "tableFrom": "exclusivity_rules",
           "tableTo": "deals",
-          "columnsFrom": [
-            "deal_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["deal_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -815,12 +791,8 @@
           "name": "feedback_items_deal_id_deals_id_fk",
           "tableFrom": "feedback_items",
           "tableTo": "deals",
-          "columnsFrom": [
-            "deal_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["deal_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -828,12 +800,8 @@
           "name": "feedback_items_deliverable_id_deliverables_id_fk",
           "tableFrom": "feedback_items",
           "tableTo": "deliverables",
-          "columnsFrom": [
-            "deliverable_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["deliverable_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -970,12 +938,8 @@
           "name": "payments_deal_id_deals_id_fk",
           "tableFrom": "payments",
           "tableTo": "deals",
-          "columnsFrom": [
-            "deal_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["deal_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1126,12 +1090,8 @@
           "name": "reminders_deal_id_deals_id_fk",
           "tableFrom": "reminders",
           "tableTo": "deals",
-          "columnsFrom": [
-            "deal_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["deal_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1139,12 +1099,8 @@
           "name": "reminders_deliverable_id_deliverables_id_fk",
           "tableFrom": "reminders",
           "tableTo": "deliverables",
-          "columnsFrom": [
-            "deliverable_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["deliverable_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1311,12 +1267,8 @@
           "name": "rework_cycles_deliverable_id_deliverables_id_fk",
           "tableFrom": "rework_cycles",
           "tableTo": "deliverables",
-          "columnsFrom": [
-            "deliverable_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["deliverable_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1341,10 +1293,7 @@
     "public.conflict_severity": {
       "name": "conflict_severity",
       "schema": "public",
-      "values": [
-        "WARN",
-        "BLOCK"
-      ]
+      "values": ["WARN", "BLOCK"]
     },
     "public.conflict_type": {
       "name": "conflict_type",
@@ -1359,28 +1308,17 @@
     "public.exclusivity_platform": {
       "name": "exclusivity_platform",
       "schema": "public",
-      "values": [
-        "INSTAGRAM",
-        "YOUTUBE",
-        "TIKTOK"
-      ]
+      "values": ["INSTAGRAM", "YOUTUBE", "TIKTOK"]
     },
     "public.exclusivity_region": {
       "name": "exclusivity_region",
       "schema": "public",
-      "values": [
-        "US",
-        "IN",
-        "GLOBAL"
-      ]
+      "values": ["US", "IN", "GLOBAL"]
     },
     "public.exclusivity_scope": {
       "name": "exclusivity_scope",
       "schema": "public",
-      "values": [
-        "EXACT_CATEGORY",
-        "PARENT_CATEGORY"
-      ]
+      "values": ["EXACT_CATEGORY", "PARENT_CATEGORY"]
     }
   },
   "schemas": {},

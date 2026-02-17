@@ -1,5 +1,4 @@
-import { sql } from "drizzle-orm";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   check,
   index,
@@ -66,7 +65,9 @@ export const mediaAssets = pgTable(
   },
   (table) => {
     return {
-      deliverableIdIdx: index("media_assets_deliverable_id_idx").on(table.deliverableId),
+      deliverableIdIdx: index("media_assets_deliverable_id_idx").on(
+        table.deliverableId,
+      ),
       assetTypeIdx: index("media_assets_asset_type_idx").on(table.assetType),
       statusIdx: index("media_assets_status_idx").on(table.status),
       versionNumberPositiveCheck: check(

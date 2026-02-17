@@ -9,8 +9,8 @@ import {
   Search,
   Sparkles,
 } from "lucide-react";
-import { toast } from "sonner";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -31,13 +31,13 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import {
-  hookCategories,
-  hookLibrary,
-  hookTones,
   type HookPlatform,
   type HookTemplate,
   type HookTone,
   type HookVariable,
+  hookCategories,
+  hookLibrary,
+  hookTones,
 } from "@/src/lib/templates/hookLibrary";
 
 const RECENT_HOOKS_STORAGE_KEY = "creatorops_recent_hooks";
@@ -45,7 +45,12 @@ const RECENT_HOOKS_LIMIT = 8;
 const CATEGORY_ALL = "All" as const;
 const TONE_ALL = "All" as const;
 
-const platformFilters: HookPlatform[] = ["All", "Instagram", "YouTube", "TikTok"];
+const platformFilters: HookPlatform[] = [
+  "All",
+  "Instagram",
+  "YouTube",
+  "TikTok",
+];
 const toneFilters: Array<typeof TONE_ALL | HookTone> = ["All", ...hookTones];
 
 const platformIconByName: Record<HookPlatform, React.ReactNode> = {
@@ -81,7 +86,12 @@ function isTypingTarget(target: EventTarget | null): boolean {
   }
 
   const tag = target.tagName;
-  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tag === "BUTTON") {
+  if (
+    tag === "INPUT" ||
+    tag === "TEXTAREA" ||
+    tag === "SELECT" ||
+    tag === "BUTTON"
+  ) {
     return true;
   }
 
@@ -95,14 +105,18 @@ export function HookBrowser({
   className,
 }: HookBrowserProps) {
   const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<typeof CATEGORY_ALL | HookTemplate["category"]>(
-    CATEGORY_ALL,
-  );
+  const [categoryFilter, setCategoryFilter] = useState<
+    typeof CATEGORY_ALL | HookTemplate["category"]
+  >(CATEGORY_ALL);
   const [platformFilter, setPlatformFilter] = useState<HookPlatform>("All");
-  const [toneFilter, setToneFilter] = useState<typeof TONE_ALL | HookTone>("All");
+  const [toneFilter, setToneFilter] = useState<typeof TONE_ALL | HookTone>(
+    "All",
+  );
   const [recentHookIds, setRecentHookIds] = useState<string[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [valuesByHookId, setValuesByHookId] = useState<Record<string, HookValuesState>>({});
+  const [valuesByHookId, setValuesByHookId] = useState<
+    Record<string, HookValuesState>
+  >({});
 
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
@@ -119,7 +133,9 @@ export function HookBrowser({
     try {
       const parsed = JSON.parse(stored) as unknown;
       if (Array.isArray(parsed)) {
-        setRecentHookIds(parsed.filter((id): id is string => typeof id === "string"));
+        setRecentHookIds(
+          parsed.filter((id): id is string => typeof id === "string"),
+        );
       }
     } catch {
       setRecentHookIds([]);
@@ -131,25 +147,74 @@ export function HookBrowser({
       return;
     }
 
-    window.localStorage.setItem(RECENT_HOOKS_STORAGE_KEY, JSON.stringify(recentHookIds));
+    window.localStorage.setItem(
+      RECENT_HOOKS_STORAGE_KEY,
+      JSON.stringify(recentHookIds),
+    );
   }, [recentHookIds]);
 
   const filteredHooks = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
+    const recentIndexById = new Map(
+      recentHookIds.map((id, index) => [id, index]),
+    );
+    const recentHooksInOrder = recentHookIds
+      .map((id) => hookLibrary.find((hook) => hook.id === id))
+      .filter((hook): hook is HookTemplate => Boolean(hook));
+    const recentCategoryCount = new Map<string, number>();
+    const recentToneCount = new Map<string, number>();
+    for (const hook of recentHooksInOrder) {
+      recentCategoryCount.set(
+        hook.category,
+        (recentCategoryCount.get(hook.category) ?? 0) + 1,
+      );
+      recentToneCount.set(hook.tone, (recentToneCount.get(hook.tone) ?? 0) + 1);
+    }
 
-    return hookLibrary.filter((hook) => {
-      const categoryMatch = categoryFilter === CATEGORY_ALL || hook.category === categoryFilter;
-      const platformMatch =
-        platformFilter === "All" || hook.platform === "All" || hook.platform === platformFilter;
-      const toneMatch = toneFilter === TONE_ALL || hook.tone === toneFilter;
-      const searchMatch =
-        normalizedSearch.length === 0 ||
-        hook.text.toLowerCase().includes(normalizedSearch) ||
-        hook.category.toLowerCase().includes(normalizedSearch);
+    const scoreHook = (hook: HookTemplate) => {
+      let score = 0;
+      const recentIndex = recentIndexById.get(hook.id);
+      if (recentIndex !== undefined) {
+        score += 100 - recentIndex;
+      }
+      score += (recentCategoryCount.get(hook.category) ?? 0) * 10;
+      score += (recentToneCount.get(hook.tone) ?? 0) * 6;
+      if (platformFilter !== "All" && hook.platform === platformFilter) {
+        score += 8;
+      }
+      if (categoryFilter !== CATEGORY_ALL && hook.category === categoryFilter) {
+        score += 6;
+      }
+      if (toneFilter !== TONE_ALL && hook.tone === toneFilter) {
+        score += 4;
+      }
+      return score;
+    };
 
-      return categoryMatch && platformMatch && toneMatch && searchMatch;
-    });
-  }, [search, categoryFilter, platformFilter, toneFilter]);
+    return hookLibrary
+      .filter((hook) => {
+        const categoryMatch =
+          categoryFilter === CATEGORY_ALL || hook.category === categoryFilter;
+        const platformMatch =
+          platformFilter === "All" ||
+          hook.platform === "All" ||
+          hook.platform === platformFilter;
+        const toneMatch = toneFilter === TONE_ALL || hook.tone === toneFilter;
+        const searchMatch =
+          normalizedSearch.length === 0 ||
+          hook.text.toLowerCase().includes(normalizedSearch) ||
+          hook.category.toLowerCase().includes(normalizedSearch);
+
+        return categoryMatch && platformMatch && toneMatch && searchMatch;
+      })
+      .sort((a, b) => {
+        const scoreDelta = scoreHook(b) - scoreHook(a);
+        if (scoreDelta !== 0) {
+          return scoreDelta;
+        }
+        return a.id.localeCompare(b.id);
+      });
+  }, [search, categoryFilter, platformFilter, toneFilter, recentHookIds]);
 
   const recentHooks = useMemo(() => {
     const map = new Map(hookLibrary.map((hook) => [hook.id, hook]));
@@ -175,10 +240,19 @@ export function HookBrowser({
   }, [activeIndex, filteredHooks]);
 
   const rememberHook = (hookId: string) => {
-    setRecentHookIds((prev) => [hookId, ...prev.filter((id) => id !== hookId)].slice(0, RECENT_HOOKS_LIMIT));
+    setRecentHookIds((prev) =>
+      [hookId, ...prev.filter((id) => id !== hookId)].slice(
+        0,
+        RECENT_HOOKS_LIMIT,
+      ),
+    );
   };
 
-  const handleValueChange = (hookId: string, variable: HookVariable, value: string) => {
+  const handleValueChange = (
+    hookId: string,
+    variable: HookVariable,
+    value: string,
+  ) => {
     setValuesByHookId((prev) => ({
       ...prev,
       [hookId]: {
@@ -188,7 +262,7 @@ export function HookBrowser({
     }));
   };
 
-  const useHook = (hook: HookTemplate) => {
+  const applyHook = (hook: HookTemplate) => {
     const text = applyVariables(hook, valuesByHookId[hook.id] ?? {});
     onInsertAtCursor(text);
     rememberHook(hook.id);
@@ -220,7 +294,9 @@ export function HookBrowser({
 
     if (event.key === "ArrowUp") {
       event.preventDefault();
-      setActiveIndex((prev) => (prev - 1 + filteredHooks.length) % filteredHooks.length);
+      setActiveIndex(
+        (prev) => (prev - 1 + filteredHooks.length) % filteredHooks.length,
+      );
       return;
     }
 
@@ -228,7 +304,7 @@ export function HookBrowser({
       event.preventDefault();
       const hook = filteredHooks[activeIndex];
       if (hook) {
-        useHook(hook);
+        applyHook(hook);
       }
     }
   };
@@ -236,7 +312,10 @@ export function HookBrowser({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className={cn("w-[min(96vw,68rem)] max-w-[68rem] gap-0 p-0 overflow-hidden rounded-xl", className)}
+        className={cn(
+          "w-[min(96vw,68rem)] max-w-[68rem] gap-0 p-0 overflow-hidden rounded-xl",
+          className,
+        )}
         onKeyDown={handleKeyDown}
       >
         <div className="grid h-[85vh] grid-rows-[auto_auto_1fr] overflow-hidden">
@@ -266,7 +345,9 @@ export function HookBrowser({
                 <Select
                   value={categoryFilter}
                   onValueChange={(value) =>
-                    setCategoryFilter(value as typeof CATEGORY_ALL | HookTemplate["category"])
+                    setCategoryFilter(
+                      value as typeof CATEGORY_ALL | HookTemplate["category"],
+                    )
                   }
                 >
                   <SelectTrigger className="h-8 dash-border dash-bg-card text-xs text-slate-900">
@@ -297,7 +378,7 @@ export function HookBrowser({
                         "h-8 rounded-full border px-3 text-xs font-medium transition-colors",
                         selected
                           ? "border-slate-900 dash-bg-panel text-white dash-bg-panel hover:text-white"
-                          : "dash-border dash-bg-card text-slate-600 dash-border dash-bg-card hover:text-slate-900"
+                          : "dash-border dash-bg-card text-slate-600 dash-border dash-bg-card hover:text-slate-900",
                       )}
                     >
                       {platformIconByName[platform]}
@@ -321,7 +402,7 @@ export function HookBrowser({
                         "h-8 rounded-full border px-3 text-xs font-medium transition-colors",
                         selected
                           ? "border-slate-900 dash-bg-panel text-white dash-bg-panel hover:text-white"
-                          : "dash-border dash-bg-card text-slate-600 dash-border dash-bg-card hover:text-slate-900"
+                          : "dash-border dash-bg-card text-slate-600 dash-border dash-bg-card hover:text-slate-900",
                       )}
                     >
                       {tone}
@@ -334,7 +415,9 @@ export function HookBrowser({
 
           <div className="grid min-h-0 gap-0 overflow-hidden lg:grid-cols-[18rem_1fr]">
             <aside className="min-h-0 overflow-y-auto border-r dash-border dash-bg-card p-4">
-              <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-3">Recently Used</h3>
+              <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-3">
+                Recently Used
+              </h3>
 
               <div className="space-y-2">
                 {recentHooks.length === 0 ? (
@@ -346,13 +429,22 @@ export function HookBrowser({
                     <button
                       key={hook.id}
                       type="button"
-                      onClick={() => useHook(hook)}
+                      onClick={() => applyHook(hook)}
                       className="group w-full rounded-lg border dash-border dash-bg-card p-3 text-left transition-all dash-border hover:shadow-sm"
                     >
-                      <p className="line-clamp-2 text-xs font-medium text-slate-700 group-hover:text-slate-900">{applyVariables(hook, valuesByHookId[hook.id] ?? {})}</p>
+                      <p className="line-clamp-2 text-xs font-medium text-slate-700 group-hover:text-slate-900">
+                        {applyVariables(hook, valuesByHookId[hook.id] ?? {})}
+                      </p>
                       <div className="mt-2 flex items-center justify-between">
-                        <Badge variant="secondary" className="dash-bg-card text-[10px] text-slate-500">{hook.category}</Badge>
-                        <span className="text-slate-400">{platformIconByName[hook.platform]}</span>
+                        <Badge
+                          variant="secondary"
+                          className="dash-bg-card text-[10px] text-slate-500"
+                        >
+                          {hook.category}
+                        </Badge>
+                        <span className="text-slate-400">
+                          {platformIconByName[hook.platform]}
+                        </span>
                       </div>
                     </button>
                   ))
@@ -381,13 +473,18 @@ export function HookBrowser({
                         }}
                         className={cn(
                           "dash-border transition-all shadow-sm",
-                          isActive ? "border-slate-900 ring-1 ring-slate-900/10 shadow-md" : "dash-border hover:shadow-md"
+                          isActive
+                            ? "border-slate-900 ring-1 ring-slate-900/10 shadow-md"
+                            : "dash-border hover:shadow-md",
                         )}
                       >
                         <CardContent className="p-5">
                           <div className="flex items-start justify-between gap-4">
                             <p className="flex-1 text-base font-medium leading-relaxed text-slate-900">
-                              {applyVariables(hook, valuesByHookId[hook.id] ?? {})}
+                              {applyVariables(
+                                hook,
+                                valuesByHookId[hook.id] ?? {},
+                              )}
                             </p>
                             <div className="flex shrink-0 items-center justify-center h-8 w-8 rounded-full dash-bg-card text-slate-400">
                               {platformIconByName[hook.platform]}
@@ -395,10 +492,23 @@ export function HookBrowser({
                           </div>
 
                           <div className="mt-4 flex flex-wrap items-center gap-2">
-                            <Badge variant="secondary" className="dash-bg-card text-slate-700 hover:bg-slate-200">{hook.category}</Badge>
-                            <Badge variant="outline" className="dash-border text-slate-500">{hook.tone}</Badge>
+                            <Badge
+                              variant="secondary"
+                              className="dash-bg-card text-slate-700 hover:bg-slate-200"
+                            >
+                              {hook.category}
+                            </Badge>
+                            <Badge
+                              variant="outline"
+                              className="dash-border text-slate-500"
+                            >
+                              {hook.tone}
+                            </Badge>
                             {isActive ? (
-                              <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700 animate-pulse">
+                              <Badge
+                                variant="outline"
+                                className="border-emerald-200 bg-emerald-50 text-emerald-700 animate-pulse"
+                              >
                                 Selected (Press Enter)
                               </Badge>
                             ) : null}
@@ -413,9 +523,15 @@ export function HookBrowser({
                                 {hook.variables?.map((variable) => (
                                   <Input
                                     key={`${hook.id}-${variable}`}
-                                    value={valuesByHookId[hook.id]?.[variable] ?? ""}
+                                    value={
+                                      valuesByHookId[hook.id]?.[variable] ?? ""
+                                    }
                                     onChange={(event) =>
-                                      handleValueChange(hook.id, variable, event.target.value)
+                                      handleValueChange(
+                                        hook.id,
+                                        variable,
+                                        event.target.value,
+                                      )
                                     }
                                     placeholder={`Enter ${variable}...`}
                                     className="h-9 dash-bg-card dash-border text-xs focus-visible:ring-slate-400"
@@ -426,7 +542,12 @@ export function HookBrowser({
                           ) : null}
 
                           <div className="mt-4 flex flex-wrap gap-2 pt-4 border-t border-slate-100">
-                            <Button type="button" size="sm" onClick={() => useHook(hook)} className="dash-bg-panel text-white dash-bg-panel">
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => applyHook(hook)}
+                              className="dash-bg-panel text-white dash-bg-panel"
+                            >
                               Use This Hook
                             </Button>
                             <Button

@@ -55,6 +55,9 @@ export function VoiceCommandButton({
   );
 
   const handleStart = useCallback(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("creatorops.onboarding.used_voice", "true");
+    }
     void voice.startListening();
   }, [voice]);
 

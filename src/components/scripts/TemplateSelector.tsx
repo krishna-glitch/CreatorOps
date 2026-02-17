@@ -1,7 +1,14 @@
 "use client";
 
-import { Camera, ChevronLeft, Clapperboard, Globe, Music2, Search } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  Camera,
+  ChevronLeft,
+  Clapperboard,
+  Globe,
+  Music2,
+  Search,
+} from "lucide-react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,14 +30,16 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import {
-  scriptTemplates,
   type ScriptTemplate,
   type ScriptTemplateCategory,
   type ScriptTemplatePlaceholder,
   type ScriptTemplatePlatform,
+  scriptTemplates,
 } from "@/src/lib/templates/scriptTemplates";
 
 const CATEGORY_ALL = "All" as const;
+const RECENT_TEMPLATES_STORAGE_KEY = "creatorops_recent_templates";
+const RECENT_TEMPLATES_LIMIT = 8;
 
 const platformIconByName: Record<ScriptTemplatePlatform, ReactNode> = {
   All: <Globe className="h-4 w-4" />,
@@ -56,7 +65,10 @@ function getTemplatePreview(template: string): string {
   return `${clean.slice(0, 50)}...`;
 }
 
-function applyPlaceholders(template: string, values: PlaceholderValues): string {
+function applyPlaceholders(
+  template: string,
+  values: PlaceholderValues,
+): string {
   let resolved = template;
 
   for (const [key, value] of Object.entries(values)) {
@@ -67,7 +79,9 @@ function applyPlaceholders(template: string, values: PlaceholderValues): string 
   return resolved;
 }
 
-function createInitialValues(placeholders: ScriptTemplatePlaceholder[]): PlaceholderValues {
+function createInitialValues(
+  placeholders: ScriptTemplatePlaceholder[],
+): PlaceholderValues {
   return placeholders.reduce<PlaceholderValues>((acc, placeholder) => {
     acc[placeholder.key] = "";
     return acc;
@@ -81,31 +95,84 @@ export function TemplateSelector({
   className,
 }: TemplateSelectorProps) {
   const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<typeof CATEGORY_ALL | ScriptTemplateCategory>(
-    CATEGORY_ALL,
-  );
-  const [selectedTemplate, setSelectedTemplate] = useState<ScriptTemplate | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<
+    typeof CATEGORY_ALL | ScriptTemplateCategory
+  >(CATEGORY_ALL);
+  const [selectedTemplate, setSelectedTemplate] =
+    useState<ScriptTemplate | null>(null);
   const [values, setValues] = useState<PlaceholderValues>({});
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [recentTemplateIds, setRecentTemplateIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const stored = window.localStorage.getItem(RECENT_TEMPLATES_STORAGE_KEY);
+    if (!stored) {
+      return;
+    }
+    try {
+      const parsed = JSON.parse(stored) as unknown;
+      if (Array.isArray(parsed)) {
+        setRecentTemplateIds(
+          parsed.filter((id): id is string => typeof id === "string"),
+        );
+      }
+    } catch {
+      setRecentTemplateIds([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    window.localStorage.setItem(
+      RECENT_TEMPLATES_STORAGE_KEY,
+      JSON.stringify(recentTemplateIds),
+    );
+  }, [recentTemplateIds]);
 
   const categories = useMemo(() => {
-    return Array.from(new Set(scriptTemplates.map((template) => template.category)));
+    return Array.from(
+      new Set(scriptTemplates.map((template) => template.category)),
+    );
   }, []);
 
   const filteredTemplates = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
 
-    return scriptTemplates.filter((template) => {
-      const categoryMatch = categoryFilter === CATEGORY_ALL || template.category === categoryFilter;
-      const searchMatch =
-        normalizedSearch.length === 0 ||
-        template.name.toLowerCase().includes(normalizedSearch) ||
-        template.category.toLowerCase().includes(normalizedSearch) ||
-        template.platform.toLowerCase().includes(normalizedSearch);
+    const indexById = new Map(
+      recentTemplateIds.map((id, index) => [id, index]),
+    );
 
-      return categoryMatch && searchMatch;
-    });
-  }, [categoryFilter, search]);
+    return scriptTemplates
+      .filter((template) => {
+        const categoryMatch =
+          categoryFilter === CATEGORY_ALL ||
+          template.category === categoryFilter;
+        const searchMatch =
+          normalizedSearch.length === 0 ||
+          template.name.toLowerCase().includes(normalizedSearch) ||
+          template.category.toLowerCase().includes(normalizedSearch) ||
+          template.platform.toLowerCase().includes(normalizedSearch);
+
+        return categoryMatch && searchMatch;
+      })
+      .sort((a, b) => {
+        const aRecent = indexById.get(a.id);
+        const bRecent = indexById.get(b.id);
+        const aRecentRank =
+          aRecent === undefined ? Number.MAX_SAFE_INTEGER : aRecent;
+        const bRecentRank =
+          bRecent === undefined ? Number.MAX_SAFE_INTEGER : bRecent;
+        if (aRecentRank !== bRecentRank) {
+          return aRecentRank - bRecentRank;
+        }
+        return a.name.localeCompare(b.name);
+      });
+  }, [categoryFilter, recentTemplateIds, search]);
 
   const missingKeys = useMemo(() => {
     if (!selectedTemplate) {
@@ -152,17 +219,31 @@ export function TemplateSelector({
     }
 
     onInsertAtCursor(previewScript);
+    setRecentTemplateIds((prev) =>
+      [
+        selectedTemplate.id,
+        ...prev.filter((id) => id !== selectedTemplate.id),
+      ].slice(0, RECENT_TEMPLATES_LIMIT),
+    );
     onOpenChange(false);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={cn("w-[min(96vw,78rem)] max-w-[78rem] gap-0 p-0 overflow-hidden rounded-xl", className)}>
+      <DialogContent
+        className={cn(
+          "w-[min(96vw,78rem)] max-w-[78rem] gap-0 p-0 overflow-hidden rounded-xl",
+          className,
+        )}
+      >
         <div className="grid h-[85vh] grid-rows-[auto_1fr]">
           <DialogHeader className="border-b dash-border dash-bg-card px-6 py-4">
-            <DialogTitle className="text-xl font-semibold text-slate-900">Script Templates</DialogTitle>
+            <DialogTitle className="text-xl font-semibold text-slate-900">
+              Script Templates
+            </DialogTitle>
             <DialogDescription className="text-slate-500">
-              Pick a template, fill placeholders, and insert a ready-to-edit script.
+              Pick a template, fill placeholders, and insert a ready-to-edit
+              script.
             </DialogDescription>
           </DialogHeader>
 
@@ -183,14 +264,18 @@ export function TemplateSelector({
                   <Select
                     value={categoryFilter}
                     onValueChange={(value) =>
-                      setCategoryFilter(value as typeof CATEGORY_ALL | ScriptTemplateCategory)
+                      setCategoryFilter(
+                        value as typeof CATEGORY_ALL | ScriptTemplateCategory,
+                      )
                     }
                   >
                     <SelectTrigger className="dash-border dash-bg-card text-slate-900">
                       <SelectValue placeholder="Filter by category" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={CATEGORY_ALL}>All categories</SelectItem>
+                      <SelectItem value={CATEGORY_ALL}>
+                        All categories
+                      </SelectItem>
                       {categories.map((category) => (
                         <SelectItem key={category} value={category}>
                           {category}
@@ -206,7 +291,9 @@ export function TemplateSelector({
                   <div className="flex h-64 flex-col items-center justify-center rounded-xl border border-dashed dash-border dash-bg-card text-center text-sm text-slate-500">
                     <Search className="mb-2 h-8 w-8 text-slate-300" />
                     <p>No templates found</p>
-                    <p className="text-xs">Try adjusting your search or category filter.</p>
+                    <p className="text-xs">
+                      Try adjusting your search or category filter.
+                    </p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 xl:grid-cols-4">
@@ -221,14 +308,21 @@ export function TemplateSelector({
                             <div className="flex h-8 w-8 items-center justify-center rounded-lg dash-bg-card text-slate-600 group-dash-bg-panel group-hover:text-white transition-colors">
                               {platformIconByName[template.platform]}
                             </div>
-                            <Badge variant="outline" className="dash-border text-slate-500 font-normal">
+                            <Badge
+                              variant="outline"
+                              className="dash-border text-slate-500 font-normal"
+                            >
                               {template.duration}
                             </Badge>
                           </div>
 
                           <div>
-                            <h3 className="font-semibold text-slate-900 leading-tight mb-1">{template.name}</h3>
-                            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{template.category}</p>
+                            <h3 className="font-semibold text-slate-900 leading-tight mb-1">
+                              {template.name}
+                            </h3>
+                            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+                              {template.category}
+                            </p>
                           </div>
 
                           <p className="line-clamp-3 text-xs text-slate-500 leading-relaxed dash-bg-card p-2 rounded-md border border-slate-100">
@@ -263,42 +357,72 @@ export function TemplateSelector({
 
                 <div className="flex-1 overflow-y-auto p-6">
                   <div className="mb-6 space-y-1">
-                    <h2 className="text-xl font-bold text-slate-900">{selectedTemplate.name}</h2>
+                    <h2 className="text-xl font-bold text-slate-900">
+                      {selectedTemplate.name}
+                    </h2>
                     <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="dash-bg-card text-slate-700 hover:bg-slate-200">{selectedTemplate.category}</Badge>
-                      <Badge variant="outline" className="dash-border text-slate-500">{selectedTemplate.platform}</Badge>
-                      <Badge variant="outline" className="dash-border text-slate-500">{selectedTemplate.duration}</Badge>
+                      <Badge
+                        variant="secondary"
+                        className="dash-bg-card text-slate-700 hover:bg-slate-200"
+                      >
+                        {selectedTemplate.category}
+                      </Badge>
+                      <Badge
+                        variant="outline"
+                        className="dash-border text-slate-500"
+                      >
+                        {selectedTemplate.platform}
+                      </Badge>
+                      <Badge
+                        variant="outline"
+                        className="dash-border text-slate-500"
+                      >
+                        {selectedTemplate.duration}
+                      </Badge>
                     </div>
                   </div>
 
                   <div className="space-y-5">
                     {selectedTemplate.placeholders.map((placeholder) => {
-                      const hasError = submitAttempted && missingKeys.includes(placeholder.key);
+                      const hasError =
+                        submitAttempted &&
+                        missingKeys.includes(placeholder.key);
 
                       return (
                         <div key={placeholder.key} className="space-y-1.5">
-                          <Label htmlFor={`template-${placeholder.key}`} className="text-sm font-medium text-slate-700">
-                            {placeholder.label} <span className="text-rose-500">*</span>
+                          <Label
+                            htmlFor={`template-${placeholder.key}`}
+                            className="text-sm font-medium text-slate-700"
+                          >
+                            {placeholder.label}{" "}
+                            <span className="text-rose-500">*</span>
                           </Label>
                           <Input
                             id={`template-${placeholder.key}`}
                             value={values[placeholder.key] ?? ""}
                             onChange={(event) =>
-                              setValues((prev) => ({ ...prev, [placeholder.key]: event.target.value }))
+                              setValues((prev) => ({
+                                ...prev,
+                                [placeholder.key]: event.target.value,
+                              }))
                             }
                             placeholder={`Enter ${placeholder.label.toLowerCase()}...`}
                             className={cn(
                               "dash-bg-card dash-border text-slate-900 focus-visible:ring-slate-900",
-                              hasError && "border-rose-300 focus-visible:ring-rose-200 bg-rose-50"
+                              hasError &&
+                                "border-rose-300 focus-visible:ring-rose-200 bg-rose-50",
                             )}
                           />
                           {placeholder.example && (
                             <p className="text-xs text-slate-500">
-                              <span className="font-medium">Example:</span> {placeholder.example}
+                              <span className="font-medium">Example:</span>{" "}
+                              {placeholder.example}
                             </p>
                           )}
                           {hasError && (
-                            <p className="text-xs font-medium text-rose-500">This field is required.</p>
+                            <p className="text-xs font-medium text-rose-500">
+                              This field is required.
+                            </p>
                           )}
                         </div>
                       );
@@ -308,8 +432,14 @@ export function TemplateSelector({
 
                 <div className="border-t dash-border dash-bg-card px-6 py-4">
                   <div className="flex items-center justify-between gap-4">
-                    <p className="text-xs text-slate-500">Fill in all fields to generate.</p>
-                    <Button type="button" onClick={handleGenerate} className="dash-bg-panel text-white dash-bg-panel">
+                    <p className="text-xs text-slate-500">
+                      Fill in all fields to generate.
+                    </p>
+                    <Button
+                      type="button"
+                      onClick={handleGenerate}
+                      className="dash-bg-panel text-white dash-bg-panel"
+                    >
                       Generate Script
                     </Button>
                   </div>
@@ -318,7 +448,9 @@ export function TemplateSelector({
 
               <section className="flex flex-col dash-bg-card">
                 <div className="border-b dash-border dash-bg-card px-6 py-4">
-                  <p className="text-sm font-semibold text-slate-900">Live Preview</p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    Live Preview
+                  </p>
                   <p className="text-xs text-slate-500">
                     Preview updates instantly as you fill each placeholder.
                   </p>
@@ -326,7 +458,11 @@ export function TemplateSelector({
                 <div className="flex-1 overflow-y-auto p-6">
                   <div className="rounded-xl border dash-border dash-bg-card p-6 shadow-sm">
                     <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-slate-800">
-                      {previewScript || <span className="text-slate-400 italic">Script preview will appear here...</span>}
+                      {previewScript || (
+                        <span className="text-slate-400 italic">
+                          Script preview will appear here...
+                        </span>
+                      )}
                     </pre>
                   </div>
                 </div>

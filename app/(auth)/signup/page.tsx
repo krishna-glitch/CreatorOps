@@ -166,9 +166,7 @@ export default function SignupPage() {
                   aria-label={
                     showConfirmPassword ? "Hide password" : "Show password"
                   }
-                  onClick={() =>
-                    setShowConfirmPassword((current) => !current)
-                  }
+                  onClick={() => setShowConfirmPassword((current) => !current)}
                   className="absolute inset-y-0 right-0 flex items-center px-3 dash-text-muted hover:gold-text"
                 >
                   {showConfirmPassword ? (
@@ -195,10 +193,7 @@ export default function SignupPage() {
         {/* Footer */}
         <p className="text-center text-sm dash-text-muted">
           Already have an account?{" "}
-          <Link
-            href="/login"
-            className="font-medium gold-text hover:underline"
-          >
+          <Link href="/login" className="font-medium gold-text hover:underline">
             Sign in
           </Link>
         </p>

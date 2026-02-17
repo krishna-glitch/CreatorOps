@@ -46,7 +46,10 @@ export async function getFileUrl(
   return data.signedUrl;
 }
 
-export async function uploadFile(file: File, deliverableId: string): Promise<UploadFileResult> {
+export async function uploadFile(
+  file: File,
+  deliverableId: string,
+): Promise<UploadFileResult> {
   const supabase = createClient();
   const {
     data: { user },
@@ -54,7 +57,9 @@ export async function uploadFile(file: File, deliverableId: string): Promise<Upl
   } = await supabase.auth.getUser();
 
   if (userError || !user) {
-    throw new Error(userError?.message ?? "You must be signed in to upload files");
+    throw new Error(
+      userError?.message ?? "You must be signed in to upload files",
+    );
   }
 
   const uniqueFileName = createUniqueFileName(file.name);
@@ -84,10 +89,11 @@ export async function uploadFile(file: File, deliverableId: string): Promise<Upl
 
 export async function deleteFile(path: string) {
   const supabase = createClient();
-  const { error } = await supabase.storage.from(CREATOR_CONTENT_BUCKET).remove([path]);
+  const { error } = await supabase.storage
+    .from(CREATOR_CONTENT_BUCKET)
+    .remove([path]);
 
   if (error) {
     throw new Error(error.message);
   }
 }
-

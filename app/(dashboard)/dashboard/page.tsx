@@ -1,10 +1,9 @@
 "use client";
 
+import type { User } from "@supabase/supabase-js";
 import { formatDistanceStrict } from "date-fns";
 import {
   Bot,
-  CalendarCheck,
-  CircleDollarSign,
   Clock3,
   CreditCard,
   LineChart,
@@ -16,8 +15,7 @@ import {
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import type { User } from "@supabase/supabase-js";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const ResponsiveContainer = dynamic(
   () => import("recharts").then((mod) => mod.ResponsiveContainer),
@@ -38,22 +36,15 @@ const Tooltip = dynamic(() => import("recharts").then((mod) => mod.Tooltip), {
 
 import { Badge } from "@/components/ui/badge";
 import { PillowyCard } from "@/components/ui/pillowy-card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { createClient } from "@/lib/supabase/client";
 import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/client";
 import { DeadlineStateBadge } from "@/src/components/deliverables/DeadlineStateBadge";
+import { useDefaultCurrency } from "@/src/hooks/useDefaultCurrency";
+import { usePullToRefresh } from "@/src/hooks/usePullToRefresh";
 import {
   formatDayLabel,
   formatDealCurrency,
-  formatDealDate,
   formatTime,
 } from "@/src/lib/utils/format-utils";
 import {
@@ -61,8 +52,31 @@ import {
   getStatusBadgeClasses,
 } from "@/src/lib/utils/status-utils";
 
-function compactCurrency(value: number) {
-  return formatDealCurrency(value, { currency: "USD", compact: true });
+function compactCurrency(value: number, currency: "USD" | "INR") {
+  return formatDealCurrency(value, { currency, compact: true });
+}
+
+function formatUSDValue(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function formatCurrencyValue(value: number, currency: string) {
+  if (currency === "INR") {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 0,
+    }).format(value);
+  }
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+  }).format(value);
 }
 
 function readMetadataString(
@@ -276,7 +290,7 @@ function DeliverablesTimeline({
   );
 }
 
-function chipToneClasses(tone: "green" | "yellow" | "red" | "blue") {
+function _chipToneClasses(tone: "green" | "yellow" | "red" | "blue") {
   if (tone === "green") {
     return "dash-chip-tone-green";
   }
@@ -289,7 +303,7 @@ function chipToneClasses(tone: "green" | "yellow" | "red" | "blue") {
   return "dash-chip-tone-blue";
 }
 
-function reminderPriorityTone(priority: "LOW" | "MED" | "HIGH" | "CRITICAL") {
+function _reminderPriorityTone(priority: "LOW" | "MED" | "HIGH" | "CRITICAL") {
   if (priority === "CRITICAL") {
     return "dash-chip-tone-red";
   }
@@ -302,7 +316,7 @@ function reminderPriorityTone(priority: "LOW" | "MED" | "HIGH" | "CRITICAL") {
   return "dash-chip-tone-blue";
 }
 
-function formatReminderRelative(dueAt: Date | string) {
+function _formatReminderRelative(dueAt: Date | string) {
   const now = new Date();
   const due = dueAt instanceof Date ? dueAt : new Date(dueAt);
   const distance = formatDistanceStrict(due, now);
@@ -353,8 +367,18 @@ function RevenueChartSkeleton() {
   );
 }
 
-function QuickActionsCard() {
+function QuickActionsCard({
+  overdueItemsCount,
+  outstandingTotal,
+  activeDealsCount,
+}: {
+  overdueItemsCount: number;
+  outstandingTotal: number;
+  activeDealsCount: number;
+}) {
   const router = useRouter();
+  const hasOverdue = overdueItemsCount > 0;
+  const hasOutstanding = outstandingTotal > 0;
   const actions = [
     {
       label: "New Deal",
@@ -363,27 +387,51 @@ function QuickActionsCard() {
       highlight: true,
       shortcut: "N",
     },
-    {
-      label: "AI Script",
-      href: "/deals/ai-create",
-      icon: Bot,
-      highlight: false,
-      shortcut: "K",
-    },
-    {
-      label: "Invoice",
-      href: "/payments/new",
-      icon: CreditCard,
-      highlight: false,
-      shortcut: null,
-    },
-    {
-      label: "Pitch",
-      href: "/analytics",
-      icon: LineChart, // Using LineChart as proxy for Pitch/Analytics
-      highlight: true,
-      shortcut: null,
-    },
+    hasOverdue
+      ? {
+          label: "Overdue",
+          href: "/deals",
+          icon: TriangleAlert,
+          highlight: true,
+          shortcut: null,
+        }
+      : {
+          label: "AI Script",
+          href: "/deals/ai-create",
+          icon: Bot,
+          highlight: false,
+          shortcut: "K",
+        },
+    hasOutstanding
+      ? {
+          label: "Collect",
+          href: "/payments/new",
+          icon: CreditCard,
+          highlight: true,
+          shortcut: null,
+        }
+      : {
+          label: "Invoice",
+          href: "/payments/new",
+          icon: CreditCard,
+          highlight: false,
+          shortcut: null,
+        },
+    activeDealsCount > 0
+      ? {
+          label: "Pipeline",
+          href: "/deals",
+          icon: LineChart,
+          highlight: true,
+          shortcut: null,
+        }
+      : {
+          label: "Analytics",
+          href: "/analytics",
+          icon: LineChart,
+          highlight: false,
+          shortcut: null,
+        },
   ] as const;
 
   return (
@@ -400,19 +448,12 @@ function QuickActionsCard() {
                 onClick={() => router.push(action.href)}
                 className="pillowy-card w-full aspect-square flex items-center justify-center transition-transform hover:scale-105 active:scale-95"
               >
-                <span
+                <Icon
                   className={cn(
-                    "material-symbols-outlined text-2xl",
-                    isHighlight ? "icon-3d-gold" : "dash-text-soft",
+                    "h-6 w-6 md:h-5 md:w-5",
+                    isHighlight ? "icon-3d-gold dash-link" : "dash-text-muted",
                   )}
-                >
-                  <Icon
-                    className={cn(
-                      "w-6 h-6",
-                      isHighlight ? "dash-link" : "dash-text-muted",
-                    )}
-                  />
-                </span>
+                />
               </button>
               <span className="text-[10px] font-semibold dash-text-muted">
                 {action.label}
@@ -427,32 +468,71 @@ function QuickActionsCard() {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { defaultCurrency } = useDefaultCurrency();
+  const dashboardRef = useRef<HTMLDivElement | null>(null);
   const [displayName, setDisplayName] = useState("Creator");
   const statsQuery = trpc.analytics.getDashboardStats.useQuery(undefined, {
-    staleTime: 60_000,
+    staleTime: 15_000,
     gcTime: 10 * 60_000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    refetchInterval: 20_000,
     placeholderData: (previous) => previous,
   });
   const remindersQuery = trpc.reminders.listOpen.useQuery(undefined, {
-    staleTime: 60_000,
+    staleTime: 15_000,
     gcTime: 10 * 60_000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    refetchInterval: 20_000,
     placeholderData: (previous) => previous,
+  });
+  const currencyBreakdownQuery = trpc.analytics.getCurrencyBreakdown.useQuery(
+    undefined,
+    {
+      staleTime: 15_000,
+      gcTime: 10 * 60_000,
+      refetchOnMount: "always",
+      refetchOnWindowFocus: true,
+      refetchInterval: 20_000,
+      placeholderData: (previous) => previous,
+    },
+  );
+
+  const refreshDashboard = useCallback(async () => {
+    await Promise.all([statsQuery.refetch(), remindersQuery.refetch()]);
+  }, [remindersQuery, statsQuery]);
+
+  const pullToRefresh = usePullToRefresh({
+    scrollRef: dashboardRef,
+    onRefresh: refreshDashboard,
+    disabled: statsQuery.isFetching || remindersQuery.isFetching,
   });
 
   const stats = statsQuery.data;
-  const hasOutstanding = (stats?.totalOutstandingPayments ?? 0) > 0;
-  const hasOverdue = (stats?.overdueItemsCount ?? 0) > 0;
+  const currencyBreakdown = currencyBreakdownQuery.data;
+  const _hasOutstanding = (stats?.totalOutstandingPayments ?? 0) > 0;
+  const _hasOverdue = (stats?.overdueItemsCount ?? 0) > 0;
+  const unconvertedCurrencies =
+    currencyBreakdown?.currencies.filter(
+      (item) => item.totalUsd === null && item.paymentCount > 0,
+    ) ?? [];
+  const unconvertedSummary = unconvertedCurrencies
+    .map(
+      (item) =>
+        `${formatCurrencyValue(item.totalOriginal, item.currency)} ${item.currency}`,
+    )
+    .join(" + ");
+  const dashboardSubtitle =
+    (stats?.overdueItemsCount ?? 0) > 0
+      ? `${stats?.overdueItemsCount ?? 0} item(s) need attention today.`
+      : (stats?.activeDealsCount ?? 0) > 0
+        ? `${stats?.activeDealsCount ?? 0} active deal(s) in motion.`
+        : "No active deals yet. Add one to start your pipeline.";
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      // Prevent conflict with Browser New Window (Cmd+N)
-      // Only trigger if Shift is also pressed or just 'n' without meta
       const isMeta = event.metaKey || event.ctrlKey;
-      const isShift = event.shiftKey;
 
       // Don't trigger if user is typing in an input
       if (
@@ -462,18 +542,12 @@ export default function DashboardPage() {
         return;
       }
 
-      if (event.key.toLowerCase() === "n" && !isMeta) {
+      if (event.key.toLowerCase() === "n" && isMeta) {
         event.preventDefault();
         router.push("/deals/new");
       }
 
-      // Shift + N for power users who might hold shift
-      if (event.key.toLowerCase() === "n" && isShift) {
-        event.preventDefault();
-        router.push("/deals/new");
-      }
-
-      if (event.key.toLowerCase() === "k" && !isMeta) {
+      if (event.key.toLowerCase() === "k" && isMeta) {
         event.preventDefault();
         router.push("/deals/ai-create");
       }
@@ -501,14 +575,19 @@ export default function DashboardPage() {
   }, []);
 
   return (
-    <div className="space-y-8">
+    <div
+      ref={dashboardRef}
+      className="space-y-8 touch-pan-y"
+      onTouchStart={pullToRefresh.handleTouchStart}
+      onTouchMove={pullToRefresh.handleTouchMove}
+      onTouchEnd={pullToRefresh.handleTouchEnd}
+      onTouchCancel={pullToRefresh.handleTouchCancel}
+    >
       <section>
         <h2 className="font-serif text-3xl dash-text">
           Welcome, <span className="gold-text italic">{displayName}</span>
         </h2>
-        <p className="dash-text-muted text-sm mt-1">
-          Your midnight vault is secure and thriving.
-        </p>
+        <p className="dash-text-muted text-sm mt-1">{dashboardSubtitle}</p>
       </section>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -523,60 +602,75 @@ export default function DashboardPage() {
           <>
             <PillowyCard className="p-5 flex flex-col justify-between h-40">
               <div className="flex justify-between items-start">
-                <span className="icon-3d-gold text-3xl">
-                  <Wallet className="w-8 h-8 dash-link" />
-                </span>
-                <span className="dash-stat-chip text-[10px] font-bold px-2 py-0.5 rounded-full border">
-                  +12%
-                </span>
+                <Wallet className="h-8 w-8 md:h-6 md:w-6 icon-3d-gold dash-link" />
               </div>
               <div>
                 <p className="text-[10px] uppercase tracking-wider dash-text-muted font-semibold mb-1">
-                  Total Revenue
+                  Revenue
                 </p>
                 <p className="text-xl font-bold dash-text tracking-tight">
-                  {compactCurrency(stats?.totalRevenueThisMonth ?? 0)}
+                  {formatUSDValue(stats?.totalRevenueAllTime ?? 0)} USD
                 </p>
+                {(currencyBreakdown?.currencies.length ?? 0) > 0 &&
+                !currencyBreakdown?.hasUnconvertedPayments ? (
+                  <p className="text-[11px] dash-text-muted mt-1">
+                    {currencyBreakdown?.currencies.length ?? 0} currencies · ECB
+                    rates
+                  </p>
+                ) : null}
+                {currencyBreakdown?.hasUnconvertedPayments ? (
+                  <>
+                    <p className="text-[11px] mt-1 dash-text-danger">
+                      + {unconvertedSummary} unconverted
+                    </p>
+                    <p className="text-[11px] dash-text-muted">
+                      <Link
+                        href="/payments/new"
+                        className="underline underline-offset-2"
+                      >
+                        Add rates
+                      </Link>{" "}
+                      to see total
+                    </p>
+                  </>
+                ) : null}
               </div>
             </PillowyCard>
 
             <PillowyCard className="p-5 flex flex-col justify-between h-40">
               <div className="flex justify-between items-start">
-                <span className="icon-3d-gold text-3xl">
-                  <Clock3 className="w-8 h-8 dash-link" />
-                </span>
+                <Clock3 className="h-8 w-8 md:h-6 md:w-6 icon-3d-gold dash-link" />
               </div>
               <div>
                 <p className="text-[10px] uppercase tracking-wider dash-text-muted font-semibold mb-1">
                   Outstanding
                 </p>
                 <p className="text-xl font-bold dash-text tracking-tight">
-                  {compactCurrency(stats?.totalOutstandingPayments ?? 0)}
+                  {compactCurrency(
+                    stats?.totalOutstandingPayments ?? 0,
+                    defaultCurrency,
+                  )}
                 </p>
               </div>
             </PillowyCard>
 
             <PillowyCard className="p-5 flex flex-col justify-between h-40">
               <div className="flex justify-between items-start">
-                <span className="icon-3d-gold text-3xl">
-                  <Zap className="w-8 h-8 dash-link" />
-                </span>
+                <Zap className="h-8 w-8 md:h-6 md:w-6 icon-3d-gold dash-link" />
               </div>
               <div>
                 <p className="text-[10px] uppercase tracking-wider dash-text-muted font-semibold mb-1">
                   Active Deals
                 </p>
                 <p className="text-xl font-bold dash-text tracking-tight">
-                  {stats?.upcomingDeliverablesCount ?? 0}
+                  {stats?.activeDealsCount ?? 0}
                 </p>
               </div>
             </PillowyCard>
 
             <PillowyCard className="p-5 flex flex-col justify-between h-40">
               <div className="flex justify-between items-start">
-                <span className="icon-3d-gold text-3xl">
-                  <Bot className="w-8 h-8 dash-link" />
-                </span>
+                <Bot className="h-8 w-8 md:h-6 md:w-6 icon-3d-gold dash-link" />
               </div>
               <div>
                 <p className="text-[10px] uppercase tracking-wider dash-text-muted font-semibold mb-1">
@@ -590,6 +684,51 @@ export default function DashboardPage() {
           </>
         )}
       </div>
+
+      {!currencyBreakdownQuery.isLoading && currencyBreakdown ? (
+        <section>
+          <details className="dash-inline-card rounded-2xl border p-4">
+            <summary className="cursor-pointer list-none text-sm font-semibold dash-text">
+              Revenue by Currency
+            </summary>
+            <div className="mt-4 space-y-3">
+              {currencyBreakdown.currencies.map((item) => (
+                <div
+                  key={item.currency}
+                  className="flex flex-wrap items-center justify-between gap-2 text-sm"
+                >
+                  <span className="font-medium dash-text">{item.currency}</span>
+                  <span className="dash-text-muted">
+                    {formatCurrencyValue(item.totalOriginal, item.currency)} (
+                    {item.paymentCount} payments)
+                  </span>
+                  <span className="dash-text">
+                    {item.totalUsd !== null
+                      ? `= ${formatUSDValue(item.totalUsd)} USD`
+                      : "Unconverted"}
+                  </span>
+                </div>
+              ))}
+              <div className="border-t border-border pt-3">
+                <p className="text-sm font-semibold dash-text">
+                  Total ~{formatUSDValue(currencyBreakdown.totalUsdEquivalent)}{" "}
+                  USD equivalent
+                </p>
+                <p className="text-xs dash-text-muted">
+                  Rates: ECB reference rates
+                </p>
+                {currencyBreakdown.hasUnconvertedPayments ? (
+                  <p className="text-xs dash-text-danger mt-1">
+                    ⚠️ {currencyBreakdown.unconvertedCount} payment(s) in other
+                    currencies not included in total. Add exchange rates to see
+                    complete revenue.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </details>
+        </section>
+      ) : null}
 
       <section>
         <div className="flex items-center justify-between mb-4">
@@ -648,7 +787,11 @@ export default function DashboardPage() {
         )}
       </section>
 
-      <QuickActionsCard />
+      <QuickActionsCard
+        overdueItemsCount={stats?.overdueItemsCount ?? 0}
+        outstandingTotal={stats?.totalOutstandingPayments ?? 0}
+        activeDealsCount={stats?.activeDealsCount ?? 0}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {statsQuery.isLoading ? (
@@ -677,9 +820,7 @@ export default function DashboardPage() {
                   >
                     <div className="flex min-w-0 flex-1 items-center gap-3">
                       <div className="w-10 h-10 rounded-xl pillowy-card flex items-center justify-center">
-                        <span className="icon-3d-gold">
-                          <Wallet className="w-5 h-5 dash-link" />
-                        </span>
+                        <Wallet className="h-5 w-5 icon-3d-gold dash-link" />
                       </div>
                       <div className="min-w-0">
                         <p className="truncate text-sm font-bold dash-text">

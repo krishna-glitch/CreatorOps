@@ -1,1 +1,4 @@
-export { reminders, remindersRelations } from "@/server/infrastructure/database/schema/reminders";
+export {
+  reminders,
+  remindersRelations,
+} from "@/server/infrastructure/database/schema/reminders";

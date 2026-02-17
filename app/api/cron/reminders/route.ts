@@ -14,10 +14,7 @@ async function handler(request: Request) {
 
   const authorization = request.headers.get("authorization");
   if (authorization !== `Bearer ${cronSecret}`) {
-    return Response.json(
-      { ok: false, error: "Unauthorized" },
-      { status: 401 },
-    );
+    return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
   try {

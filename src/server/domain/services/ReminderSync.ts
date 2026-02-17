@@ -1,6 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm";
-import { generateRemindersForDeliverable } from "./ReminderGenerator";
 import { reminders } from "@/server/infrastructure/database/schema/reminders";
+import { generateRemindersForDeliverable } from "./ReminderGenerator";
 
 type ReminderDbClient = {
   select: (...args: any[]) => any;

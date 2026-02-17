@@ -1,12 +1,12 @@
 import { z } from "zod";
-import { getGroqClient, GROQ_EXTRACTION_MODEL } from "./client";
+import { ExternalServiceError, ValidationError } from "@/server/utils/errors";
+import logger from "@/server/utils/logger";
+import { GROQ_EXTRACTION_MODEL, getGroqClient } from "./client";
 import {
   buildExtractDealUserPrompt,
   EXTRACT_DEAL_SYSTEM_PROMPT,
 } from "./prompts/extractDeal";
 import { disableAIExtractionDueToQuota } from "./quotaFlag";
-import { ExternalServiceError, ValidationError } from "@/server/utils/errors";
-import logger from "@/server/utils/logger";
 
 const deliverableSchema = z.object({
   platform: z.enum(["INSTAGRAM", "YOUTUBE", "TIKTOK"]),
@@ -136,7 +136,10 @@ async function callGroqWithRetry(message: string): Promise<string> {
         break;
       }
 
-      if (!isRetryableGroqError(normalizedError) || attempt === RETRY_OPTIONS.maxAttempts) {
+      if (
+        !isRetryableGroqError(normalizedError) ||
+        attempt === RETRY_OPTIONS.maxAttempts
+      ) {
         break;
       }
 
@@ -159,7 +162,9 @@ async function callGroqWithRetry(message: string): Promise<string> {
   throw new ExternalServiceError("Groq", lastError ?? undefined);
 }
 
-export async function extractDealFromMessage(message: string): Promise<ExtractedDeal> {
+export async function extractDealFromMessage(
+  message: string,
+): Promise<ExtractedDeal> {
   const normalizedMessage = message.trim();
   if (!normalizedMessage) {
     throw new ValidationError("Message is required for deal extraction", {

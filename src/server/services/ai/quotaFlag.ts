@@ -53,7 +53,8 @@ export function getAIExtractionAvailability() {
   clearIfExpired(now);
 
   const enabled =
-    quotaFlagState.disabledUntilMs === null || now >= quotaFlagState.disabledUntilMs;
+    quotaFlagState.disabledUntilMs === null ||
+    now >= quotaFlagState.disabledUntilMs;
 
   return {
     enabled,

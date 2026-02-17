@@ -101,7 +101,10 @@ export function ReworkCycleCompleteForm({
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-2">
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="space-y-4 pt-2"
+          >
             <div className="grid grid-cols-2 gap-3">
               <FormField
                 control={form.control}
@@ -118,7 +121,9 @@ export function ReworkCycleCompleteForm({
                         value={field.value ?? ""}
                         onChange={(event) => {
                           const value = event.target.value;
-                          field.onChange(value === "" ? undefined : Number(value));
+                          field.onChange(
+                            value === "" ? undefined : Number(value),
+                          );
                         }}
                         onBlur={field.onBlur}
                       />
@@ -142,7 +147,9 @@ export function ReworkCycleCompleteForm({
                         value={field.value ?? ""}
                         onChange={(event) => {
                           const value = event.target.value;
-                          field.onChange(value === "" ? undefined : Number(value));
+                          field.onChange(
+                            value === "" ? undefined : Number(value),
+                          );
                         }}
                         onBlur={field.onBlur}
                       />

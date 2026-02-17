@@ -3,8 +3,8 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -22,10 +22,18 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const linkError = useMemo(() => {
+    const errorCode = searchParams.get("error_code");
+    if (errorCode === "otp_expired") {
+      return "That sign-in link has expired or is invalid. Please sign in with your email and password.";
+    }
+    return null;
+  }, [searchParams]);
 
   const {
     register,
@@ -68,9 +76,7 @@ export default function LoginPage() {
 
     if (authError) {
       if (authError.message.toLowerCase().includes("email not confirmed")) {
-        setError(
-          "Email is not confirmed. In test mode we attempted auto-confirmation but sign-in still failed.",
-        );
+        setError("Unable to sign in. Please check your email and password.");
         return;
       }
 
@@ -98,9 +104,9 @@ export default function LoginPage() {
         {/* Card */}
         <div className="pillowy-card dash-card rounded-xl border p-8">
           {/* Error Banner */}
-          {error && (
+          {(linkError || error) && (
             <div className="dash-chip-tone-red mb-6 rounded-lg border px-4 py-3 text-sm">
-              {error}
+              {linkError ?? error}
             </div>
           )}
 
@@ -175,5 +181,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageContent />
+    </Suspense>
   );
 }
