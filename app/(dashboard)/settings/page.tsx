@@ -34,7 +34,9 @@ export default async function SettingsPage() {
   try {
     usage = await caller.mediaAssets.storageUsage();
   } catch (error) {
-    console.error("Failed to load storage usage for settings page", error);
+    if (process.env.NODE_ENV !== "production") {
+      console.error("Failed to load storage usage for settings page", error);
+    }
   }
   const metadata = (user.user_metadata ?? {}) as Record<string, unknown>;
   const fullName =
