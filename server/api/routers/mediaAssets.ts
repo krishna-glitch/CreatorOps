@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { deals } from "@/server/infrastructure/database/schema/deals";
 import { deliverables } from "@/server/infrastructure/database/schema/deliverables";
@@ -62,50 +62,41 @@ function extractPgErrorCode(error: unknown): string | null {
 
 export const mediaAssetsRouter = createTRPCRouter({
   storageUsage: protectedProcedure.query(async ({ ctx }) => {
-    let assetRows: Array<{ fileSizeBytes: number }> = [];
     try {
-      assetRows = await ctx.db
+      const [result] = await ctx.db
         .select({
-          fileSizeBytes: mediaAssets.fileSizeBytes,
+          totalBytes: sql<number>`COALESCE(SUM(${mediaAssets.fileSizeBytes}), 0)::bigint`,
         })
         .from(mediaAssets)
         .innerJoin(deliverables, eq(mediaAssets.deliverableId, deliverables.id))
         .innerJoin(deals, eq(deliverables.dealId, deals.id))
         .where(eq(deals.userId, ctx.user.id));
+
+      const totalBytesUsed = Number(result?.totalBytes ?? 0);
+      const percentUsed = Math.min(
+        100,
+        Math.round((totalBytesUsed / STORAGE_LIMIT_BYTES) * 100),
+      );
+
+      return {
+        totalBytesUsed,
+        storageLimitBytes: STORAGE_LIMIT_BYTES,
+        percentUsed,
+        approachingLimit: percentUsed >= 80,
+      };
     } catch (error) {
       const pgCode = extractPgErrorCode(error);
+      const message =
+        pgCode === "42P01"
+          ? "Media tables are missing. Please run the latest migrations."
+          : "Could not load storage usage right now.";
 
-      // Gracefully handle schema drift when media_assets table/columns are missing.
-      if (pgCode === "42703" || pgCode === "42P01") {
-        return {
-          totalBytesUsed: 0,
-          storageLimitBytes: STORAGE_LIMIT_BYTES,
-          percentUsed: 0,
-          approachingLimit: false,
-        };
-      }
-
-      throw error;
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message,
+        cause: error,
+      });
     }
-
-    const safeTotalBytes = assetRows.reduce((total, row) => {
-      const size =
-        typeof row.fileSizeBytes === "number"
-          ? row.fileSizeBytes
-          : Number(row.fileSizeBytes);
-      return total + (Number.isFinite(size) ? size : 0);
-    }, 0);
-    const percentUsed = Math.min(
-      100,
-      Math.round((safeTotalBytes / STORAGE_LIMIT_BYTES) * 100),
-    );
-
-    return {
-      totalBytesUsed: safeTotalBytes,
-      storageLimitBytes: STORAGE_LIMIT_BYTES,
-      percentUsed,
-      approachingLimit: percentUsed >= 80,
-    };
   }),
 
   getScriptVersions: protectedProcedure

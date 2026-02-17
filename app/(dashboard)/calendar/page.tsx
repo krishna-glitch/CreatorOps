@@ -1,4 +1,15 @@
-import CalendarView from "@/src/components/calendar/CalendarView";
+import dynamic from "next/dynamic";
+
+const CalendarView = dynamic(
+  () => import("@/src/components/calendar/CalendarView"),
+  {
+    loading: () => (
+      <div className="rounded-2xl border dash-border dash-bg-card p-8 text-center dash-text-muted">
+        Loading calendar...
+      </div>
+    ),
+  },
+);
 
 export const metadata = {
   title: "Calendar | CreatorOps",
@@ -7,11 +18,11 @@ export const metadata = {
 
 export default function CalendarPage() {
   return (
-    <div className="flex h-full flex-col bg-slate-50">
-      <div className="border-b border-slate-200 bg-white px-6 py-4">
+    <div className="flex h-full flex-col dash-bg-panel">
+      <div className="border-b dash-border dash-bg-card px-6 py-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Calendar</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="text-2xl font-bold dash-text">Calendar</h1>
+          <p className="text-sm dash-text-muted">
             Manage your schedule, deadlines, and payments
           </p>
         </div>

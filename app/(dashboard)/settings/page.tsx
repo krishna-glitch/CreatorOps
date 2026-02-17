@@ -25,6 +25,13 @@ export default async function SettingsPage() {
   });
 
   const usage = await caller.mediaAssets.storageUsage();
+  const metadata = (user.user_metadata ?? {}) as Record<string, unknown>;
+  const fullName =
+    (typeof metadata.full_name === "string" && metadata.full_name.trim().length > 0
+      ? metadata.full_name.trim()
+      : typeof metadata.name === "string" && metadata.name.trim().length > 0
+        ? metadata.name.trim()
+        : "") || undefined;
   
   return (
     <div className="mx-auto w-full max-w-2xl px-2 py-4">
@@ -36,7 +43,7 @@ export default async function SettingsPage() {
       </div>
 
       <SettingsClient 
-        user={{ email: user.email }}
+        user={{ email: user.email, fullName }}
         storageUsage={{
           usedMb: formatBytesToMb(usage.totalBytesUsed),
           limitGb: usage.storageLimitBytes / (1024 * 1024 * 1024),
@@ -47,4 +54,3 @@ export default async function SettingsPage() {
     </div>
   );
 }
-

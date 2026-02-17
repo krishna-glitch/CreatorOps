@@ -1,6 +1,7 @@
 // Auth reference (Supabase-managed)
 export { authUsers } from "./auth";
 // Tables
+export { clientErrorLogs } from "./clientErrorLogs";
 // Relations
 export { brands, brandsRelations } from "./brands";
 export { deals, dealsRelations } from "./deals";

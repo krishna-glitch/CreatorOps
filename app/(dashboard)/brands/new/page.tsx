@@ -47,11 +47,9 @@ export default function NewBrandPage() {
   const trpcUtils = trpc.useUtils();
 
   const createBrandMutation = trpc.brands.create.useMutation({
-    onSuccess: async () => {
-      await Promise.all([
-        trpcUtils.brands.list.invalidate(),
-        trpcUtils.analytics.getDashboardStats.invalidate(),
-      ]);
+    onSuccess: () => {
+      void trpcUtils.brands.list.invalidate();
+      void trpcUtils.analytics.getDashboardStats.invalidate();
       toast.success("Brand created successfully.", { duration: 3000 });
       router.push("/brands");
     },

@@ -84,22 +84,24 @@ export const notificationsRouter = createTRPCRouter({
   unsubscribe: protectedProcedure
     .input(
       z.object({
-        endpoint: z.string().url(),
+        endpoint: z.string().url().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      const whereClause = input.endpoint
+        ? and(
+            eq(pushSubscriptions.endpoint, input.endpoint),
+            eq(pushSubscriptions.userId, ctx.user.id),
+          )
+        : eq(pushSubscriptions.userId, ctx.user.id);
+
       await ctx.db
         .update(pushSubscriptions)
         .set({
           isActive: false,
           updatedAt: new Date(),
         })
-        .where(
-          and(
-            eq(pushSubscriptions.endpoint, input.endpoint),
-            eq(pushSubscriptions.userId, ctx.user.id),
-          ),
-        );
+        .where(whereClause);
 
       return {
         ok: true,

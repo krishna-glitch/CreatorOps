@@ -78,7 +78,7 @@ export function MobileHeader({ userEmail }: { userEmail?: string | null }) {
           <DialogHeader className="dash-mobile-drawer-header border-b p-4">
             <DialogTitle className="flex items-center gap-2">
               <Package2 className="dash-mobile-brand-icon h-6 w-6" />
-              <span>CreatorOps</span>
+              <span className="gold-text">CreatorOps</span>
             </DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto" onClick={() => setOpen(false)}>
@@ -104,7 +104,7 @@ export function MobileHeader({ userEmail }: { userEmail?: string | null }) {
       
       <Link href="/dashboard" className="flex flex-1 items-center justify-center gap-2 font-semibold">
         <Package2 className="dash-mobile-brand-icon h-6 w-6" />
-        <span className="text-lg tracking-tight">CreatorOps</span>
+        <span className="gold-text text-lg tracking-tight">CreatorOps</span>
       </Link>
 
       <div className="flex items-center gap-1">

@@ -13,20 +13,29 @@ import {
   Info,
   LogOut,
   ExternalLink,
-  Coins
+  Coins,
+  Bell,
+  Check,
+  X
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { usePWA } from "@/src/hooks/usePWA";
 import { cn } from "@/lib/utils";
 import { LogoutButton } from "@/components/logout-button";
 import { Badge } from "@/components/ui/badge";
+import { createClient } from "@/lib/supabase/client";
 import { useDefaultCurrency } from "@/src/hooks/useDefaultCurrency";
+import { requestNotificationPermission, getStoredPermissionStatus } from "@/src/lib/notifications/requestPermission";
+import { getAppNotificationsEnabled, setAppNotificationsEnabled } from "@/src/lib/notifications/preferences";
+import { trpc } from "@/lib/trpc/client";
 
 type SettingsClientProps = {
   user: {
     email?: string;
+    fullName?: string;
   };
   storageUsage: {
     usedMb: number;
@@ -36,10 +45,176 @@ type SettingsClientProps = {
   };
 };
 
+function normalizeDisplayName(value: string) {
+  return value.replace(/\s+/g, " ").trim();
+}
+
 export function SettingsClient({ user, storageUsage }: SettingsClientProps) {
   const { canInstall, isInstalled, isOffline, install } = usePWA();
   const [theme, setTheme] = useState<string>("system");
   const { defaultCurrency, setDefaultCurrency } = useDefaultCurrency();
+  const [profileName, setProfileName] = useState<string>(user.fullName ?? "");
+  const [savedProfileName, setSavedProfileName] = useState<string>(user.fullName ?? "");
+  const [savingProfileName, setSavingProfileName] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [notifPermission, setNotifPermission] = useState<string>(
+    () => getStoredPermissionStatus() || "default",
+  );
+  const [appNotifEnabled, setAppNotifEnabledState] = useState<boolean>(
+    () => getAppNotificationsEnabled(),
+  );
+  const [notifBusy, setNotifBusy] = useState(false);
+  const utils = trpc.useUtils();
+  const vapidQuery = trpc.notifications.getVapidPublicKey.useQuery(undefined, {
+    staleTime: 60 * 60 * 1000, // 1 hour
+    gcTime: 24 * 60 * 60 * 1000, // 24 hours
+  });
+  const subscribeMutation = trpc.notifications.subscribe.useMutation({
+    onSuccess: async () => {
+      await utils.notifications.status.invalidate();
+    },
+  });
+  const unsubscribeMutation = trpc.notifications.unsubscribe.useMutation({
+    onSuccess: async () => {
+      await utils.notifications.status.invalidate();
+    },
+  });
+  const supabase = createClient();
+
+  const handleProfileNameSave = async () => {
+    const normalizedName = normalizeDisplayName(profileName);
+
+    if (normalizedName.length === 0) {
+      toast.error("Name cannot be empty.");
+      return;
+    }
+
+    setSavingProfileName(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          full_name: normalizedName,
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      setProfileName(normalizedName);
+      setSavedProfileName(normalizedName);
+      setIsEditingName(false);
+      toast.success("Display name updated.");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Could not update display name.";
+      toast.error(message);
+    } finally {
+      setSavingProfileName(false);
+    }
+  };
+
+  const urlBase64ToUint8Array = (base64String: string) => {
+    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const rawData = atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; i += 1) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  };
+
+  const handleNotificationToggle = async () => {
+    if (notifBusy) return;
+    setNotifBusy(true);
+
+    try {
+      if (appNotifEnabled) {
+        let subscriptionEndpoint: string | undefined;
+        let subscription: PushSubscription | null = null;
+
+        if ("serviceWorker" in navigator) {
+          const registration = await navigator.serviceWorker.ready;
+          subscription = await registration.pushManager.getSubscription();
+          subscriptionEndpoint = subscription?.endpoint;
+        }
+
+        // Disable on server even if browser subscription is missing/inconsistent.
+        if (subscriptionEndpoint) {
+          await unsubscribeMutation.mutateAsync({ endpoint: subscriptionEndpoint });
+        } else {
+          await unsubscribeMutation.mutateAsync({});
+        }
+
+        if (subscription) {
+          await subscription.unsubscribe();
+        }
+
+        setAppNotificationsEnabled(false);
+        setAppNotifEnabledState(false);
+        toast.success("Notifications turned off.");
+        return;
+      }
+
+      if (notifPermission === "denied") {
+        toast.error("Notifications are blocked in browser settings.");
+        return;
+      }
+
+      if (!("serviceWorker" in navigator)) {
+        toast.error("Service workers are not supported on this browser.");
+        return;
+      }
+
+      const permission = await requestNotificationPermission();
+      setNotifPermission(permission);
+      if (permission !== "granted") {
+        if (permission === "denied") {
+          toast.error("Notifications are blocked in browser settings.");
+        }
+        return;
+      }
+
+      const publicKey = vapidQuery.data?.publicKey;
+      if (!publicKey) {
+        toast.error("Push notifications are not configured yet.");
+        return;
+      }
+
+      const registration = await navigator.serviceWorker.ready;
+      let subscription = await registration.pushManager.getSubscription();
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey),
+        });
+      }
+
+      const raw = subscription.toJSON();
+      if (!raw.endpoint || !raw.keys?.p256dh || !raw.keys?.auth) {
+        throw new Error("Invalid push subscription payload.");
+      }
+
+      await subscribeMutation.mutateAsync({
+        endpoint: raw.endpoint,
+        keys: {
+          p256dh: raw.keys.p256dh,
+          auth: raw.keys.auth,
+        },
+      });
+
+      setAppNotificationsEnabled(true);
+      setAppNotifEnabledState(true);
+      toast.success("Notifications enabled.");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Could not update notifications.";
+      toast.error(message);
+    } finally {
+      setNotifBusy(false);
+    }
+  };
 
   const resolveThemeMode = (preference: string): "light" | "dark" => {
     if (preference === "light" || preference === "dark") {
@@ -59,11 +234,15 @@ export function SettingsClient({ user, storageUsage }: SettingsClientProps) {
 
   const applyThemePreference = (preference: string) => {
     const root = document.documentElement;
+    const body = document.body;
     const resolved = resolveThemeMode(preference);
 
     root.classList.toggle("dark", resolved === "dark");
+    body.classList.toggle("dark", resolved === "dark");
     root.setAttribute("data-theme", resolved);
+    body.setAttribute("data-theme", resolved);
     root.style.colorScheme = resolved;
+    body.style.colorScheme = resolved;
   };
 
   useEffect(() => {
@@ -80,6 +259,11 @@ export function SettingsClient({ user, storageUsage }: SettingsClientProps) {
       applyThemePreference("system");
     }
   }, []);
+
+  useEffect(() => {
+    setProfileName(user.fullName ?? "");
+    setSavedProfileName(user.fullName ?? "");
+  }, [user.fullName]);
 
   const handleThemeChange = (newTheme: string) => {
     const safeTheme =
@@ -128,7 +312,7 @@ export function SettingsClient({ user, storageUsage }: SettingsClientProps) {
       {/* Account Section */}
       <section className="space-y-3">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">Account</h2>
-        <div className="rounded-2xl border dash-border bg-white dark:bg-gray-950 overflow-hidden">
+        <div className="rounded-2xl border dash-border dash-bg-card overflow-hidden">
           <div className="flex items-center gap-4 p-4 border-b dash-border">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
               <User className="h-6 w-6" />
@@ -139,16 +323,84 @@ export function SettingsClient({ user, storageUsage }: SettingsClientProps) {
             </div>
             <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800">Free Plan</Badge>
           </div>
+
+          <div className="flex items-center justify-between p-4 border-b dash-border">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="p-2 rounded-lg bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
+                <User className="h-5 w-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium">Display Name</p>
+                {isEditingName ? (
+                  <div className="mt-2 flex items-center gap-2 max-w-sm">
+                    <Input
+                      value={profileName}
+                      onChange={(event) => setProfileName(event.target.value)}
+                      placeholder="Enter your name"
+                      className="h-9 text-sm"
+                      maxLength={80}
+                      autoFocus
+                    />
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground truncate">
+                    {profileName || "Not set"}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 ml-4">
+              {isEditingName ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground"
+                    onClick={() => {
+                      setIsEditingName(false);
+                      setProfileName(savedProfileName);
+                    }}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    className="h-8 w-8 dash-shell-primary-btn"
+                    onClick={handleProfileNameSave}
+                    loading={savingProfileName}
+                    disabled={normalizeDisplayName(profileName) === savedProfileName || normalizeDisplayName(profileName).length === 0}
+                  >
+                    <Check className="h-4 w-4" />
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-3 text-xs font-medium"
+                  onClick={() => setIsEditingName(true)}
+                >
+                  Edit
+                </Button>
+              )}
+            </div>
+          </div>
+
           <div className="p-2">
              <LogoutButton className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20" />
           </div>
         </div>
+        {!isEditingName && (
+          <p className="px-1 text-[10px] text-muted-foreground italic">
+            Dashboard greeting uses your first name.
+          </p>
+        )}
       </section>
 
       {/* App & PWA Section */}
       <section className="space-y-3">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">App Settings</h2>
-        <div className="rounded-2xl border dash-border bg-white dark:bg-gray-950 divide-y dash-border">
+        <div className="rounded-2xl border dash-border dash-bg-card divide-y dash-border">
           {/* PWA Status */}
           <div className="flex items-center justify-between p-4">
             <div className="flex items-center gap-3">
@@ -189,6 +441,75 @@ export function SettingsClient({ user, storageUsage }: SettingsClientProps) {
             <div className={cn("h-2 w-2 rounded-full", isOffline ? "bg-red-500" : "bg-emerald-500")} />
           </div>
 
+          {/* Notifications */}
+          <div className="flex items-center justify-between p-4">
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                "p-2 rounded-lg",
+                notifPermission === "granted" && appNotifEnabled ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30" : 
+                notifPermission === "denied" ? "bg-rose-100 text-rose-600 dark:bg-rose-900/30" :
+                "bg-blue-100 text-blue-600 dark:bg-blue-900/30"
+              )}>
+                <Bell className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">Notifications</p>
+                <p className="text-xs text-muted-foreground">
+                  {notifPermission === "denied"
+                      ? "Blocked in browser settings" 
+                    : notifPermission === "granted" && appNotifEnabled
+                      ? "Enabled for alerts & updates"
+                    : notifPermission === "granted"
+                      ? "Muted in app (browser permission still granted)"
+                      : "Permission not yet requested"}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={appNotifEnabled && notifPermission === "granted"}
+                aria-label="Toggle notifications"
+                onClick={handleNotificationToggle}
+                disabled={notifBusy || subscribeMutation.isPending || unsubscribeMutation.isPending}
+                className={cn(
+                  "relative inline-flex h-8 w-14 items-center rounded-full transition-colors duration-200",
+                  appNotifEnabled && notifPermission === "granted"
+                    ? "bg-emerald-500"
+                    : "dash-bg-panel",
+                  (notifBusy || subscribeMutation.isPending || unsubscribeMutation.isPending) && "opacity-60",
+                )}
+              >
+                <span
+                  className={cn(
+                    "inline-block h-6 w-6 transform rounded-full bg-white shadow transition-transform duration-200",
+                    appNotifEnabled && notifPermission === "granted"
+                      ? "translate-x-7"
+                      : "translate-x-1",
+                  )}
+                />
+              </button>
+              {notifPermission === "denied" && (
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={() => toast.info("How to re-enable", {
+                    description: "Tap the icon in your browser address bar (usually a lock or settings icon) to reset notification permissions."
+                  })}
+                  className="h-8 text-[10px] uppercase border-rose-200 text-rose-600 hover:bg-rose-50"
+                >
+                  Blocked
+                </Button>
+              )}
+              {notifPermission === "granted" && appNotifEnabled && (
+                <Badge variant="outline" className="text-[10px] uppercase text-emerald-600 border-emerald-200 bg-emerald-50">
+                  Active
+                </Badge>
+              )}
+            </div>
+          </div>
+
           {/* Appearance */}
           <div className="p-4 space-y-3">
             <div className="flex items-center gap-3 mb-1">
@@ -197,7 +518,7 @@ export function SettingsClient({ user, storageUsage }: SettingsClientProps) {
               </div>
               <p className="text-sm font-medium">Appearance</p>
             </div>
-            <div className="grid grid-cols-3 gap-2 p-1 bg-gray-100 dark:bg-gray-900 rounded-xl">
+            <div className="grid grid-cols-3 gap-2 p-1 dash-bg-panel rounded-xl">
               {[
                 { id: "light", icon: Sun, label: "Light" },
                 { id: "dark", icon: Moon, label: "Dark" },
@@ -209,8 +530,8 @@ export function SettingsClient({ user, storageUsage }: SettingsClientProps) {
                   className={cn(
                     "flex flex-col items-center gap-1.5 py-2 px-1 rounded-lg text-xs font-medium transition-all",
                     theme === item.id 
-                      ? "bg-white text-blue-600 shadow-sm dark:bg-gray-800 dark:text-blue-400" 
-                      : "text-muted-foreground hover:text-foreground"
+                      ? "dash-bg-card gold-text shadow-sm border dash-border"
+                      : "dash-text-muted hover:dash-text"
                   )}
                 >
                   <item.icon className="h-4 w-4" />
@@ -232,7 +553,7 @@ export function SettingsClient({ user, storageUsage }: SettingsClientProps) {
                 </p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 dark:bg-gray-900 rounded-xl">
+            <div className="grid grid-cols-2 gap-2 p-1 dash-bg-panel rounded-xl">
               {(["USD", "INR"] as const).map((currency) => (
                 <button
                   key={currency}
@@ -241,8 +562,8 @@ export function SettingsClient({ user, storageUsage }: SettingsClientProps) {
                   className={cn(
                     "py-2 px-1 rounded-lg text-xs font-medium transition-all",
                     defaultCurrency === currency
-                      ? "bg-white text-emerald-700 shadow-sm dark:bg-gray-800 dark:text-emerald-400"
-                      : "text-muted-foreground hover:text-foreground",
+                      ? "dash-bg-card gold-text shadow-sm border dash-border"
+                      : "dash-text-muted hover:dash-text",
                   )}
                 >
                   {currency}
@@ -256,7 +577,7 @@ export function SettingsClient({ user, storageUsage }: SettingsClientProps) {
       {/* Storage Section */}
       <section className="space-y-3">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">Storage</h2>
-        <div className="rounded-2xl border dash-border bg-white dark:bg-gray-950 p-4 space-y-4">
+        <div className="rounded-2xl border dash-border dash-bg-card p-4 space-y-4">
           <div className="flex justify-between items-end">
             <div>
               <p className="text-sm font-medium">Media Storage</p>
@@ -269,7 +590,7 @@ export function SettingsClient({ user, storageUsage }: SettingsClientProps) {
               {storageUsage.percentUsed}%
             </p>
           </div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+          <div className="h-2 w-full overflow-hidden rounded-full dash-bg-panel">
             <div
               className={cn(
                 "h-full transition-all",
@@ -290,10 +611,10 @@ export function SettingsClient({ user, storageUsage }: SettingsClientProps) {
       {/* Data Management Section */}
       <section className="space-y-3">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">Data & Privacy</h2>
-        <div className="rounded-2xl border dash-border bg-white dark:bg-gray-950 divide-y dash-border">
+        <div className="rounded-2xl border dash-border dash-bg-card divide-y dash-border">
           <button 
             onClick={handleExport}
-            className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
+            className="w-full flex items-center justify-between p-4 text-left hover:bg-[var(--shell-panel-bg)] transition-colors"
           >
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
@@ -309,7 +630,7 @@ export function SettingsClient({ user, storageUsage }: SettingsClientProps) {
 
           <button 
             onClick={handleClearCache}
-            className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
+            className="w-full flex items-center justify-between p-4 text-left hover:bg-[var(--shell-panel-bg)] transition-colors"
           >
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
@@ -326,7 +647,7 @@ export function SettingsClient({ user, storageUsage }: SettingsClientProps) {
 
       {/* About Section */}
       <section className="space-y-3">
-        <div className="rounded-2xl border dash-border bg-white dark:bg-gray-950 p-4">
+        <div className="rounded-2xl border dash-border dash-bg-card p-4">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-2 rounded-lg bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
               <ShieldCheck className="h-5 w-5" />
@@ -337,8 +658,8 @@ export function SettingsClient({ user, storageUsage }: SettingsClientProps) {
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4 pt-2 border-t dash-border">
-            <a href="#" className="text-xs text-blue-600 hover:underline">Privacy Policy</a>
-            <a href="#" className="text-xs text-blue-600 hover:underline">Terms of Service</a>
+            <a href="#" className="text-xs dash-link hover:underline">Privacy Policy</a>
+            <a href="#" className="text-xs dash-link hover:underline">Terms of Service</a>
           </div>
         </div>
       </section>

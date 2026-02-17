@@ -59,6 +59,21 @@ export default function BrandDetailPage() {
     },
   });
 
+  const deleteBrandMutation = trpc.brands.delete.useMutation({
+    onSuccess: async () => {
+      await Promise.all([
+        trpcUtils.brands.list.invalidate(),
+        trpcUtils.deals.list.invalidate(),
+        trpcUtils.analytics.getDashboardStats.invalidate(),
+      ]);
+      toast.success("Brand deleted.", { duration: 3000 });
+      window.location.href = "/brands";
+    },
+    onError: (error) => {
+      toast.error(error.message || "Could not delete brand", { duration: 3000 });
+    },
+  });
+
   const handleStartEdit = () => {
     if (!brandQuery.data) {
       return;
@@ -82,6 +97,21 @@ export default function BrandDetailPage() {
       id: brandId,
       name: draftName,
     });
+  };
+
+  const handleDelete = () => {
+    if (!brandId || !brand) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete brand \"${brand.name}\"? This cannot be undone.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    deleteBrandMutation.mutate({ id: brandId });
   };
 
   if (!brandId) {
@@ -158,11 +188,30 @@ export default function BrandDetailPage() {
                 <button
                   type="button"
                   onClick={handleStartEdit}
-                  className={buttonVariants()}
+                  className={buttonVariants({ variant: "outline" })}
                 >
                   Edit
                 </button>
               )
+            ) : null}
+            {!isLoadingBrand && !brandError && brand ? (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={
+                  deleteBrandMutation.isPending ||
+                  updateBrandMutation.isPending ||
+                  associatedDeals.length > 0
+                }
+                className={buttonVariants({ variant: "destructive" })}
+                title={
+                  associatedDeals.length > 0
+                    ? "Delete associated deals before deleting this brand"
+                    : "Delete this brand"
+                }
+              >
+                {deleteBrandMutation.isPending ? "Deleting..." : "Delete"}
+              </button>
             ) : null}
           </div>
         </div>

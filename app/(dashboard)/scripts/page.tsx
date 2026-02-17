@@ -1,13 +1,25 @@
 "use client";
 
 import { FileText, Plus, Search, Share2, Trash2, X } from "lucide-react";
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { ScriptEditor } from "@/src/components/media/ScriptEditor";
+
+const ScriptEditor = dynamic(
+  () => import("@/src/components/media/ScriptEditor").then((mod) => mod.ScriptEditor),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="rounded-xl border dash-border p-6 text-sm dash-text-muted">
+        Loading editor...
+      </div>
+    ),
+  },
+);
 
 const NOOP_UPLOAD_ENDPOINT = "/api/script-drafts/upload";
 const FILES_STORAGE_KEY = "creatorops.scriptlab.files.v1";

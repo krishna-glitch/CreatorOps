@@ -16,7 +16,8 @@ import {
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import type { User } from "@supabase/supabase-js";
 
 const ResponsiveContainer = dynamic(
   () => import("recharts").then((mod) => mod.ResponsiveContainer),
@@ -47,6 +48,7 @@ import {
 } from "@/components/ui/table";
 import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
 import { DeadlineStateBadge } from "@/src/components/deliverables/DeadlineStateBadge";
 import {
   formatDayLabel,
@@ -61,6 +63,43 @@ import {
 
 function compactCurrency(value: number) {
   return formatDealCurrency(value, { currency: "USD", compact: true });
+}
+
+function readMetadataString(
+  metadata: Record<string, unknown>,
+  keys: string[],
+): string | null {
+  for (const key of keys) {
+    const value = metadata[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return null;
+}
+
+function firstToken(value: string) {
+  return value.trim().split(/\s+/)[0] ?? "";
+}
+
+function resolveDisplayName(user: User | null) {
+  if (!user) {
+    return "Creator";
+  }
+
+  const metadata = (user.user_metadata ?? {}) as Record<string, unknown>;
+  const fullName = readMetadataString(metadata, ["full_name", "name"]);
+  if (fullName) {
+    const firstNameFromFull = firstToken(fullName);
+    return firstNameFromFull.length > 0 ? firstNameFromFull : "Creator";
+  }
+
+  const firstName = readMetadataString(metadata, ["first_name", "given_name"]);
+  if (firstName) {
+    return firstToken(firstName);
+  }
+
+  return "Creator";
 }
 
 type TimelineItem = {
@@ -388,7 +427,7 @@ function QuickActionsCard() {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const utils = trpc.useUtils();
+  const [displayName, setDisplayName] = useState("Creator");
   const statsQuery = trpc.analytics.getDashboardStats.useQuery(undefined, {
     staleTime: 60_000,
     gcTime: 10 * 60_000,
@@ -444,11 +483,28 @@ export default function DashboardPage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [router]);
 
+  useEffect(() => {
+    let mounted = true;
+    const supabase = createClient();
+
+    void supabase.auth.getUser().then(({ data }) => {
+      if (!mounted) {
+        return;
+      }
+
+      setDisplayName(resolveDisplayName(data.user ?? null));
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   return (
     <div className="space-y-8">
       <section>
         <h2 className="font-serif text-3xl dash-text">
-          Welcome, <span className="gold-text italic">Creator</span>
+          Welcome, <span className="gold-text italic">{displayName}</span>
         </h2>
         <p className="dash-text-muted text-sm mt-1">
           Your midnight vault is secure and thriving.
@@ -616,25 +672,25 @@ export default function DashboardPage() {
                   <button
                     key={deal.id}
                     type="button"
-                    className="dash-inline-card flex items-center justify-between p-4 rounded-2xl border transition-colors hover:opacity-95 cursor-pointer"
+                    className="dash-inline-card w-full flex items-center justify-between p-4 rounded-2xl border transition-colors hover:opacity-95 cursor-pointer text-left"
                     onClick={() => router.push(`/deals/${deal.id}`)}
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
                       <div className="w-10 h-10 rounded-xl pillowy-card flex items-center justify-center">
                         <span className="icon-3d-gold">
                           <Wallet className="w-5 h-5 dash-link" />
                         </span>
                       </div>
-                      <div>
-                        <p className="text-sm font-bold dash-text">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold dash-text">
                           {deal.title}
                         </p>
-                        <p className="text-[10px] dash-text-muted">
+                        <p className="truncate text-[10px] dash-text-muted">
                           {deal.brandName}
                         </p>
                       </div>
                     </div>
-                    <div className="text-right">
+                    <div className="ml-3 shrink-0 text-right">
                       <p className="text-sm font-bold gold-text">
                         {formatDealCurrency(Number(deal.totalValue ?? 0), {
                           currency: deal.currency,

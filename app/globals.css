@@ -1,30 +1,32 @@
 @import "tailwindcss";
+@import "react-big-calendar/lib/css/react-big-calendar.css";
+@import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
 @plugin '@tailwindcss/typography';
 @plugin '@tailwindcss/forms';
 
 @custom-variant dark (&:where(html.dark, html.dark *));
 
 :root {
-  --background: #eef2f8;
-  --foreground: #111827;
-  --card: #f5f7fb;
-  --card-foreground: #111827;
-  --popover: #f5f7fb;
-  --popover-foreground: #111827;
-  --primary: #111827;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #0f172a;
   --primary-foreground: #ffffff;
-  --secondary: #e9edf5;
-  --secondary-foreground: #111827;
-  --muted: #eef2f8;
-  --muted-foreground: #8b94a5;
-  --accent: #e9edf5;
-  --accent-foreground: #111827;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #0f172a;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --accent: #f1f5f9;
+  --accent-foreground: #0f172a;
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
-  --border: rgba(255, 255, 255, 0.88);
-  --input: rgba(255, 255, 255, 0.9);
+  --border: #e2e8f0;
+  --input: #e2e8f0;
   --ring: #be9124;
-  --radius: 0.5rem;
+  --radius: 0.75rem;
 
   /* Z-Index Scale */
   --z-nav: 40;
@@ -34,39 +36,40 @@
   --z-toast: 80;
   --z-max: 100;
 
-  --shell-text: #111827;
-  --shell-text-muted: #8b94a5;
-  --shell-text-soft: #a8afbf;
-  --shell-card-bg: #f5f7fb;
-  --shell-panel-bg: rgba(245, 247, 251, 0.92);
-  --shell-panel-hover: rgba(255, 255, 255, 0.98);
-  --shell-border: rgba(255, 255, 255, 0.9);
-  --shell-border-soft: rgba(255, 255, 255, 0.8);
-  --shell-shadow: 0 12px 26px rgba(181, 191, 208, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  --shell-gold: #be9124;
-  --shell-gold-soft: rgba(190, 145, 36, 0.14);
-  --shell-chart-grid: rgba(139, 148, 165, 0.28);
-  --shell-chart-cursor: rgba(190, 145, 36, 0.12);
-  --shell-avatar-bg: #d5dbe7;
-  --shell-avatar-inner-from: #f1f5fb;
-  --shell-avatar-inner-to: #c8d2e2;
+  --shell-text: #0f172a;
+  --shell-text-muted: #475569;
+  --shell-text-soft: #64748b;
+  --shell-card-bg: #ffffff;
+  --shell-panel-bg: #f1f5f9;
+  --shell-panel-hover: #e2e8f0;
+  --shell-border: #e2e8f0;
+  --shell-border-soft: #cbd5e1;
+  --shell-shadow: 0 4px 12px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.1);
+  --shell-shadow-pressed: inset 2px 2px 4px rgba(0, 0, 0, 0.06), inset -2px -2px 4px rgba(255, 255, 255, 0.8);
+  --shell-gold: #926c15;
+  --shell-gold-soft: rgba(146, 108, 21, 0.1);
+  --shell-chart-grid: #e2e8f0;
+  --shell-chart-cursor: rgba(146, 108, 21, 0.05);
+  --shell-avatar-bg: #e2e8f0;
+  --shell-avatar-inner-from: #f8fafc;
+  --shell-avatar-inner-to: #e2e8f0;
 
-  --shell-tone-green-bg: rgba(34, 197, 94, 0.15);
-  --shell-tone-green-border: rgba(34, 197, 94, 0.28);
+  --shell-tone-green-bg: #f0fdf4;
+  --shell-tone-green-border: #bbf7d0;
   --shell-tone-green-text: #15803d;
-  --shell-tone-yellow-bg: rgba(245, 158, 11, 0.15);
-  --shell-tone-yellow-border: rgba(245, 158, 11, 0.28);
-  --shell-tone-yellow-text: #b45309;
-  --shell-tone-red-bg: rgba(244, 63, 94, 0.15);
-  --shell-tone-red-border: rgba(244, 63, 94, 0.28);
-  --shell-tone-red-text: #be123c;
-  --shell-tone-blue-bg: rgba(59, 130, 246, 0.15);
-  --shell-tone-blue-border: rgba(59, 130, 246, 0.28);
+  --shell-tone-yellow-bg: #fefce8;
+  --shell-tone-yellow-border: #fef08a;
+  --shell-tone-yellow-text: #a16207;
+  --shell-tone-red-bg: #fef2f2;
+  --shell-tone-red-border: #fecaca;
+  --shell-tone-red-text: #b91c1c;
+  --shell-tone-blue-bg: #eff6ff;
+  --shell-tone-blue-border: #bfdbfe;
   --shell-tone-blue-text: #1d4ed8;
-  --shell-warn-bg: rgba(245, 158, 11, 0.12);
-  --shell-warn-border: rgba(245, 158, 11, 0.24);
-  --shell-danger-bg: rgba(244, 63, 94, 0.12);
-  --shell-danger-border: rgba(244, 63, 94, 0.24);
+  --shell-warn-bg: #fffbeb;
+  --shell-warn-border: #fef3c7;
+  --shell-danger-bg: #fff1f2;
+  --shell-danger-border: #ffe4e6;
 
   --shell-font-serif: var(--font-playfair), "Times New Roman", serif;
   --shell-font-sans: var(--font-plus-jakarta), var(--font-geist-sans), Arial, Helvetica, sans-serif;
@@ -102,6 +105,7 @@ html.dark:root {
   --shell-border: rgba(212, 175, 55, 0.22);
   --shell-border-soft: rgba(212, 175, 55, 0.14);
   --shell-shadow: 0 12px 28px rgba(0, 0, 0, 0.48), inset 0 1px 0 rgba(212, 175, 55, 0.12);
+  --shell-shadow-pressed: inset 6px 6px 12px rgba(0, 0, 0, 0.45), inset -2px -2px 8px rgba(212, 175, 55, 0.05);
   --shell-gold: #d4af37;
   --shell-gold-soft: rgba(212, 175, 55, 0.14);
   --shell-chart-grid: rgba(212, 175, 55, 0.18);
@@ -171,41 +175,7 @@ body {
 }
 
 .dashboard-shell {
-  --background: #000000;
-  --foreground: #ededed;
-  --card: #0a0a0a;
-  --card-foreground: #ededed;
-  --popover: #0a0a0a;
-  --popover-foreground: #ededed;
-  --primary: #ededed;
-  --primary-foreground: #0a0a0a;
-  --secondary: #121212;
-  --secondary-foreground: #ededed;
-  --muted: #121212;
-  --muted-foreground: #94979f;
-  --accent: #121212;
-  --accent-foreground: #ededed;
-  --destructive: #7f1d1d;
-  --destructive-foreground: #ededed;
-  --border: rgba(212, 175, 55, 0.22);
-  --input: rgba(212, 175, 55, 0.14);
-  --ring: #d4af37;
-  --shell-text: #f4f4f5;
-  --shell-text-muted: #94979f;
-  --shell-text-soft: #adb0b8;
-  --shell-card-bg: linear-gradient(145deg, #131313, #060606);
-  --shell-panel-bg: #0a0a0a;
-  --shell-panel-hover: #101010;
-  --shell-border: rgba(212, 175, 55, 0.22);
-  --shell-border-soft: rgba(212, 175, 55, 0.14);
-  --shell-shadow: 0 12px 28px rgba(0, 0, 0, 0.48), inset 0 1px 0 rgba(212, 175, 55, 0.12);
-  --shell-gold: #d4af37;
-  --shell-gold-soft: rgba(212, 175, 55, 0.14);
-  --shell-chart-grid: rgba(212, 175, 55, 0.18);
-  --shell-chart-cursor: rgba(212, 175, 55, 0.18);
-  --shell-avatar-bg: #121212;
-  --shell-avatar-inner-from: #1b1b1b;
-  --shell-avatar-inner-to: #000000;
+  /* Themed via :root and html.dark:root variables */
 }
 
 h1.dash-title {
@@ -340,7 +310,7 @@ h1.dash-title {
 }
 .pillowy-card-pressed {
   background: var(--shell-panel-bg);
-  box-shadow: inset 6px 6px 12px rgba(0, 0, 0, 0.45), inset -2px -2px 8px rgba(212, 175, 55, 0.05);
+  box-shadow: var(--shell-shadow-pressed);
   border-radius: 24px;
 }
 .icon-3d-gold {
@@ -354,192 +324,124 @@ h1.dash-title {
   box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.2);
 }
 
-/* Legacy utility bridge for non-migrated dashboard routes */
-.dashboard-shell [class~="bg-white"],
-.dashboard-shell [class~="bg-gray-50"],
-.dashboard-shell [class~="bg-gray-100"],
-.dashboard-shell [class~="bg-gray-200"],
-.dashboard-shell [class~="bg-slate-50"],
-.dashboard-shell [class~="bg-slate-100"],
-.dashboard-shell [class~="bg-gray-50/70"],
-.dashboard-shell [class~="dark:bg-gray-950"] {
-  background: var(--shell-card-bg);
-}
-
-.dashboard-shell [class~="bg-gray-800"],
-.dashboard-shell [class~="bg-gray-900"],
-.dashboard-shell [class~="bg-gray-900/30"],
-.dashboard-shell [class~="bg-gray-900/40"],
-.dashboard-shell [class~="bg-gray-950"],
-.dashboard-shell [class~="bg-slate-800"],
-.dashboard-shell [class~="bg-slate-900"] {
-  background: var(--shell-panel-bg);
-}
-
-.dashboard-shell [class~="border-gray-100"],
-.dashboard-shell [class~="border-gray-200"],
-.dashboard-shell [class~="border-gray-300"],
-.dashboard-shell [class~="border-gray-700"],
-.dashboard-shell [class~="border-gray-800"],
-.dashboard-shell [class~="border-gray-900"],
-.dashboard-shell [class~="border-slate-200"],
-.dashboard-shell [class~="border-slate-200/70"],
-.dashboard-shell [class~="border-slate-200/80"],
-.dashboard-shell [class~="border-slate-300"],
-.dashboard-shell [class~="border-slate-700"],
-.dashboard-shell [class~="border-slate-800"],
-.dashboard-shell [class~="border-slate-900"],
-.dashboard-shell [class~="dark:border-gray-800"],
-.dashboard-shell [class~="dark:border-slate-800"],
-.dashboard-shell [class~="dark:border-gray-700"] {
-  border-color: var(--shell-border-soft);
-}
-
-.dashboard-shell [class~="text-gray-900"],
-.dashboard-shell [class~="text-slate-900"],
-.dashboard-shell [class~="text-white"] {
-  color: var(--shell-text);
-}
-
-.dashboard-shell [class~="text-gray-700"],
-.dashboard-shell [class~="text-gray-500"],
-.dashboard-shell [class~="text-gray-200"],
-.dashboard-shell [class~="text-slate-700"],
-.dashboard-shell [class~="text-slate-600"],
-.dashboard-shell [class~="text-slate-500"],
-.dashboard-shell [class~="text-slate-400"],
-.dashboard-shell [class~="text-slate-200"] {
-  color: var(--shell-text-muted);
-}
-
-.dashboard-shell [class~="bg-amber-50"],
-.dashboard-shell [class~="bg-amber-100"],
-.dashboard-shell [class~="bg-amber-900/40"],
-.dashboard-shell [class~="bg-amber-950/40"],
-.dashboard-shell [class~="bg-yellow-50"],
-.dashboard-shell [class~="bg-yellow-100"],
-.dashboard-shell [class~="bg-yellow-900/20"],
-.dashboard-shell [class~="bg-yellow-900/40"],
-.dashboard-shell [class~="bg-yellow-950/40"] {
-  background: var(--shell-tone-yellow-bg);
-}
-
-.dashboard-shell [class~="border-amber-200"],
-.dashboard-shell [class~="border-amber-900/60"],
-.dashboard-shell [class~="border-yellow-200"],
-.dashboard-shell [class~="border-yellow-900/40"] {
-  border-color: var(--shell-tone-yellow-border);
-}
-
-.dashboard-shell [class~="text-amber-100"],
-.dashboard-shell [class~="text-amber-300"],
-.dashboard-shell [class~="text-amber-600"],
-.dashboard-shell [class~="text-amber-700"],
-.dashboard-shell [class~="text-amber-800"],
-.dashboard-shell [class~="text-amber-900"],
-.dashboard-shell [class~="text-yellow-200"],
-.dashboard-shell [class~="text-yellow-300"],
-.dashboard-shell [class~="text-yellow-700"],
-.dashboard-shell [class~="text-yellow-800"] {
-  color: var(--shell-tone-yellow-text);
-}
-
-.dashboard-shell [class~="bg-red-50"],
-.dashboard-shell [class~="bg-red-100"],
-.dashboard-shell [class~="bg-red-900/40"],
-.dashboard-shell [class~="bg-red-950/40"] {
-  background: var(--shell-tone-red-bg);
-}
-
-.dashboard-shell [class~="border-red-300"],
-.dashboard-shell [class~="border-red-900/70"] {
-  border-color: var(--shell-tone-red-border);
-}
-
-.dashboard-shell [class~="text-red-200"],
-.dashboard-shell [class~="text-red-300"],
-.dashboard-shell [class~="text-red-600"],
-.dashboard-shell [class~="text-red-700"] {
-  color: var(--shell-tone-red-text);
-}
-
-.dashboard-shell [class~="bg-green-50"],
-.dashboard-shell [class~="bg-green-100"],
-.dashboard-shell [class~="bg-green-900/40"] {
-  background: var(--shell-tone-green-bg);
-}
-
-.dashboard-shell [class~="border-green-200"] {
-  border-color: var(--shell-tone-green-border);
-}
-
-.dashboard-shell [class~="text-green-300"],
-.dashboard-shell [class~="text-green-700"] {
-  color: var(--shell-tone-green-text);
-}
-
-.dashboard-shell [class~="bg-blue-100"] {
-  background: var(--shell-tone-blue-bg);
-}
-
-.dashboard-shell [class~="border-blue-200"] {
-  border-color: var(--shell-tone-blue-border);
-}
-
-.dashboard-shell [class~="text-blue-600"],
-.dashboard-shell [class~="text-blue-700"] {
-  color: var(--shell-tone-blue-text);
-}
-
-/* Normalize old gradient utility stacks to shell surfaces */
-.dashboard-shell [class~="from-slate-50"],
-.dashboard-shell [class~="to-white"],
-.dashboard-shell [class~="dark:from-slate-950"],
-.dashboard-shell [class~="dark:to-slate-950"] {
-  --tw-gradient-from: var(--shell-card-bg) var(--tw-gradient-from-position);
-  --tw-gradient-to: color-mix(in srgb, var(--shell-card-bg) 95%, transparent) var(--tw-gradient-to-position);
-  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
-}
-
-/* High-specificity overrides for Tailwind dark surface classes still emitted in routes/components */
-.dashboard-shell .dark\:bg-gray-950,
-.dashboard-shell .bg-gray-950,
-.dashboard-shell .dark\:bg-gray-950\/40,
-.dashboard-shell .bg-gray-950\/40,
-.dashboard-shell .dark\:bg-gray-900\/30,
-.dashboard-shell .bg-gray-900\/30,
-.dashboard-shell .dark\:bg-gray-900\/40,
-.dashboard-shell .bg-gray-900\/40,
-.dashboard-shell .dark\:bg-gray-900,
-.dashboard-shell .bg-gray-900,
-.dashboard-shell .dark\:bg-gray-800,
-.dashboard-shell .bg-gray-800,
-.dashboard-shell .dark\:bg-slate-900,
-.dashboard-shell .bg-slate-900,
-.dashboard-shell .dark\:bg-slate-800,
-.dashboard-shell .bg-slate-800 {
-  background: var(--shell-panel-bg) !important;
-}
-
-.dashboard-shell .dark\:bg-white,
-.dashboard-shell .bg-white,
-.dashboard-shell .dark\:bg-gray-50,
-.dashboard-shell .bg-gray-50,
-.dashboard-shell .dark\:bg-slate-50,
-.dashboard-shell .bg-slate-50 {
-  background: var(--shell-card-bg) !important;
-}
-
-.dashboard-shell .dark\:border-gray-800,
-.dashboard-shell .border-gray-800,
-.dashboard-shell .border-gray-200,
-.dashboard-shell .border-slate-800,
-.dashboard-shell .border-slate-200 {
-  border-color: var(--shell-border-soft) !important;
-}
+/* Legacy utility bridge removed to prevent theme interference */
 
 @layer components {
   .touch-target {
     @apply min-h-[44px] min-w-[44px] flex items-center justify-center;
   }
+}
+
+/* Calendar fixes (react-big-calendar under dashboard skin) */
+.calendar-shell .rbc-calendar {
+  background: var(--shell-card-bg);
+  color: var(--shell-text);
+  font-family: var(--shell-font-sans);
+}
+
+.calendar-shell .rbc-toolbar {
+  display: none;
+}
+
+.calendar-shell .rbc-month-view,
+.calendar-shell .rbc-time-view,
+.calendar-shell .rbc-agenda-view {
+  border-color: var(--shell-border-soft);
+  background: var(--shell-card-bg);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.calendar-shell .rbc-header {
+  padding: 12px 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  color: var(--shell-text-muted);
+  border-bottom: 1px solid var(--shell-border-soft);
+}
+
+.calendar-shell .rbc-time-header-content,
+.calendar-shell .rbc-timeslot-group,
+.calendar-shell .rbc-day-bg,
+.calendar-shell .rbc-time-content > * + * > * {
+  border-color: var(--shell-border-soft);
+}
+
+.calendar-shell .rbc-month-row {
+  border-color: var(--shell-border-soft);
+}
+
+.calendar-shell .rbc-off-range-bg {
+  background: color-mix(in srgb, var(--shell-panel-bg) 40%, transparent);
+}
+
+.calendar-shell .rbc-today {
+  background: color-mix(in srgb, var(--shell-gold-soft) 25%, transparent);
+}
+
+.calendar-shell .rbc-event {
+  border: none;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  transition: transform 0.1s ease;
+}
+
+.calendar-shell .rbc-event:active {
+  transform: scale(0.98);
+}
+
+.calendar-shell .rbc-event-label {
+  font-size: 0.7rem;
+  opacity: 0.8;
+}
+
+.calendar-shell .rbc-event-content {
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.calendar-shell .rbc-show-more {
+  background: transparent;
+  color: var(--shell-gold);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.calendar-shell .rbc-label,
+.calendar-shell .rbc-date-cell,
+.calendar-shell .rbc-agenda-date-cell,
+.calendar-shell .rbc-agenda-time-cell {
+  color: var(--shell-text-muted);
+  padding: 4px 8px;
+}
+
+.calendar-shell .rbc-now.rbc-btn-now {
+  color: var(--shell-gold);
+  font-weight: bold;
+}
+
+.calendar-shell .rbc-agenda-view table.rbc-agenda-table {
+  border: 1px solid var(--shell-border-soft);
+}
+
+.calendar-shell .rbc-agenda-view table.rbc-agenda-table thead > tr > th {
+  border-bottom: 1px solid var(--shell-border-soft);
+  color: var(--shell-text);
+}
+
+.calendar-shell .rbc-agenda-view table.rbc-agenda-table tbody > tr > td {
+  border-color: var(--shell-border-soft);
+}
+
+/* Custom scrollbar for agenda and time views */
+.calendar-shell .rbc-time-content::-webkit-scrollbar,
+.calendar-shell .rbc-agenda-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.calendar-shell .rbc-time-content::-webkit-scrollbar-thumb,
+.calendar-shell .rbc-agenda-content::-webkit-scrollbar-thumb {
+  background-color: var(--shell-border-soft);
+  border-radius: 10px;
 }

@@ -20,6 +20,14 @@ type ReminderPushPayload = {
 
 let configured = false;
 
+function hasValue(value: string | undefined | null) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function looksLikeBase64Url(value: string) {
+  return /^[A-Za-z0-9_-]+$/.test(value);
+}
+
 function ensureConfigured() {
   if (configured) {
     return true;
@@ -29,17 +37,32 @@ function ensureConfigured() {
   const privateKey = process.env.VAPID_PRIVATE_KEY;
   const subject = process.env.VAPID_SUBJECT ?? "mailto:support@creatorops.local";
 
-  if (!publicKey || !privateKey) {
+  if (!hasValue(publicKey) || !hasValue(privateKey)) {
     return false;
   }
 
-  webpush.setVapidDetails(subject, publicKey, privateKey);
-  configured = true;
-  return true;
+  const trimmedPublic = (publicKey as string).trim();
+  const trimmedPrivate = (privateKey as string).trim();
+  if (!looksLikeBase64Url(trimmedPublic) || !looksLikeBase64Url(trimmedPrivate)) {
+    console.error("Invalid VAPID key format");
+    return false;
+  }
+
+  try {
+    webpush.setVapidDetails(subject, trimmedPublic, trimmedPrivate);
+    configured = true;
+    return true;
+  } catch (error) {
+    console.error("Invalid VAPID configuration for web push", error);
+    configured = false;
+    return false;
+  }
 }
 
 export function isWebPushConfigured() {
-  return ensureConfigured();
+  const publicKey = process.env.VAPID_PUBLIC_KEY;
+  const privateKey = process.env.VAPID_PRIVATE_KEY;
+  return hasValue(publicKey) && hasValue(privateKey);
 }
 
 export function getPublicVapidKey() {
@@ -103,10 +126,21 @@ export async function sendWebPushNotification(params: {
     throw new Error("Web push is not configured");
   }
 
+  const endpoint = params.subscription.endpoint?.trim();
+  const p256dh = params.subscription.keys?.p256dh?.trim();
+  const auth = params.subscription.keys?.auth?.trim();
+
+  if (!endpoint || !p256dh || !auth) {
+    throw new Error("Invalid push subscription payload");
+  }
+
   return webpush.sendNotification(
     {
-      endpoint: params.subscription.endpoint,
-      keys: params.subscription.keys,
+      endpoint,
+      keys: {
+        p256dh,
+        auth,
+      },
     },
     JSON.stringify(params.payload),
   );

@@ -1,8 +1,10 @@
 "use client";
 
+import { memo } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import { Settings, X } from "lucide-react";
 import { View, Views } from "react-big-calendar";
+import { cn } from "@/lib/utils";
 
 interface CalendarSettingsProps {
     preferences: {
@@ -14,36 +16,36 @@ interface CalendarSettingsProps {
     setPreference: (key: string, value: string | number | boolean) => void;
 }
 
-export function CalendarSettings({ preferences, setPreference }: CalendarSettingsProps) {
+export const CalendarSettings = memo(function CalendarSettings({ preferences, setPreference }: CalendarSettingsProps) {
     return (
         <Popover.Root>
             <Popover.Trigger asChild>
-                <button className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors">
+                <button className="p-2 dash-text-muted hover:dash-text hover:dash-bg-card rounded-full transition-colors">
                     <Settings className="w-5 h-5" />
                 </button>
             </Popover.Trigger>
 
             <Popover.Portal>
                 <Popover.Content
-                    className="w-72 bg-white rounded-lg shadow-xl border border-slate-200 p-4 z-50 animate-in fade-in zoom-in-95 duration-200"
+                    className="w-72 dash-bg-card rounded-2xl shadow-2xl border dash-border p-5 z-[var(--z-toast)] animate-in fade-in zoom-in-95 duration-200"
                     sideOffset={5}
                     align="end"
                 >
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-semibold text-slate-900">Calendar Settings</h3>
-                        <Popover.Close className="text-slate-400 hover:text-slate-600">
+                    <div className="flex items-center justify-between mb-6">
+                        <h3 className="font-serif font-bold text-lg gold-text">Preferences</h3>
+                        <Popover.Close className="dash-text-soft hover:dash-text p-1">
                             <X className="w-4 h-4" />
                         </Popover.Close>
                     </div>
 
-                    <div className="space-y-4">
+                    <div className="space-y-6">
                         {/* Default View */}
                         <div className="space-y-2">
-                            <label className="text-sm font-medium text-slate-700">Default View</label>
+                            <label className="text-[10px] uppercase font-bold tracking-widest dash-text-muted px-1">Default View</label>
                             <select
                                 value={preferences.defaultView}
                                 onChange={(e) => setPreference('defaultView', e.target.value)}
-                                className="w-full rounded-md border border-slate-300 text-sm py-1.5 px-2 focus:ring-2 focus:ring-brand-500 outline-none"
+                                className="w-full rounded-xl border dash-border dash-bg-panel dash-text text-sm py-2 px-3 focus:ring-2 focus:ring-[var(--shell-gold)] outline-none appearance-none cursor-pointer"
                             >
                                 <option value={Views.MONTH}>Month</option>
                                 <option value={Views.WEEK}>Week</option>
@@ -54,46 +56,55 @@ export function CalendarSettings({ preferences, setPreference }: CalendarSetting
 
                         {/* Week Starts On */}
                         <div className="space-y-2">
-                            <label className="text-sm font-medium text-slate-700">Week Starts On</label>
-                            <div className="flex rounded-md border border-slate-300 overflow-hidden">
+                            <label className="text-[10px] uppercase font-bold tracking-widest dash-text-muted px-1">Week Starts On</label>
+                            <div className="flex rounded-xl border dash-border overflow-hidden dash-bg-panel p-1">
                                 <button
                                     onClick={() => setPreference('weekStartsOn', 0)}
-                                    className={`flex-1 py-1.5 text-sm ${preferences.weekStartsOn === 0 ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-600 hover:bg-slate-50'}`}
+                                    className={cn(
+                                        "flex-1 py-2 text-xs font-bold rounded-lg transition-all",
+                                        preferences.weekStartsOn === 0 ? "bg-white dark:bg-white/10 shadow-sm gold-text" : "dash-text-muted hover:dash-text"
+                                    )}
                                 >
-                                    Sunday
+                                    Sun
                                 </button>
-                                <div className="w-px bg-slate-300" />
                                 <button
                                     onClick={() => setPreference('weekStartsOn', 1)}
-                                    className={`flex-1 py-1.5 text-sm ${preferences.weekStartsOn === 1 ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-600 hover:bg-slate-50'}`}
+                                    className={cn(
+                                        "flex-1 py-2 text-xs font-bold rounded-lg transition-all",
+                                        preferences.weekStartsOn === 1 ? "bg-white dark:bg-white/10 shadow-sm gold-text" : "dash-text-muted hover:dash-text"
+                                    )}
                                 >
-                                    Monday
+                                    Mon
                                 </button>
                             </div>
                         </div>
 
                         {/* Show Weekends */}
-                        <div className="flex items-center justify-between">
-                            <label className="text-sm font-medium text-slate-700">Show Weekends</label>
+                        <div className="flex items-center justify-between px-1">
+                            <label className="text-[10px] uppercase font-bold tracking-widest dash-text-muted">Show Weekends</label>
                             <button
                                 onClick={() => setPreference('showWeekends', !preferences.showWeekends)}
-                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 ${preferences.showWeekends ? 'bg-brand-600' : 'bg-slate-200'
-                                    }`}
+                                className={cn(
+                                    "relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none",
+                                    preferences.showWeekends ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-white/10'
+                                )}
                             >
                                 <span
-                                    className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${preferences.showWeekends ? 'translate-x-4.5' : 'translate-x-0.5'
-                                        }`}
+                                    className={cn(
+                                        "inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform",
+                                        preferences.showWeekends ? 'translate-x-5.5' : 'translate-x-1'
+                                    )}
                                 />
                             </button>
                         </div>
 
                         {/* Event Density */}
                         <div className="space-y-2">
-                            <label className="text-sm font-medium text-slate-700">Event Density</label>
+                            <label className="text-[10px] uppercase font-bold tracking-widest dash-text-muted px-1">Density</label>
                             <select
                                 value={preferences.eventDensity}
                                 onChange={(e) => setPreference('eventDensity', e.target.value)}
-                                className="w-full rounded-md border border-slate-300 text-sm py-1.5 px-2 focus:ring-2 focus:ring-brand-500 outline-none"
+                                className="w-full rounded-xl border dash-border dash-bg-panel dash-text text-sm py-2 px-3 focus:ring-2 focus:ring-[var(--shell-gold)] outline-none appearance-none cursor-pointer"
                             >
                                 <option value="compact">Compact</option>
                                 <option value="comfortable">Comfortable</option>
@@ -103,9 +114,9 @@ export function CalendarSettings({ preferences, setPreference }: CalendarSetting
 
                     </div>
 
-                    <Popover.Arrow className="fill-white" />
+                    <Popover.Arrow className="fill-border dark:fill-white/10" />
                 </Popover.Content>
             </Popover.Portal>
         </Popover.Root>
     );
-}
+});
