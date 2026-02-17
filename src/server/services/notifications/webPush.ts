@@ -62,7 +62,11 @@ function ensureConfigured() {
 export function isWebPushConfigured() {
   const publicKey = process.env.VAPID_PUBLIC_KEY;
   const privateKey = process.env.VAPID_PRIVATE_KEY;
-  return hasValue(publicKey) && hasValue(privateKey);
+  if (!hasValue(publicKey) || !hasValue(privateKey)) return false;
+  return (
+    looksLikeBase64Url((publicKey as string).trim()) &&
+    looksLikeBase64Url((privateKey as string).trim())
+  );
 }
 
 export function getPublicVapidKey() {

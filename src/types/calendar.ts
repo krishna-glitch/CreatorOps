@@ -4,6 +4,7 @@ export interface CalendarEvent {
     eventType: CalendarEventType;
     sourceId: string;
     dealId: string;
+    currency: "USD" | "INR";
     eventDate: Date;
     completedAt: Date | null;
     title: string;

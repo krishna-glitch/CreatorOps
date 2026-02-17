@@ -28,8 +28,9 @@ import { LogoutButton } from "@/components/logout-button";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/client";
 import { useDefaultCurrency } from "@/src/hooks/useDefaultCurrency";
-import { requestNotificationPermission, getStoredPermissionStatus } from "@/src/lib/notifications/requestPermission";
+import { requestNotificationPermission, getPermissionStatus } from "@/src/lib/notifications/requestPermission";
 import { getAppNotificationsEnabled, setAppNotificationsEnabled } from "@/src/lib/notifications/preferences";
+import { getReadyPushManager, isPushNotificationsSupported } from "@/src/lib/notifications/pushSupport";
 import { trpc } from "@/lib/trpc/client";
 
 type SettingsClientProps = {
@@ -49,8 +50,44 @@ function normalizeDisplayName(value: string) {
   return value.replace(/\s+/g, " ").trim();
 }
 
+function resolveThemeMode(preference: string): "light" | "dark" {
+  if (preference === "light" || preference === "dark") {
+    return preference;
+  }
+
+  const supportsMatchMedia =
+    typeof window !== "undefined" && typeof window.matchMedia === "function";
+  if (!supportsMatchMedia) {
+    return "dark";
+  }
+
+  return window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+}
+
+function applyThemePreference(preference: string) {
+  const root = document.documentElement;
+  const body = document.body;
+  const resolved = resolveThemeMode(preference);
+
+  root.classList.toggle("dark", resolved === "dark");
+  body.classList.toggle("dark", resolved === "dark");
+  root.setAttribute("data-theme", resolved);
+  body.setAttribute("data-theme", resolved);
+  root.style.colorScheme = resolved;
+  body.style.colorScheme = resolved;
+}
+
 export function SettingsClient({ user, storageUsage }: SettingsClientProps) {
-  const { canInstall, isInstalled, isOffline, install } = usePWA();
+  const {
+    canInstall,
+    isInstalled,
+    isOffline,
+    install,
+    isManualInstallSupported,
+    manualInstallHint,
+  } = usePWA();
   const [theme, setTheme] = useState<string>("system");
   const { defaultCurrency, setDefaultCurrency } = useDefaultCurrency();
   const [profileName, setProfileName] = useState<string>(user.fullName ?? "");
@@ -58,7 +95,7 @@ export function SettingsClient({ user, storageUsage }: SettingsClientProps) {
   const [savingProfileName, setSavingProfileName] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [notifPermission, setNotifPermission] = useState<string>(
-    () => getStoredPermissionStatus() || "default",
+    () => getPermissionStatus() || "default",
   );
   const [appNotifEnabled, setAppNotifEnabledState] = useState<boolean>(
     () => getAppNotificationsEnabled(),
@@ -134,10 +171,15 @@ export function SettingsClient({ user, storageUsage }: SettingsClientProps) {
         let subscriptionEndpoint: string | undefined;
         let subscription: PushSubscription | null = null;
 
-        if ("serviceWorker" in navigator) {
-          const registration = await navigator.serviceWorker.ready;
-          subscription = await registration.pushManager.getSubscription();
-          subscriptionEndpoint = subscription?.endpoint;
+        if (isPushNotificationsSupported()) {
+          try {
+            const pushManager = await getReadyPushManager();
+            subscription = await pushManager.getSubscription();
+            subscriptionEndpoint = subscription?.endpoint;
+          } catch {
+            subscription = null;
+            subscriptionEndpoint = undefined;
+          }
         }
 
         // Disable on server even if browser subscription is missing/inconsistent.
@@ -162,8 +204,8 @@ export function SettingsClient({ user, storageUsage }: SettingsClientProps) {
         return;
       }
 
-      if (!("serviceWorker" in navigator)) {
-        toast.error("Service workers are not supported on this browser.");
+      if (!isPushNotificationsSupported()) {
+        toast.error("Push notifications are not supported on this browser.");
         return;
       }
 
@@ -182,10 +224,10 @@ export function SettingsClient({ user, storageUsage }: SettingsClientProps) {
         return;
       }
 
-      const registration = await navigator.serviceWorker.ready;
-      let subscription = await registration.pushManager.getSubscription();
+      const pushManager = await getReadyPushManager();
+      let subscription = await pushManager.getSubscription();
       if (!subscription) {
-        subscription = await registration.pushManager.subscribe({
+        subscription = await pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(publicKey),
         });
@@ -214,35 +256,6 @@ export function SettingsClient({ user, storageUsage }: SettingsClientProps) {
     } finally {
       setNotifBusy(false);
     }
-  };
-
-  const resolveThemeMode = (preference: string): "light" | "dark" => {
-    if (preference === "light" || preference === "dark") {
-      return preference;
-    }
-
-    const supportsMatchMedia =
-      typeof window !== "undefined" && typeof window.matchMedia === "function";
-    if (!supportsMatchMedia) {
-      return "dark";
-    }
-
-    return window.matchMedia("(prefers-color-scheme: dark)").matches
-      ? "dark"
-      : "light";
-  };
-
-  const applyThemePreference = (preference: string) => {
-    const root = document.documentElement;
-    const body = document.body;
-    const resolved = resolveThemeMode(preference);
-
-    root.classList.toggle("dark", resolved === "dark");
-    body.classList.toggle("dark", resolved === "dark");
-    root.setAttribute("data-theme", resolved);
-    body.setAttribute("data-theme", resolved);
-    root.style.colorScheme = resolved;
-    body.style.colorScheme = resolved;
   };
 
   useEffect(() => {
@@ -410,13 +423,29 @@ export function SettingsClient({ user, storageUsage }: SettingsClientProps) {
               <div>
                 <p className="text-sm font-medium">Native App</p>
                 <p className="text-xs text-muted-foreground">
-                  {isInstalled ? "Already installed" : canInstall ? "Install for offline use" : "Run in standalone mode"}
+                  {isInstalled
+                    ? "Already installed"
+                    : canInstall
+                      ? "Install for offline use"
+                      : isManualInstallSupported
+                        ? "Install from browser menu"
+                        : "Run in standalone mode"}
                 </p>
               </div>
             </div>
             {canInstall && !isInstalled && (
               <Button size="sm" onClick={install} className="dash-shell-primary-btn h-8">
                 Install
+              </Button>
+            )}
+            {!canInstall && !isInstalled && isManualInstallSupported && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => toast.info(manualInstallHint ?? "Use browser menu to install this app.")}
+                className="h-8"
+              >
+                How to Install
               </Button>
             )}
             {isInstalled && (
@@ -612,7 +641,8 @@ export function SettingsClient({ user, storageUsage }: SettingsClientProps) {
       <section className="space-y-3">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">Data & Privacy</h2>
         <div className="rounded-2xl border dash-border dash-bg-card divide-y dash-border">
-          <button 
+          <button
+            type="button"
             onClick={handleExport}
             className="w-full flex items-center justify-between p-4 text-left hover:bg-[var(--shell-panel-bg)] transition-colors"
           >
@@ -628,7 +658,8 @@ export function SettingsClient({ user, storageUsage }: SettingsClientProps) {
             <ExternalLink className="h-4 w-4 text-muted-foreground" />
           </button>
 
-          <button 
+          <button
+            type="button"
             onClick={handleClearCache}
             className="w-full flex items-center justify-between p-4 text-left hover:bg-[var(--shell-panel-bg)] transition-colors"
           >
@@ -658,8 +689,8 @@ export function SettingsClient({ user, storageUsage }: SettingsClientProps) {
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4 pt-2 border-t dash-border">
-            <a href="#" className="text-xs dash-link hover:underline">Privacy Policy</a>
-            <a href="#" className="text-xs dash-link hover:underline">Terms of Service</a>
+            <a href="/privacy" className="text-xs dash-link hover:underline">Privacy Policy</a>
+            <a href="/terms" className="text-xs dash-link hover:underline">Terms of Service</a>
           </div>
         </div>
       </section>

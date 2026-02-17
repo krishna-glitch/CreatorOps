@@ -11,6 +11,8 @@ interface CalendarFiltersProps {
     setDate: (date: Date) => void;
     view: View;
     setView: (view: View) => void;
+    availableViews: View[];
+    compact?: boolean;
     filters: {
         eventTypes: string[];
         status: string;
@@ -23,6 +25,8 @@ export const CalendarFilters = memo(function CalendarFilters({
     setDate,
     view,
     setView,
+    availableViews,
+    compact = false,
     filters,
     setFilters,
 }: CalendarFiltersProps) {
@@ -73,11 +77,12 @@ export const CalendarFilters = memo(function CalendarFilters({
     }, [date, view]);
 
     return (
-        <div className="flex flex-col gap-4 p-4 dash-bg-card border-b dash-border">
+        <div className="flex flex-col gap-4 p-2 sm:p-4 dash-bg-card">
             {/* Top Row: Navigation & Main Controls */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
                     <button
+                        type="button"
                         onClick={() => handleNavigate('TODAY')}
                         className="px-3 py-1.5 text-xs font-bold uppercase tracking-widest gold-text hover:opacity-80 transition-opacity"
                     >
@@ -85,6 +90,7 @@ export const CalendarFilters = memo(function CalendarFilters({
                     </button>
                     <div className="flex items-center rounded-xl border dash-border bg-white dark:bg-black/20 shadow-sm overflow-hidden">
                         <button 
+                            type="button"
                             onClick={() => handleNavigate('PREV')} 
                             className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 dash-text-muted transition-colors"
                             aria-label="Previous"
@@ -93,6 +99,7 @@ export const CalendarFilters = memo(function CalendarFilters({
                         </button>
                         <div className="w-px h-4 bg-slate-200 dark:bg-white/10" />
                         <button 
+                            type="button"
                             onClick={() => handleNavigate('NEXT')} 
                             className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 dash-text-muted transition-colors"
                             aria-label="Next"
@@ -100,19 +107,20 @@ export const CalendarFilters = memo(function CalendarFilters({
                             <ChevronRight className="w-4 h-4" />
                         </button>
                     </div>
-                    <span className="ml-2 text-lg font-serif font-bold dash-text">
+                    <span className={cn("ml-2 font-serif font-bold dash-text", compact ? "text-base" : "text-lg")}>
                         {dateLabel}
                     </span>
                 </div>
 
                 {/* View Switcher */}
-                <div className="flex items-center dash-bg-panel rounded-xl p-1 shadow-inner border dash-border">
-                    {[Views.MONTH, Views.WEEK, Views.DAY, Views.AGENDA].map(v => (
+                <div className="flex w-full items-center gap-1 overflow-x-auto no-scrollbar rounded-xl border dash-border dash-bg-panel p-1 shadow-inner sm:w-auto">
+                    {availableViews.map(v => (
                         <button
+                            type="button"
                             key={v}
                             onClick={() => setView(v)}
                             className={cn(
-                                "px-3 py-1.5 text-[10px] uppercase font-bold tracking-widest rounded-lg transition-all",
+                                "rounded-lg px-3 py-1.5 text-[10px] uppercase font-bold tracking-widest transition-all whitespace-nowrap",
                                 view === v
                                     ? "pillowy-card gold-text bg-white dark:bg-black/40 shadow-sm"
                                     : "dash-text-soft hover:dash-text"
@@ -128,7 +136,7 @@ export const CalendarFilters = memo(function CalendarFilters({
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between pt-2">
 
                 {/* Event Types */}
-                <div className="flex flex-wrap items-center gap-4">
+                <div className="flex w-full flex-wrap items-center gap-2 sm:gap-4">
                     <label className="flex items-center gap-2 text-[10px] uppercase font-bold tracking-wider dash-text-muted cursor-pointer group">
                         <input
                             type="checkbox"
@@ -159,9 +167,10 @@ export const CalendarFilters = memo(function CalendarFilters({
                 </div>
 
                 {/* Status Pills */}
-                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 w-full sm:w-auto">
+                <div className="flex w-full items-center gap-2 overflow-x-auto no-scrollbar pb-1 sm:w-auto">
                     {['all', 'upcoming', 'overdue', 'completed'].map((status) => (
                         <button
+                            type="button"
                             key={status}
                             onClick={() => setStatus(status)}
                             className={cn(

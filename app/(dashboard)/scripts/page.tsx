@@ -224,7 +224,10 @@ export default function ScriptLabPage() {
 
       await navigator.clipboard.writeText(sharePayload.text);
       toast.success("Script copied to clipboard.");
-    } catch {
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
       toast.error("Could not share this script right now.");
     }
   };

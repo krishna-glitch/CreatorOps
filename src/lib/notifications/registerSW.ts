@@ -1,3 +1,5 @@
+import { getReadyPushManager } from "./pushSupport";
+
 export async function registerServiceWorker() {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
     throw new Error("Service Workers not supported or not in browser context");
@@ -25,7 +27,7 @@ export async function requestNotificationPermission() {
 }
 
 export async function getPushSubscription() {
-  const registration = await navigator.serviceWorker.ready;
-  const subscription = await registration.pushManager.getSubscription();
+  const pushManager = await getReadyPushManager();
+  const subscription = await pushManager.getSubscription();
   return subscription;
 }

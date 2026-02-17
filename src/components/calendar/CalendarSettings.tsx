@@ -20,7 +20,10 @@ export const CalendarSettings = memo(function CalendarSettings({ preferences, se
     return (
         <Popover.Root>
             <Popover.Trigger asChild>
-                <button className="p-2 dash-text-muted hover:dash-text hover:dash-bg-card rounded-full transition-colors">
+                <button
+                    type="button"
+                    className="p-2 dash-text-muted hover:dash-text hover:dash-bg-card rounded-full transition-colors"
+                >
                     <Settings className="w-5 h-5" />
                 </button>
             </Popover.Trigger>
@@ -59,6 +62,7 @@ export const CalendarSettings = memo(function CalendarSettings({ preferences, se
                             <label className="text-[10px] uppercase font-bold tracking-widest dash-text-muted px-1">Week Starts On</label>
                             <div className="flex rounded-xl border dash-border overflow-hidden dash-bg-panel p-1">
                                 <button
+                                    type="button"
                                     onClick={() => setPreference('weekStartsOn', 0)}
                                     className={cn(
                                         "flex-1 py-2 text-xs font-bold rounded-lg transition-all",
@@ -68,6 +72,7 @@ export const CalendarSettings = memo(function CalendarSettings({ preferences, se
                                     Sun
                                 </button>
                                 <button
+                                    type="button"
                                     onClick={() => setPreference('weekStartsOn', 1)}
                                     className={cn(
                                         "flex-1 py-2 text-xs font-bold rounded-lg transition-all",
@@ -83,6 +88,7 @@ export const CalendarSettings = memo(function CalendarSettings({ preferences, se
                         <div className="flex items-center justify-between px-1">
                             <label className="text-[10px] uppercase font-bold tracking-widest dash-text-muted">Show Weekends</label>
                             <button
+                                type="button"
                                 onClick={() => setPreference('showWeekends', !preferences.showWeekends)}
                                 className={cn(
                                     "relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none",

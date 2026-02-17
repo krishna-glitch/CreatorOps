@@ -12,6 +12,8 @@ export function usePWA() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
+  const [isManualInstallSupported, setIsManualInstallSupported] = useState(false);
+  const [manualInstallHint, setManualInstallHint] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -42,6 +44,23 @@ export function usePWA() {
       setIsInstalled(true);
     }
 
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    const isIOS = /iphone|ipad|ipod/.test(userAgent);
+    const isSafari =
+      /safari/.test(userAgent) &&
+      !/crios|fxios|edgios|opr\//.test(userAgent);
+    const isStandalone =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      (navigator as { standalone?: boolean }).standalone === true;
+
+    if (isIOS && isSafari && !isStandalone) {
+      setIsManualInstallSupported(true);
+      setManualInstallHint("Open Safari share menu and tap Add to Home Screen.");
+    } else {
+      setIsManualInstallSupported(false);
+      setManualInstallHint(null);
+    }
+
     return () => {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
       window.removeEventListener("appinstalled", handleAppInstalled);
@@ -61,6 +80,8 @@ export function usePWA() {
 
   return {
     canInstall: !!deferredPrompt,
+    isManualInstallSupported,
+    manualInstallHint,
     isInstalled,
     isOffline,
     install,
