@@ -36,8 +36,7 @@ function getFeedbackTypeClassName(type: string) {
       "border-transparent bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300",
     EDITING:
       "border-transparent bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300",
-    COPY:
-      "border-transparent bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300",
+    COPY: "border-transparent bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300",
     TIMING:
       "border-transparent bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300",
     TECHNICAL:
@@ -142,7 +141,9 @@ function FeedbackForDeliverable({
               className="rounded-md border dash-border dash-bg-card p-3 dash-border dash-bg-panel"
             >
               <div className="flex flex-wrap items-center gap-2">
-                <Badge className={getFeedbackTypeClassName(feedback.feedbackType)}>
+                <Badge
+                  className={getFeedbackTypeClassName(feedback.feedbackType)}
+                >
                   {feedback.feedbackType.replaceAll("_", " ")}
                 </Badge>
                 <Badge className={getSeverityClassName(feedback.severity)}>
@@ -154,7 +155,9 @@ function FeedbackForDeliverable({
                 </span>
               </div>
 
-              <p className="mt-2 whitespace-pre-wrap text-sm">{feedback.messageRaw}</p>
+              <p className="mt-2 whitespace-pre-wrap text-sm">
+                {feedback.messageRaw}
+              </p>
               {feedback.summary ? (
                 <p className="mt-1 text-xs text-muted-foreground">
                   Summary: {feedback.summary}
@@ -167,7 +170,9 @@ function FeedbackForDeliverable({
 
       {cycles.length > 0 ? (
         <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">Rework Cycles</p>
+          <p className="text-xs font-medium text-muted-foreground">
+            Rework Cycles
+          </p>
           {cycles.map((cycle) => (
             <div
               key={cycle.id}
@@ -194,7 +199,9 @@ function FeedbackForDeliverable({
   );
 }
 
-export function DealDeliverablesSection({ dealId }: DealDeliverablesSectionProps) {
+export function DealDeliverablesSection({
+  dealId,
+}: DealDeliverablesSectionProps) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   const deliverablesQuery = trpc.deliverables.listByDeal.useQuery(
@@ -234,9 +241,13 @@ export function DealDeliverablesSection({ dealId }: DealDeliverablesSectionProps
       />
 
       {deliverablesQuery.isLoading ? (
-        <p className="mt-3 text-sm text-muted-foreground">Loading deliverables...</p>
+        <p className="mt-3 text-sm text-muted-foreground">
+          Loading deliverables...
+        </p>
       ) : deliverablesQuery.error ? (
-        <p className="mt-3 text-sm text-red-600">Could not load deliverables.</p>
+        <p className="mt-3 text-sm text-red-600">
+          Could not load deliverables.
+        </p>
       ) : (deliverablesQuery.data?.length ?? 0) === 0 ? (
         <p className="mt-3 text-sm text-muted-foreground">
           No deliverables added to this deal yet.
@@ -266,49 +277,50 @@ export function DealDeliverablesSection({ dealId }: DealDeliverablesSectionProps
             <tbody>
               {deliverablesQuery.data?.map((deliverable) => {
                 return [
-                    <tr
-                      key={`${deliverable.id}-row`}
-                      className="border-b dash-border dark:border-gray-900"
-                    >
-                      <td className="px-3 py-3 font-medium">
-                        {deliverable.platform} / {deliverable.type}
-                      </td>
-                      <td className="px-3 py-3">{deliverable.quantity}</td>
-                      <td className="px-3 py-3">
-                        {deliverable.scheduledAt
-                          ? formatDealDate(deliverable.scheduledAt, { includeTime: true })
-                          : "Not scheduled"}
-                      </td>
-                      <td className="px-3 py-3">
-                        <div className="space-y-1">
-                          <DeadlineStateBadge
-                            state={deliverable.deadline_state}
-                            reason={deliverable.deadline_state_reason}
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            {deliverable.deadline_state_reason}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="px-3 py-3">
-                        <Badge variant="outline">{deliverable.status}</Badge>
-                      </td>
-                    </tr>
-                  ,
                   <tr
-                      key={`${deliverable.id}-feedback`}
-                      className="border-b dash-border last:border-0 dark:border-gray-900"
-                    >
-                      <td className="px-3 pb-4" colSpan={5}>
-                        <FeedbackForDeliverable
-                          dealId={dealId}
-                          deliverableId={deliverable.id}
-                          onCreated={() => {
-                            void deliverablesQuery.refetch();
-                          }}
+                    key={`${deliverable.id}-row`}
+                    className="border-b dash-border dark:border-gray-900"
+                  >
+                    <td className="px-3 py-3 font-medium">
+                      {deliverable.platform} / {deliverable.type}
+                    </td>
+                    <td className="px-3 py-3">{deliverable.quantity}</td>
+                    <td className="px-3 py-3">
+                      {deliverable.scheduledAt
+                        ? formatDealDate(deliverable.scheduledAt, {
+                            includeTime: true,
+                          })
+                        : "Not scheduled"}
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="space-y-1">
+                        <DeadlineStateBadge
+                          state={deliverable.deadline_state}
+                          reason={deliverable.deadline_state_reason}
                         />
-                      </td>
-                    </tr>
+                        <p className="text-xs text-muted-foreground">
+                          {deliverable.deadline_state_reason}
+                        </p>
+                      </div>
+                    </td>
+                    <td className="px-3 py-3">
+                      <Badge variant="outline">{deliverable.status}</Badge>
+                    </td>
+                  </tr>,
+                  <tr
+                    key={`${deliverable.id}-feedback`}
+                    className="border-b dash-border last:border-0 dark:border-gray-900"
+                  >
+                    <td className="px-3 pb-4" colSpan={5}>
+                      <FeedbackForDeliverable
+                        dealId={dealId}
+                        deliverableId={deliverable.id}
+                        onCreated={() => {
+                          void deliverablesQuery.refetch();
+                        }}
+                      />
+                    </td>
+                  </tr>,
                 ];
               })}
             </tbody>

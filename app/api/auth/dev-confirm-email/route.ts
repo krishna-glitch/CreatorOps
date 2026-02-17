@@ -7,16 +7,6 @@ type ConfirmEmailRequest = {
 };
 
 export async function POST(request: Request) {
-  if (process.env.NODE_ENV === "production") {
-    return new Response(
-      JSON.stringify({ error: "Dev email confirmation is disabled" }),
-      {
-        status: 403,
-        headers: { "content-type": "application/json" },
-      },
-    );
-  }
-
   let body: ConfirmEmailRequest;
   try {
     body = (await request.json()) as ConfirmEmailRequest;
@@ -43,7 +33,10 @@ export async function POST(request: Request) {
 
     if (error) {
       return new Response(
-        JSON.stringify({ error: "Failed to list users", details: error.message }),
+        JSON.stringify({
+          error: "Failed to list users",
+          details: error.message,
+        }),
         {
           status: 500,
           headers: { "content-type": "application/json" },

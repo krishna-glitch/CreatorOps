@@ -8,9 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { trpc } from "@/lib/trpc/client";
 
 const ScriptEditor = dynamic(
-  () => import("@/src/components/media/ScriptEditor").then((mod) => mod.ScriptEditor),
+  () =>
+    import("@/src/components/media/ScriptEditor").then(
+      (mod) => mod.ScriptEditor,
+    ),
   {
     ssr: false,
     loading: () => (
@@ -21,25 +25,22 @@ const ScriptEditor = dynamic(
   },
 );
 
-const NOOP_UPLOAD_ENDPOINT = "/api/script-drafts/upload";
-const FILES_STORAGE_KEY = "creatorops.scriptlab.files.v1";
-const SCRIPTLAB_BANNER_DISMISSED_KEY = "creatorops.scriptlab.banner.dismissed.v1";
+const SCRIPTLAB_BANNER_DISMISSED_KEY =
+  "creatorops.scriptlab.banner.dismissed.v1";
+const SELECTED_FILE_STORAGE_KEY = "creatorops.scriptlab.selected-file.v1";
 
 type ScriptFile = {
   id: string;
   title: string;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
 };
 
-function createScriptFile(title = "Untitled Video Script"): ScriptFile {
-  const now = new Date().toISOString();
-  return {
-    id: crypto.randomUUID(),
-    title,
-    createdAt: now,
-    updatedAt: now,
-  };
+function createDefaultScriptTitle() {
+  return `Untitled Script ${new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+  }).format(new Date())}`;
 }
 
 function getDeliverableId(fileId: string) {
@@ -55,8 +56,8 @@ function toFileBaseName(title: string) {
   return normalized || "video-script";
 }
 
-function formatUpdatedAt(isoDate: string) {
-  const date = new Date(isoDate);
+function formatUpdatedAt(value: Date | string) {
+  const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) {
     return "Unknown";
   }
@@ -67,52 +68,65 @@ function formatUpdatedAt(isoDate: string) {
   }).format(date);
 }
 
-function htmlToPlainText(html: string) {
-  if (typeof window === "undefined") {
-    return "";
-  }
-  const container = window.document.createElement("div");
-  container.innerHTML = html;
-  return container.textContent?.trim() ?? "";
+function markdownToInitialHtml(markdown: string) {
+  const escaped = markdown
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+
+  const blocks = escaped
+    .trim()
+    .split(/\n{2,}/)
+    .map((block) => `<p>${block.replace(/\n/g, "<br />")}</p>`);
+
+  return blocks.length > 0 ? blocks.join("") : "<p></p>";
 }
 
 export default function ScriptLabPage() {
-  const [files, setFiles] = useState<ScriptFile[]>([]);
+  const utils = trpc.useUtils();
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [showInfoBanner, setShowInfoBanner] = useState(true);
+  const [titleDraft, setTitleDraft] = useState("");
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+  const filesQuery = trpc.scriptLab.list.useQuery(undefined, {
+    staleTime: 15_000,
+    refetchOnWindowFocus: true,
+  });
 
-    try {
-      const raw = window.localStorage.getItem(FILES_STORAGE_KEY);
-      if (!raw) {
-        const starter = createScriptFile("Intro Video Script");
-        setFiles([starter]);
-        setSelectedFileId(starter.id);
-        return;
-      }
+  const createFileMutation = trpc.scriptLab.create.useMutation({
+    onSuccess: async (created) => {
+      await utils.scriptLab.list.invalidate();
+      setSelectedFileId(created.id);
+      setTitleDraft(created.title);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Could not create script file.");
+    },
+  });
 
-      const parsed = JSON.parse(raw) as ScriptFile[];
-      if (!Array.isArray(parsed) || parsed.length === 0) {
-        const starter = createScriptFile("Intro Video Script");
-        setFiles([starter]);
-        setSelectedFileId(starter.id);
-        return;
-      }
+  const updateTitleMutation = trpc.scriptLab.updateTitle.useMutation({
+    onSuccess: async () => {
+      await utils.scriptLab.list.invalidate();
+    },
+    onError: (error) => {
+      toast.error(error.message || "Could not rename script file.");
+    },
+  });
 
-      const sorted = [...parsed].sort((a, b) =>
-        b.updatedAt.localeCompare(a.updatedAt),
-      );
-      setFiles(sorted);
-      setSelectedFileId(sorted[0]?.id ?? null);
-    } catch {
-      const starter = createScriptFile("Intro Video Script");
-      setFiles([starter]);
-      setSelectedFileId(starter.id);
-    }
-  }, []);
+  const deleteFileMutation = trpc.scriptLab.delete.useMutation({
+    onSuccess: async () => {
+      await Promise.all([
+        utils.scriptLab.list.invalidate(),
+        utils.scriptLab.getById.invalidate(),
+      ]);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Could not delete script file.");
+    },
+  });
+
+  const files: ScriptFile[] = filesQuery.data?.items ?? [];
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -124,25 +138,54 @@ export default function ScriptLabPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (files.length === 0) return;
-    window.localStorage.setItem(FILES_STORAGE_KEY, JSON.stringify(files));
-  }, [files]);
 
-  useEffect(() => {
     if (files.length === 0) {
       setSelectedFileId(null);
       return;
     }
 
-    const stillExists = selectedFileId
-      ? files.some((file) => file.id === selectedFileId)
-      : false;
-    if (!stillExists) {
-      setSelectedFileId(files[0]?.id ?? null);
+    const rememberedSelection = window.localStorage.getItem(
+      SELECTED_FILE_STORAGE_KEY,
+    );
+
+    setSelectedFileId((current) => {
+      if (current && files.some((item) => item.id === current)) {
+        return current;
+      }
+      if (
+        rememberedSelection &&
+        files.some((item) => item.id === rememberedSelection)
+      ) {
+        return rememberedSelection;
+      }
+      return files[0]?.id ?? null;
+    });
+  }, [files]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    if (!selectedFileId) {
+      window.localStorage.removeItem(SELECTED_FILE_STORAGE_KEY);
+      return;
     }
-  }, [files, selectedFileId]);
+
+    window.localStorage.setItem(SELECTED_FILE_STORAGE_KEY, selectedFileId);
+  }, [selectedFileId]);
 
   const selectedFile = files.find((file) => file.id === selectedFileId) ?? null;
+
+  useEffect(() => {
+    setTitleDraft(selectedFile?.title ?? "");
+  }, [selectedFile?.title]);
+
+  const fileContentQuery = trpc.scriptLab.getById.useQuery(
+    { id: selectedFileId ?? "00000000-0000-0000-0000-000000000000" },
+    {
+      enabled: Boolean(selectedFileId),
+      staleTime: 10_000,
+    },
+  );
 
   const visibleFiles = useMemo(() => {
     const needle = searchTerm.trim().toLowerCase();
@@ -151,62 +194,46 @@ export default function ScriptLabPage() {
   }, [files, searchTerm]);
 
   const createFile = () => {
-    const newFile = createScriptFile(`Video Script ${files.length + 1}`);
-    setFiles((current) => [newFile, ...current]);
-    setSelectedFileId(newFile.id);
+    const id = crypto.randomUUID();
+    void createFileMutation.mutate({ id, title: createDefaultScriptTitle() });
   };
 
-  const updateSelectedTitle = (nextTitle: string) => {
-    if (!selectedFileId) return;
-    setFiles((current) =>
-      current.map((file) =>
-        file.id === selectedFileId
-          ? {
-              ...file,
-              title: nextTitle,
-              updatedAt: new Date().toISOString(),
-            }
-          : file,
-      ),
-    );
+  const saveTitle = async () => {
+    if (!selectedFile) return;
+
+    const nextTitle = titleDraft.trim();
+    if (!nextTitle || nextTitle === selectedFile.title) {
+      setTitleDraft(selectedFile.title);
+      return;
+    }
+
+    await updateTitleMutation.mutateAsync({
+      id: selectedFile.id,
+      title: nextTitle,
+    });
   };
 
-  const touchSelectedFile = () => {
-    if (!selectedFileId) return;
-    setFiles((current) =>
-      [...current]
-        .map((file) =>
-          file.id === selectedFileId
-            ? { ...file, updatedAt: new Date().toISOString() }
-            : file,
-        )
-        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
-    );
-  };
-
-  const deleteSelectedFile = () => {
+  const deleteSelectedFile = async () => {
     if (!selectedFileId || typeof window === "undefined") return;
 
     const confirmed = window.confirm(
-      "Delete this script file? This removes local draft history for it.",
+      "Delete this script file? This removes script content and local draft history.",
     );
     if (!confirmed) return;
 
     const deliverableId = getDeliverableId(selectedFileId);
     window.localStorage.removeItem(`creatorops.script.draft.${deliverableId}`);
-    window.localStorage.removeItem(`creatorops.script.versions.${deliverableId}`);
+    window.localStorage.removeItem(
+      `creatorops.script.versions.${deliverableId}`,
+    );
 
-    setFiles((current) => current.filter((file) => file.id !== selectedFileId));
+    await deleteFileMutation.mutateAsync({ id: selectedFileId });
   };
 
   const shareSelectedFile = async () => {
-    if (!selectedFile || typeof window === "undefined") return;
+    if (!selectedFile) return;
 
-    const deliverableId = getDeliverableId(selectedFile.id);
-    const rawDraft =
-      window.localStorage.getItem(`creatorops.script.draft.${deliverableId}`) ??
-      "";
-    const scriptText = htmlToPlainText(rawDraft);
+    const scriptText = (fileContentQuery.data?.contentMarkdown ?? "").trim();
     const shareTitle = selectedFile.title.trim() || "Video Script";
     const sharePayload = {
       title: shareTitle,
@@ -235,16 +262,16 @@ export default function ScriptLabPage() {
   return (
     <div className="mx-auto w-full max-w-[1400px] px-3 py-4 sm:px-6 sm:py-6">
       {showInfoBanner ? (
-        <div className="mb-4 flex items-start justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
+        <div className="mb-4 flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 shadow-sm dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300">
           <p>
-            Script files are organized locally like a notebook. They survive
-            refresh in this browser.
+            Script files are synced to your account and available across
+            devices.
           </p>
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="h-7 w-7 shrink-0 text-amber-700 hover:bg-amber-100 hover:text-amber-900 dark:text-amber-300 dark:hover:bg-amber-900/40 dark:hover:text-amber-100"
+            className="h-7 w-7 shrink-0 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-900 dark:text-emerald-300 dark:hover:bg-emerald-900/40 dark:hover:text-emerald-100"
             onClick={() => {
               setShowInfoBanner(false);
               if (typeof window !== "undefined") {
@@ -266,7 +293,12 @@ export default function ScriptLabPage() {
           <CardHeader className="space-y-4 border-b dash-border bg-gradient-to-b from-slate-50 to-white pb-4 dash-border dark:from-slate-950 dark:to-slate-950">
             <div className="flex items-center justify-between gap-2">
               <CardTitle className="text-base">Script Library</CardTitle>
-              <Button type="button" size="sm" onClick={createFile}>
+              <Button
+                type="button"
+                size="sm"
+                onClick={createFile}
+                disabled={createFileMutation.isPending}
+              >
                 <Plus className="h-4 w-4" />
                 New
               </Button>
@@ -283,13 +315,17 @@ export default function ScriptLabPage() {
             <div className="flex items-center justify-between">
               <Badge variant="outline">{files.length} files</Badge>
               <p className="text-xs text-muted-foreground">
-                {searchTerm.trim() ? `${visibleFiles.length} shown` : "All visible"}
+                {searchTerm.trim() ? `${visibleFiles.length} shown` : "Synced"}
               </p>
             </div>
           </CardHeader>
 
           <CardContent className="max-h-[calc(78vh-160px)] space-y-2 overflow-auto p-3">
-            {visibleFiles.length === 0 ? (
+            {filesQuery.isLoading ? (
+              <p className="rounded-lg border border-dashed dash-border p-3 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                Loading scripts...
+              </p>
+            ) : visibleFiles.length === 0 ? (
               <p className="rounded-lg border border-dashed dash-border p-3 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
                 No matching scripts.
               </p>
@@ -308,10 +344,14 @@ export default function ScriptLabPage() {
                         : "border dash-border dash-bg-panel"
                     }`}
                   >
-                    <p className="line-clamp-1 text-sm font-medium">{file.title}</p>
+                    <p className="line-clamp-1 text-sm font-medium">
+                      {file.title}
+                    </p>
                     <p
                       className={`mt-1 text-xs ${
-                        active ? "text-slate-200 dark:text-slate-600" : "text-slate-500 dark:text-slate-400"
+                        active
+                          ? "text-slate-200 dark:text-slate-600"
+                          : "text-slate-500 dark:text-slate-400"
                       }`}
                     >
                       Updated {formatUpdatedAt(file.updatedAt)}
@@ -329,8 +369,17 @@ export default function ScriptLabPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <FileText className="h-4 w-4 text-slate-500 dark:text-slate-400" />
                 <Input
-                  value={selectedFile.title}
-                  onChange={(event) => updateSelectedTitle(event.target.value)}
+                  value={titleDraft}
+                  onChange={(event) => setTitleDraft(event.target.value)}
+                  onBlur={() => {
+                    void saveTitle();
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      void saveTitle();
+                    }
+                  }}
                   placeholder="Video script title"
                   className="min-w-0 flex-1"
                 />
@@ -346,8 +395,11 @@ export default function ScriptLabPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={deleteSelectedFile}
+                  onClick={() => {
+                    void deleteSelectedFile();
+                  }}
                   className="border-red-300 text-red-700 hover:bg-red-50 hover:text-red-700 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/40 dark:hover:text-red-200"
+                  disabled={deleteFileMutation.isPending}
                 >
                   <Trash2 className="h-4 w-4" />
                   Delete
@@ -365,19 +417,36 @@ export default function ScriptLabPage() {
                   key={selectedFile.id}
                   deliverableId={getDeliverableId(selectedFile.id)}
                   fileBaseName={toFileBaseName(selectedFile.title)}
+                  initialHtml={markdownToInitialHtml(
+                    fileContentQuery.data?.contentMarkdown ?? "",
+                  )}
                   autoSaveIntervalMs={20_000}
                   getSignedUrl={async ({ fileName }) => ({
-                    signedUrl: NOOP_UPLOAD_ENDPOINT,
-                    path: `local/script-lab/${selectedFile.id}/${fileName}`,
-                    method: "POST",
+                    signedUrl: `/api/script-drafts/upload?fileId=${selectedFile.id}&fileName=${encodeURIComponent(fileName)}`,
+                    path: `script-lab/${selectedFile.id}/${fileName}`,
+                    method: "PUT",
                   })}
-                  saveMetadata={async () => {}}
-                  onSaved={touchSelectedFile}
+                  saveMetadata={async () => {
+                    await Promise.all([
+                      utils.scriptLab.list.invalidate(),
+                      utils.scriptLab.getById.invalidate({
+                        id: selectedFile.id,
+                      }),
+                    ]);
+                  }}
+                  onSaved={() => {
+                    void Promise.all([
+                      utils.scriptLab.list.invalidate(),
+                      utils.scriptLab.getById.invalidate({
+                        id: selectedFile.id,
+                      }),
+                    ]);
+                  }}
                 />
               </div>
             ) : (
               <div className="flex min-h-[520px] items-center justify-center rounded-xl border border-dashed dash-border text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                Create a script file to start writing.
+                Create your first script file to start writing.
               </div>
             )}
           </CardContent>

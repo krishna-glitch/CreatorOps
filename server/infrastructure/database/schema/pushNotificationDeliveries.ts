@@ -8,8 +8,8 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { reminders } from "./reminders";
 import { pushSubscriptions } from "./pushSubscriptions";
+import { reminders } from "./reminders";
 
 export const pushDeliveryStatusEnum = pgEnum("push_delivery_status", [
   "SENT",

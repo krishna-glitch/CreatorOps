@@ -71,9 +71,12 @@ export function FeedbackForm({
         duration: 2500,
       });
       if (result.warningAlert) {
-        toast.warning(`${result.warningAlert.title}: ${result.warningAlert.message}`, {
-          duration: 5000,
-        });
+        toast.warning(
+          `${result.warningAlert.title}: ${result.warningAlert.message}`,
+          {
+            duration: 5000,
+          },
+        );
       }
       onCreated?.();
       onOpenChange(false);
@@ -125,12 +128,16 @@ export function FeedbackForm({
         <DialogHeader>
           <DialogTitle>Add Feedback</DialogTitle>
           <DialogDescription>
-            Log brand feedback and start a new rework cycle for this deliverable.
+            Log brand feedback and start a new rework cycle for this
+            deliverable.
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-2">
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="space-y-4 pt-2"
+          >
             <FormField
               control={form.control}
               name="feedback_type"
@@ -144,7 +151,9 @@ export function FeedbackForm({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="CREATIVE_DIRECTION">CREATIVE_DIRECTION</SelectItem>
+                      <SelectItem value="CREATIVE_DIRECTION">
+                        CREATIVE_DIRECTION
+                      </SelectItem>
                       <SelectItem value="COMPLIANCE">COMPLIANCE</SelectItem>
                       <SelectItem value="BRAND_VOICE">BRAND_VOICE</SelectItem>
                       <SelectItem value="EDITING">EDITING</SelectItem>

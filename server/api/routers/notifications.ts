@@ -1,11 +1,11 @@
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { pushSubscriptions } from "@/server/infrastructure/database/schema/pushSubscriptions";
 import {
   getPublicVapidKey,
   isWebPushConfigured,
 } from "@/src/server/services/notifications/webPush";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const subscriptionInputSchema = z.object({
   endpoint: z.string().url(),

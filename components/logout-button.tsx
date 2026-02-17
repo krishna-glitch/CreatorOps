@@ -29,7 +29,7 @@ export function LogoutButton({ className }: { className?: string }) {
   return (
     <Button
       variant="ghost"
-      size={className?.includes('w-full') ? 'default' : 'icon'}
+      size={className?.includes("w-full") ? "default" : "icon"}
       onClick={handleLogout}
       loading={loading}
       className={cn("dash-shell-icon-btn", className)}
@@ -37,7 +37,7 @@ export function LogoutButton({ className }: { className?: string }) {
       title="Log out"
     >
       <LogOut className="h-4 w-4 mr-2" />
-      {className?.includes('w-full') ? 'Log out' : null}
+      {className?.includes("w-full") ? "Log out" : null}
     </Button>
   );
 }

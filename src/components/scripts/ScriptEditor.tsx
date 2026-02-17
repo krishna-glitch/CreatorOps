@@ -1,12 +1,12 @@
 "use client";
 
 import CharacterCount from "@tiptap/extension-character-count";
-import { EditorContent, useEditor } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
-import Underline from "@tiptap/extension-underline";
-import TextAlign from "@tiptap/extension-text-align";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
+import TextAlign from "@tiptap/extension-text-align";
+import Underline from "@tiptap/extension-underline";
+import { EditorContent, useEditor } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
 import {
   AlignCenter,
   AlignLeft,
@@ -109,7 +109,7 @@ function getDraftStorageKey(deliverableId: string) {
 }
 
 function formatTimestamp(date: Date) {
-  return date.toISOString().replace(/[-:]/g, "").replace(/\..+/, "");
+  return date.toISOString().replace(/[-:.]/g, "");
 }
 
 function uploadWithSignedUrl(input: {
@@ -148,12 +148,12 @@ function hasActiveRules(rules?: BrandRules): boolean {
   if (!rules) return false;
   return Boolean(
     (rules.required_phrases?.length ?? 0) > 0 ||
-    (rules.forbidden_words?.length ?? 0) > 0 ||
-    (rules.required_hashtags?.length ?? 0) > 0 ||
-    rules.must_tag_brand ||
-    rules.min_word_count ||
-    rules.max_word_count ||
-    rules.max_hashtags,
+      (rules.forbidden_words?.length ?? 0) > 0 ||
+      (rules.required_hashtags?.length ?? 0) > 0 ||
+      rules.must_tag_brand ||
+      rules.min_word_count ||
+      rules.max_word_count ||
+      rules.max_hashtags,
   );
 }
 
@@ -211,6 +211,7 @@ function ToolbarButton({
       variant="ghost"
       size="sm"
       onClick={onClick}
+      title={tooltip}
       disabled={disabled}
       className={cn(
         "h-8 w-8 p-0 text-slate-500 dash-bg-card hover:text-slate-900",
@@ -258,74 +259,116 @@ export function ScriptEditor({
   const [highlights, setHighlights] = useState<ComplianceHighlight[]>([]);
   const [versions, setVersions] = useState<ScriptVersion[]>([]);
   const [isRestoringVersion, setIsRestoringVersion] = useState(false);
+  const [hasRemoteUpdate, setHasRemoteUpdate] = useState(false);
 
   const turndownRef = useRef(new TurndownService());
   const lastSavedContentRef = useRef<string>("");
   const lastDraftHtmlRef = useRef<string>("");
+  const hasHydratedInitialRef = useRef(false);
+  const lastSeenInitialHtmlRef = useRef(initialHtml);
+  const pendingRemoteHtmlRef = useRef<string | null>(null);
   const inFlightSaveRef = useRef(false);
   const pendingAutoSaveRef = useRef(false);
-  const idleAutoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const draftPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const idleAutoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const draftPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
-  const editor = useEditor({
-    immediatelyRender: false,
-    extensions: [
-      StarterKit.configure({
-        heading: {
-          levels: [1, 2, 3],
-        },
-      }),
-      Underline,
-      Link.configure({
-        openOnClick: false,
-        HTMLAttributes: {
-          class: "text-blue-500 underline cursor-pointer",
-        },
-      }),
-      TextAlign.configure({
-        types: ["heading", "paragraph"],
-      }),
-      Placeholder.configure({
-        placeholder: "Start writing your script...",
-      }),
-      CharacterCount.configure(),
-    ],
-    content: initialHtml,
-    onCreate: ({ editor: editorInstance }) => {
-      setScriptText(editorInstance.getText({ blockSeparator: "\n\n" }));
-      lastDraftHtmlRef.current = editorInstance.getHTML();
-    },
-    onUpdate: ({ editor: editorInstance }) => {
-      setIsDirty((prev) => prev || true);
-      setError((prev) => (prev === null ? prev : null));
+  const editor = useEditor(
+    {
+      immediatelyRender: false,
+      extensions: [
+        StarterKit.configure({
+          heading: {
+            levels: [1, 2, 3],
+          },
+        }),
+        Underline,
+        Link.configure({
+          openOnClick: false,
+          HTMLAttributes: {
+            class: "text-blue-500 underline cursor-pointer",
+          },
+        }),
+        TextAlign.configure({
+          types: ["heading", "paragraph"],
+        }),
+        Placeholder.configure({
+          placeholder: "Start writing your script...",
+        }),
+        CharacterCount.configure(),
+      ],
+      content: "<p></p>",
+      onCreate: ({ editor: editorInstance }) => {
+        setScriptText(editorInstance.getText({ blockSeparator: "\n\n" }));
+        lastDraftHtmlRef.current = editorInstance.getHTML();
+      },
+      onUpdate: ({ editor: editorInstance }) => {
+        setIsDirty((prev) => prev || true);
+        setError((prev) => (prev === null ? prev : null));
 
-      const nextText = editorInstance.getText({ blockSeparator: "\n\n" });
-      setScriptText((prev) => (prev === nextText ? prev : nextText));
+        const nextText = editorInstance.getText({ blockSeparator: "\n\n" });
+        setScriptText((prev) => (prev === nextText ? prev : nextText));
 
-      if (typeof window !== "undefined") {
-        const html = editorInstance.getHTML();
-        if (lastDraftHtmlRef.current !== html) {
-          lastDraftHtmlRef.current = html;
-          if (draftPersistTimerRef.current !== null) {
-            clearTimeout(draftPersistTimerRef.current);
+        if (typeof window !== "undefined") {
+          const html = editorInstance.getHTML();
+          if (lastDraftHtmlRef.current !== html) {
+            lastDraftHtmlRef.current = html;
+            if (draftPersistTimerRef.current !== null) {
+              clearTimeout(draftPersistTimerRef.current);
+            }
+            draftPersistTimerRef.current = setTimeout(() => {
+              window.localStorage.setItem(
+                getDraftStorageKey(deliverableId),
+                lastDraftHtmlRef.current,
+              );
+              draftPersistTimerRef.current = null;
+            }, 300);
           }
-          draftPersistTimerRef.current = setTimeout(() => {
-            window.localStorage.setItem(
-              getDraftStorageKey(deliverableId),
-              lastDraftHtmlRef.current,
-            );
-            draftPersistTimerRef.current = null;
-          }, 300);
         }
-      }
-    },
-    editorProps: {
-      attributes: {
-        class:
-          "prose prose-slate mx-auto min-h-[60vh] w-full max-w-prose bg-transparent px-4 py-12 outline-none focus:outline-none sm:prose-lg sm:px-8 [&_h1]:font-bold [&_h1]:text-slate-900 [&_h2]:font-bold [&_h2]:text-slate-800 [&_h3]:font-semibold [&_h3]:text-slate-800 [&_li]:ml-4 [&_ol]:list-decimal [&_ul]:list-disc",
+      },
+      editorProps: {
+        attributes: {
+          class:
+            "prose prose-slate mx-auto min-h-[60vh] w-full max-w-prose bg-transparent px-4 py-12 outline-none focus:outline-none sm:prose-lg sm:px-8 [&_h1]:font-bold [&_h1]:text-slate-900 [&_h2]:font-bold [&_h2]:text-slate-800 [&_h3]:font-semibold [&_h3]:text-slate-800 [&_li]:ml-4 [&_ol]:list-decimal [&_ul]:list-disc",
+        },
       },
     },
-  }, [deliverableId, initialHtml]);
+    [deliverableId],
+  );
+
+  useEffect(() => {
+    if (!editor) {
+      return;
+    }
+
+    if (!hasHydratedInitialRef.current) {
+      editor.commands.setContent(initialHtml, { emitUpdate: false });
+      setScriptText(editor.getText({ blockSeparator: "\n\n" }));
+      lastDraftHtmlRef.current = initialHtml;
+      hasHydratedInitialRef.current = true;
+      lastSeenInitialHtmlRef.current = initialHtml;
+      return;
+    }
+
+    if (initialHtml === lastSeenInitialHtmlRef.current) {
+      return;
+    }
+
+    lastSeenInitialHtmlRef.current = initialHtml;
+
+    if (isDirty) {
+      pendingRemoteHtmlRef.current = initialHtml;
+      setHasRemoteUpdate(true);
+      return;
+    }
+
+    editor.commands.setContent(initialHtml, { emitUpdate: false });
+    setScriptText(editor.getText({ blockSeparator: "\n\n" }));
+    lastDraftHtmlRef.current = initialHtml;
+  }, [editor, initialHtml, isDirty]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -366,6 +409,11 @@ export function ScriptEditor({
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    hasHydratedInitialRef.current = false;
+    lastSeenInitialHtmlRef.current = initialHtml;
+    pendingRemoteHtmlRef.current = null;
+    setHasRemoteUpdate(false);
+
     try {
       const stored = window.localStorage.getItem(
         getVersionsStorageKey(deliverableId),
@@ -377,7 +425,7 @@ export function ScriptEditor({
     } catch {
       setVersions([]);
     }
-  }, [deliverableId]);
+  }, [deliverableId, initialHtml]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -401,6 +449,7 @@ export function ScriptEditor({
     editor.commands.setContent(storedDraft, { emitUpdate: false });
     lastDraftHtmlRef.current = storedDraft;
     setScriptText(editor.getText({ blockSeparator: "\n\n" }));
+    setIsDirty(true);
   }, [deliverableId, editor]);
 
   useEffect(() => {
@@ -583,7 +632,7 @@ export function ScriptEditor({
         idleAutoSaveTimerRef.current = null;
       }
     };
-  }, [scriptText, isDirty, queueAutoSave]);
+  }, [isDirty, queueAutoSave]);
 
   const insertAtCursor = useCallback(
     (value: string) => {
@@ -658,6 +707,21 @@ export function ScriptEditor({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [saveDraft]);
+
+  const applyRemoteUpdate = useCallback(() => {
+    if (!editor || !pendingRemoteHtmlRef.current) {
+      return;
+    }
+
+    editor.commands.setContent(pendingRemoteHtmlRef.current, {
+      emitUpdate: false,
+    });
+    setScriptText(editor.getText({ blockSeparator: "\n\n" }));
+    lastDraftHtmlRef.current = pendingRemoteHtmlRef.current;
+    pendingRemoteHtmlRef.current = null;
+    setHasRemoteUpdate(false);
+    setIsDirty(false);
+  }, [editor]);
 
   const addLink = useCallback(() => {
     if (!editor) return;
@@ -769,21 +833,27 @@ export function ScriptEditor({
           {/* Structure */}
           <div className="flex items-center gap-1 px-1 border-r dash-border hidden sm:flex">
             <ToolbarButton
-              onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+              onClick={() =>
+                editor.chain().focus().toggleHeading({ level: 1 }).run()
+              }
               isActive={editor.isActive("heading", { level: 1 })}
               tooltip="Heading 1"
             >
               <Heading1 className="h-4 w-4" />
             </ToolbarButton>
             <ToolbarButton
-              onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+              onClick={() =>
+                editor.chain().focus().toggleHeading({ level: 2 }).run()
+              }
               isActive={editor.isActive("heading", { level: 2 })}
               tooltip="Heading 2"
             >
               <Heading2 className="h-4 w-4" />
             </ToolbarButton>
             <ToolbarButton
-              onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+              onClick={() =>
+                editor.chain().focus().toggleHeading({ level: 3 }).run()
+              }
               isActive={editor.isActive("heading", { level: 3 })}
               tooltip="Heading 3"
             >
@@ -815,7 +885,9 @@ export function ScriptEditor({
               <AlignLeft className="h-4 w-4" />
             </ToolbarButton>
             <ToolbarButton
-              onClick={() => editor.chain().focus().setTextAlign("center").run()}
+              onClick={() =>
+                editor.chain().focus().setTextAlign("center").run()
+              }
               isActive={editor.isActive({ textAlign: "center" })}
               tooltip="Align Center"
             >
@@ -888,9 +960,7 @@ export function ScriptEditor({
             <div className="rounded-xl border dash-border dash-bg-card p-4 transition-all">
               <div className="space-y-4">
                 <div>
-                  <h3 className="font-semibold text-slate-900">
-                    Library
-                  </h3>
+                  <h3 className="font-semibold text-slate-900">Library</h3>
                   <p className="mt-1 text-xs leading-relaxed text-slate-500">
                     Access templates and hooks to speed up your writing.
                   </p>
@@ -923,9 +993,7 @@ export function ScriptEditor({
             <div className="rounded-xl border dash-border dash-bg-card p-4">
               <div className="space-y-4">
                 <div>
-                  <h3 className="font-semibold text-slate-900">
-                    Shortcuts
-                  </h3>
+                  <h3 className="font-semibold text-slate-900">Shortcuts</h3>
                   <div className="mt-2 space-y-2">
                     <div className="flex justify-between text-xs text-slate-500">
                       <span>Save</span>
@@ -937,7 +1005,7 @@ export function ScriptEditor({
                     </div>
                     <div className="flex justify-between text-xs text-slate-500">
                       <span>Hooks</span>
-                      <kbd className="font-sans">H</kbd>
+                      <kbd className="font-sans">Cmd+H</kbd>
                     </div>
                     <div className="flex justify-between text-xs text-slate-500">
                       <span>Undo</span>
@@ -993,7 +1061,12 @@ export function ScriptEditor({
                 type="button"
                 variant="ghost"
                 size="sm"
-                className={cn("h-7 gap-1.5 px-2 text-xs", showAnalyticsPanel && rightTab === "analytics" && "dash-bg-card")}
+                className={cn(
+                  "h-7 gap-1.5 px-2 text-xs",
+                  showAnalyticsPanel &&
+                    rightTab === "analytics" &&
+                    "dash-bg-card",
+                )}
                 onClick={() => {
                   if (rightTab === "analytics" && showAnalyticsPanel) {
                     setShowAnalyticsPanel(false);
@@ -1178,13 +1251,24 @@ export function ScriptEditor({
         </aside>
       </div>
 
-      {
-        error ? (
-          <p className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
-            {error}
-          </p>
-        ) : null
-      }
+      {error ? (
+        <p className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+          {error}
+        </p>
+      ) : null}
+      {hasRemoteUpdate ? (
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <span>A newer remote version is available.</span>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={applyRemoteUpdate}
+          >
+            Apply remote update
+          </Button>
+        </div>
+      ) : null}
 
       <Dialog open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
         <DialogContent className="bottom-0 top-auto translate-x-[-50%] translate-y-0 rounded-t-xl rounded-b-none p-4 md:hidden">
@@ -1344,7 +1428,7 @@ export function ScriptEditor({
           </div>
         </DialogContent>
       </Dialog>
-    </section >
+    </section>
   );
 }
 

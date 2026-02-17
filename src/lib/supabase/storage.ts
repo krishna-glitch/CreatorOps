@@ -1,6 +1,6 @@
 export {
   deleteFile,
   getFileUrl,
-  uploadFile,
   type UploadFileResult,
+  uploadFile,
 } from "@/lib/supabase/storage";

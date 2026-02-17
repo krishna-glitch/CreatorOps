@@ -1,4 +1,9 @@
-import { AlertTriangle, CheckCircle2, Clock3, TriangleAlert } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Clock3,
+  TriangleAlert,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 type DeadlineState =
@@ -50,7 +55,12 @@ function getDeadlineStateMeta(state: DeadlineState) {
   }
 
   return {
-    label: state === "LATE" ? "Late" : state === "LATE_1D" ? "Late 1-3d" : "Late 3d+",
+    label:
+      state === "LATE"
+        ? "Late"
+        : state === "LATE_1D"
+          ? "Late 1-3d"
+          : "Late 3d+",
     icon: AlertTriangle,
     className: "border-rose-200 bg-rose-100 text-rose-700",
   };

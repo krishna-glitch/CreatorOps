@@ -255,7 +255,9 @@ function countCharacters(text: string): number {
 }
 
 function splitSentences(text: string): string[] {
-  return (text.match(SENTENCE_PATTERN) ?? []).map((part) => part.trim()).filter(Boolean);
+  return (text.match(SENTENCE_PATTERN) ?? [])
+    .map((part) => part.trim())
+    .filter(Boolean);
 }
 
 function countSyllables(words: string[]): number {
@@ -319,7 +321,8 @@ export function analyzeSentiment(text: string): SentimentResult {
   }
 
   const totalMatched = positiveCount + negativeCount;
-  const rawScore = totalMatched > 0 ? (positiveCount - negativeCount) / totalMatched : 0;
+  const rawScore =
+    totalMatched > 0 ? (positiveCount - negativeCount) / totalMatched : 0;
   const score = Number(clamp(rawScore, -1, 1).toFixed(3));
 
   let sentiment: SentimentResult["sentiment"] = "neutral";
@@ -336,7 +339,9 @@ export function analyzeSentiment(text: string): SentimentResult {
 
 export function getKeywordDensity(text: string): KeywordDensityItem[] {
   const cleaned = stripHtml(text);
-  const words = getWords(cleaned).filter((word) => !STOP_WORDS.has(word) && word.length > 1);
+  const words = getWords(cleaned).filter(
+    (word) => !STOP_WORDS.has(word) && word.length > 1,
+  );
   const total = words.length || 1;
   const frequency = new Map<string, number>();
 
@@ -413,7 +418,8 @@ export function analyzeScript(text: string): ScriptMetrics {
   const words = countWords(cleaned);
   const characters = countCharacters(cleaned);
   const sentences = splitSentences(cleaned).length;
-  const avgSentenceLength = sentences > 0 ? Number((words / sentences).toFixed(2)) : 0;
+  const avgSentenceLength =
+    sentences > 0 ? Number((words / sentences).toFixed(2)) : 0;
   const emojiCount = (cleaned.match(EMOJI_PATTERN) ?? []).length;
   const hashtags = (cleaned.match(HASHTAG_PATTERN) ?? []).length;
   const mentions = (cleaned.match(MENTION_PATTERN) ?? []).length;

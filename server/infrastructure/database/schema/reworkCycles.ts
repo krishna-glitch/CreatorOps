@@ -1,5 +1,4 @@
-import { sql } from "drizzle-orm";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   boolean,
   check,
@@ -35,9 +34,15 @@ export const reworkCycles = pgTable(
   },
   (table) => {
     return {
-      deliverableIdIdx: index("rework_cycles_deliverable_id_idx").on(table.deliverableId),
-      cycleNumberIdx: index("rework_cycles_cycle_number_idx").on(table.cycleNumber),
-      requestedAtIdx: index("rework_cycles_requested_at_idx").on(table.requestedAt),
+      deliverableIdIdx: index("rework_cycles_deliverable_id_idx").on(
+        table.deliverableId,
+      ),
+      cycleNumberIdx: index("rework_cycles_cycle_number_idx").on(
+        table.cycleNumber,
+      ),
+      requestedAtIdx: index("rework_cycles_requested_at_idx").on(
+        table.requestedAt,
+      ),
       deliverableCycleUniqueIdx: uniqueIndex(
         "rework_cycles_deliverable_id_cycle_number_unique_idx",
       ).on(table.deliverableId, table.cycleNumber),

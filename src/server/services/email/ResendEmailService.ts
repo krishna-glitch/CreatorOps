@@ -20,7 +20,7 @@ export type ReminderEmailPayload = {
 };
 
 const DEFAULT_FROM_EMAIL = "CreatorOps <noreply@yourdomain.com>";
-const DEFAULT_APP_URL = "http://localhost:3000";
+const DEFAULT_APP_URL = "https://creator-ops-eta.vercel.app";
 
 function getResendClient() {
   const apiKey = process.env.RESEND_API_KEY;
@@ -52,16 +52,25 @@ function escapeHtml(value: string) {
 }
 
 function getTemplateType(reminder: ReminderEmailPayload) {
-  if (reminder.dedupe_key.includes("deliverable:") && reminder.dedupe_key.includes(":due_soon")) {
+  if (
+    reminder.dedupe_key.includes("deliverable:") &&
+    reminder.dedupe_key.includes(":due_soon")
+  ) {
     return "DELIVERABLE_DUE_SOON" as const;
   }
-  if (reminder.dedupe_key.includes("deliverable:") && reminder.dedupe_key.includes(":overdue")) {
+  if (
+    reminder.dedupe_key.includes("deliverable:") &&
+    reminder.dedupe_key.includes(":overdue")
+  ) {
     return "DELIVERABLE_OVERDUE" as const;
   }
   return "PAYMENT_OVERDUE" as const;
 }
 
-function buildReminderEmail(reminder: ReminderEmailPayload, user: ReminderEmailUser) {
+function buildReminderEmail(
+  reminder: ReminderEmailPayload,
+  user: ReminderEmailUser,
+) {
   const type = getTemplateType(reminder);
   const dueAt = toDate(reminder.due_at);
   const dueAtText = format(dueAt, "MMM d, yyyy h:mm a");

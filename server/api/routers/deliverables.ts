@@ -1,17 +1,17 @@
-import { TRPCError } from "@trpc/server";
 import { randomUUID } from "node:crypto";
+import { TRPCError } from "@trpc/server";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import { calculateDeadlineState } from "@/src/server/domain/services/DeadlineCalculator";
-import { syncDeliverableReminders } from "@/src/server/domain/services/ReminderSync";
-import {
-  detectExclusivityConflicts,
-  type Conflict,
-} from "@/src/server/domain/services/ConflictDetector";
-import { conflicts } from "@/server/infrastructure/database/schema/exclusivity";
 import { deals } from "@/server/infrastructure/database/schema/deals";
 import { deliverables } from "@/server/infrastructure/database/schema/deliverables";
+import { conflicts } from "@/server/infrastructure/database/schema/exclusivity";
 import { reminders } from "@/server/infrastructure/database/schema/reminders";
+import {
+  type Conflict,
+  detectExclusivityConflicts,
+} from "@/src/server/domain/services/ConflictDetector";
+import { calculateDeadlineState } from "@/src/server/domain/services/DeadlineCalculator";
+import { syncDeliverableReminders } from "@/src/server/domain/services/ReminderSync";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const deliverablePlatformSchema = z.enum([
@@ -121,7 +121,10 @@ export const deliverablesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         const deal = await ctx.db.query.deals.findFirst({
-          where: and(eq(deals.id, input.deal_id), eq(deals.userId, ctx.user.id)),
+          where: and(
+            eq(deals.id, input.deal_id),
+            eq(deals.userId, ctx.user.id),
+          ),
           columns: {
             id: true,
           },
@@ -135,8 +138,12 @@ export const deliverablesRouter = createTRPCRouter({
         }
 
         const deliverableId = input.deliverable_id ?? randomUUID();
-        const scheduledAt = input.scheduled_at ? new Date(input.scheduled_at) : null;
-        const deliverablePlatform = detectorPlatformSchema.safeParse(input.platform);
+        const scheduledAt = input.scheduled_at
+          ? new Date(input.scheduled_at)
+          : null;
+        const deliverablePlatform = detectorPlatformSchema.safeParse(
+          input.platform,
+        );
         const userRules = await ctx.db.query.exclusivityRules.findMany({
           with: {
             deal: {
@@ -149,7 +156,10 @@ export const deliverablesRouter = createTRPCRouter({
         });
 
         const applicableRules = userRules
-          .filter((rule) => rule.deal.userId === ctx.user.id && rule.dealId !== input.deal_id)
+          .filter(
+            (rule) =>
+              rule.deal.userId === ctx.user.id && rule.dealId !== input.deal_id,
+          )
           .map((rule) => ({
             id: rule.id,
             deal_id: rule.dealId,
@@ -165,14 +175,14 @@ export const deliverablesRouter = createTRPCRouter({
         const detectedConflicts =
           deliverablePlatform.success && scheduledAt
             ? detectExclusivityConflicts(
-              {
-                id: deliverableId,
-                category: input.category_path ?? null,
-                platform: deliverablePlatform.data,
-                scheduled_at: scheduledAt,
-              },
-              applicableRules,
-            )
+                {
+                  id: deliverableId,
+                  category: input.category_path ?? null,
+                  platform: deliverablePlatform.data,
+                  scheduled_at: scheduledAt,
+                },
+                applicableRules,
+              )
             : [];
 
         if (detectedConflicts.length > 0) {
@@ -186,7 +196,9 @@ export const deliverablesRouter = createTRPCRouter({
                 ...conflict.overlap,
                 conflict_session_id: input.conflict_session_id ?? null,
                 proceeded_despite_conflict: input.acknowledge_conflicts,
-                acknowledged_by_user_id: input.acknowledge_conflicts ? ctx.user.id : null,
+                acknowledged_by_user_id: input.acknowledge_conflicts
+                  ? ctx.user.id
+                  : null,
                 detected_at: conflictEventTime,
               },
               severity: conflict.severity,

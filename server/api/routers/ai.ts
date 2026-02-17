@@ -1,12 +1,17 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { ExternalServiceError } from "@/server/utils/errors";
 import { testGroqConnection } from "@/src/server/services/ai/client";
 import { getAIExtractionAvailability } from "@/src/server/services/ai/quotaFlag";
-import { ExternalServiceError } from "@/server/utils/errors";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 
 const testConnectionInputSchema = z.object({
-  message: z.string().trim().min(1).max(500).default("Nike wants 2 reels for $1500"),
+  message: z
+    .string()
+    .trim()
+    .min(1)
+    .max(500)
+    .default("Nike wants 2 reels for $1500"),
 });
 
 export const aiRouter = createTRPCRouter({

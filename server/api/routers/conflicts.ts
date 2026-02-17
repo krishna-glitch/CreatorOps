@@ -1,9 +1,9 @@
 import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { conflicts } from "@/server/infrastructure/database/schema/exclusivity";
 import { deals } from "@/server/infrastructure/database/schema/deals";
 import { deliverables } from "@/server/infrastructure/database/schema/deliverables";
+import { conflicts } from "@/server/infrastructure/database/schema/exclusivity";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const listConflictsInputSchema = z
@@ -131,12 +131,16 @@ export const conflictsRouter = createTRPCRouter({
               return true;
             }
 
-            const maybeDeliverable = deliverableMap.get(row.newDealOrDeliverableId);
+            const maybeDeliverable = deliverableMap.get(
+              row.newDealOrDeliverableId,
+            );
             return maybeDeliverable?.deal.userId === ctx.user.id;
           })
           .map((row) => {
             const maybeDeal = dealMap.get(row.newDealOrDeliverableId);
-            const maybeDeliverable = deliverableMap.get(row.newDealOrDeliverableId);
+            const maybeDeliverable = deliverableMap.get(
+              row.newDealOrDeliverableId,
+            );
             const targetDeal = maybeDeal ?? maybeDeliverable?.deal ?? null;
 
             return {
@@ -152,8 +156,10 @@ export const conflictsRouter = createTRPCRouter({
               target_deliverable_id: maybeDeliverable?.id ?? null,
               conflicting_rule_id: row.conflictingRuleId ?? null,
               conflicting_rule_deal_id: row.conflictingRule?.deal?.id ?? null,
-              conflicting_rule_deal_title: row.conflictingRule?.deal?.title ?? null,
-              conflicting_rule_brand_name: row.conflictingRule?.deal?.brand?.name ?? null,
+              conflicting_rule_deal_title:
+                row.conflictingRule?.deal?.title ?? null,
+              conflicting_rule_brand_name:
+                row.conflictingRule?.deal?.brand?.name ?? null,
             };
           });
 

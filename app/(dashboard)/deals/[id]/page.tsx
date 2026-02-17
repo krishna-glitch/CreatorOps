@@ -1,16 +1,16 @@
 import { TRPCError } from "@trpc/server";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { db } from "@/db";
 import { buttonVariants } from "@/components/ui/button";
+import { db } from "@/db";
 import { createClient } from "@/lib/supabase/server";
+import { appRouter } from "@/server/api/root";
 import {
   formatDealCurrency,
   formatDealDate,
   StatusBadge,
 } from "@/src/components/deals/StatusBadge";
 import { DealDeliverablesSection } from "@/src/components/deliverables/DealDeliverablesSection";
-import { appRouter } from "@/server/api/root";
 
 type DealDetailPageProps = {
   params: Promise<{
@@ -40,7 +40,8 @@ function formatPaymentAmount(
   value: string | number | null,
   currency: string | null | undefined,
 ) {
-  const normalizedCurrency = currency === "USD" || currency === "INR" ? currency : null;
+  const normalizedCurrency =
+    currency === "USD" || currency === "INR" ? currency : null;
   return formatDealCurrency(value, { currency: normalizedCurrency });
 }
 
@@ -49,7 +50,10 @@ function formatRevisionHours(totalMinutes: number) {
   return `${hours.toFixed(1)} hours`;
 }
 
-function getRevisionStatusClassName(revisionsUsed: number, revisionLimit: number) {
+function getRevisionStatusClassName(
+  revisionsUsed: number,
+  revisionLimit: number,
+) {
   if (revisionsUsed > revisionLimit) {
     return "border-transparent bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300";
   }
@@ -82,7 +86,9 @@ export default async function DealDetailPage({ params }: DealDetailPageProps) {
   try {
     const deal = await caller.deals.getById({ id });
     const payments = await caller.payments.listByDeal({ deal_id: id });
-    const revisionStats = await caller.feedback.getDealRevisionStats({ deal_id: id });
+    const revisionStats = await caller.feedback.getDealRevisionStats({
+      deal_id: id,
+    });
 
     const totalExpected = payments.reduce(
       (sum, payment) => sum + (Number(payment.amount) || 0),
@@ -132,7 +138,10 @@ export default async function DealDetailPage({ params }: DealDetailPageProps) {
               >
                 Back to Deals
               </Link>
-              <Link href={`/deals/${deal.id}/edit`} className={buttonVariants({ variant: "default" })}>
+              <Link
+                href={`/deals/${deal.id}/edit`}
+                className={buttonVariants({ variant: "default" })}
+              >
                 Edit Deal
               </Link>
             </div>
@@ -160,6 +169,27 @@ export default async function DealDetailPage({ params }: DealDetailPageProps) {
                   <dt className="text-sm text-muted-foreground">Status</dt>
                   <dd>
                     <StatusBadge status={deal.status} />
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-sm text-muted-foreground">
+                    Compensation
+                  </dt>
+                  <dd className="text-sm font-medium">
+                    {deal.compensationModel ?? "FIXED"}
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-sm text-muted-foreground">Split</dt>
+                  <dd className="text-sm font-medium">
+                    {typeof deal.cashPercent === "number"
+                      ? deal.cashPercent
+                      : 100}
+                    % cash /{" "}
+                    {typeof deal.affiliatePercent === "number"
+                      ? deal.affiliatePercent
+                      : 0}
+                    % affiliate
                   </dd>
                 </div>
                 <div className="flex items-center justify-between gap-3">
@@ -225,13 +255,12 @@ export default async function DealDetailPage({ params }: DealDetailPageProps) {
           <section className="mt-6 rounded-xl border dash-border p-4 dash-border">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-sm font-medium">Payments</h2>
-              <button
-                type="button"
-                disabled
+              <Link
+                href={`/payments/new?dealId=${deal.id}`}
                 className={buttonVariants({ variant: "default", size: "sm" })}
               >
-                Add Payment (Coming Soon)
-              </button>
+                Add Payment
+              </Link>
             </div>
 
             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -287,13 +316,17 @@ export default async function DealDetailPage({ params }: DealDetailPageProps) {
                         <p>
                           Expected:{" "}
                           {payment.expectedDate
-                            ? formatDealDate(payment.expectedDate, { includeTime: true })
+                            ? formatDealDate(payment.expectedDate, {
+                                includeTime: true,
+                              })
                             : "N/A"}
                         </p>
                         <p>
                           Paid:{" "}
                           {payment.paidAt
-                            ? formatDealDate(payment.paidAt, { includeTime: true })
+                            ? formatDealDate(payment.paidAt, {
+                                includeTime: true,
+                              })
                             : "N/A"}
                         </p>
                         <p>Payment method: {payment.paymentMethod ?? "N/A"}</p>
@@ -327,7 +360,10 @@ export default async function DealDetailPage({ params }: DealDetailPageProps) {
                           className="border-b dash-border last:border-0 dark:border-gray-900"
                         >
                           <td className="px-3 py-3 font-medium">
-                            {formatPaymentAmount(payment.amount, payment.currency)}
+                            {formatPaymentAmount(
+                              payment.amount,
+                              payment.currency,
+                            )}
                           </td>
                           <td className="px-3 py-3">
                             <span
@@ -341,13 +377,17 @@ export default async function DealDetailPage({ params }: DealDetailPageProps) {
                               <p>
                                 Expected:{" "}
                                 {payment.expectedDate
-                                  ? formatDealDate(payment.expectedDate, { includeTime: true })
+                                  ? formatDealDate(payment.expectedDate, {
+                                      includeTime: true,
+                                    })
                                   : "N/A"}
                               </p>
                               <p>
                                 Paid:{" "}
                                 {payment.paidAt
-                                  ? formatDealDate(payment.paidAt, { includeTime: true })
+                                  ? formatDealDate(payment.paidAt, {
+                                      includeTime: true,
+                                    })
                                   : "N/A"}
                               </p>
                             </div>

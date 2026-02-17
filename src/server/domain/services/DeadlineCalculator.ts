@@ -23,7 +23,7 @@ export type DeadlineCalculationResult = {
 };
 
 export function calculateDeadlineState(
-  input: DeadlineCalculationInput
+  input: DeadlineCalculationInput,
 ): DeadlineCalculationResult {
   const now = toDate(input.now);
   const postedAt = toOptionalDate(input.posted_at);

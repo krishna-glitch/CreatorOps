@@ -1,8 +1,14 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Playfair_Display, Plus_Jakarta_Sans } from "next/font/google";
+import {
+  Geist,
+  Geist_Mono,
+  Playfair_Display,
+  Plus_Jakarta_Sans,
+} from "next/font/google";
+import Script from "next/script";
 import { Toaster } from "sonner";
-import { PWAClient } from "@/components/pwa-client";
 import { ClientObservability } from "@/components/client-observability";
+import { PWAClient } from "@/components/pwa-client";
 import { TRPCProvider } from "@/lib/trpc/provider";
 import "./globals.css";
 
@@ -58,38 +64,11 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head suppressHydrationWarning>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  var savedTheme = localStorage.getItem("creatorops-theme");
-                  var supportsMatchMedia = typeof window.matchMedia === "function";
-                  var prefersDark = supportsMatchMedia
-                    ? window.matchMedia("(prefers-color-scheme: dark)").matches
-                    : true;
-                  var themePreference = "system";
-                  var resolvedTheme = prefersDark ? "dark" : "light";
-
-                  if (savedTheme === "light" || savedTheme === "dark") {
-                    themePreference = savedTheme;
-                    resolvedTheme = savedTheme;
-                  } else {
-                    try {
-                      localStorage.setItem("creatorops-theme", "system");
-                    } catch (_) {}
-                  }
-
-                  document.documentElement.classList.toggle("dark", resolvedTheme === "dark");
-                  document.documentElement.setAttribute("data-theme", themePreference);
-                  document.documentElement.style.colorScheme = resolvedTheme;
-                } catch (_) {}
-              })();
-            `,
-          }}
-        />
+        <Script src="/theme-init.js" strategy="beforeInteractive" />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} ${plusJakarta.variable} antialiased font-sans`}>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} ${plusJakarta.variable} antialiased font-sans`}
+      >
         <TRPCProvider>
           {children}
           <ClientObservability />

@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useEffect, ReactNode } from "react";
-import { createPortal } from "react-dom";
-import { motion, AnimatePresence, useDragControls, PanInfo } from "framer-motion";
+import { AnimatePresence, motion, type PanInfo } from "framer-motion";
 import { X } from "lucide-react";
-import { triggerHaptic } from "@/src/lib/utils/haptics";
+import React, { type ReactNode, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
+import { triggerHaptic } from "@/src/lib/utils/haptics";
 
 interface BottomSheetProps {
   isOpen: boolean;
@@ -79,7 +79,7 @@ export function BottomSheet({
             onDragEnd={handleDragEnd}
             className={cn(
               "relative z-10 w-full max-w-lg overflow-hidden rounded-t-[24px] bg-white shadow-2xl dark:bg-gray-900 pb-safe",
-              className
+              className,
             )}
             style={{ maxHeight: "92vh" }}
           >
@@ -98,6 +98,7 @@ export function BottomSheet({
                 )}
                 {showCloseButton && (
                   <button
+                    type="button"
                     onClick={onClose}
                     className="rounded-full bg-gray-100 p-2 text-gray-500 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
                   >
@@ -108,13 +109,11 @@ export function BottomSheet({
             )}
 
             {/* Content */}
-            <div className="overflow-y-auto px-6 pt-2 pb-8">
-              {children}
-            </div>
+            <div className="overflow-y-auto px-6 pt-2 pb-8">{children}</div>
           </motion.div>
         </div>
       )}
     </AnimatePresence>,
-    document.body
+    document.body,
   );
 }

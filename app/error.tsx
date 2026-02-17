@@ -20,7 +20,8 @@ export default function GlobalError({
         digest: error.digest,
         pathname:
           typeof window !== "undefined" ? window.location.pathname : undefined,
-        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+        userAgent:
+          typeof navigator !== "undefined" ? navigator.userAgent : undefined,
       });
 
       fetch("/api/observability/client-error", {
@@ -44,7 +45,12 @@ export default function GlobalError({
         <Button onClick={reset} variant="default">
           Try again
         </Button>
-        <Button onClick={() => window.location.href = '/'} variant="outline">
+        <Button
+          onClick={() => {
+            window.location.href = "/";
+          }}
+          variant="outline"
+        >
           Go Home
         </Button>
       </div>

@@ -29,9 +29,9 @@ export const pushSubscriptions = pgTable(
   },
   (table) => {
     return {
-      endpointUniqueIdx: uniqueIndex("push_subscriptions_endpoint_unique_idx").on(
-        table.endpoint,
-      ),
+      endpointUniqueIdx: uniqueIndex(
+        "push_subscriptions_endpoint_unique_idx",
+      ).on(table.endpoint),
       userActiveIdx: index("push_subscriptions_user_active_idx").on(
         table.userId,
         table.isActive,

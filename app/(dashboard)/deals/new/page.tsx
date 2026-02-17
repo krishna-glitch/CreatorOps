@@ -44,7 +44,10 @@ import { useDefaultCurrency } from "@/src/hooks/useDefaultCurrency";
 import type { ParsedCommand } from "@/src/lib/voice/commandParser";
 
 const VoiceCommandButton = dynamic(
-  () => import("@/src/components/voice/VoiceCommandButton").then((mod) => mod.VoiceCommandButton),
+  () =>
+    import("@/src/components/voice/VoiceCommandButton").then(
+      (mod) => mod.VoiceCommandButton,
+    ),
   { ssr: false },
 );
 
@@ -75,25 +78,48 @@ const exclusivityRuleFormSchema = z
     },
   );
 
-const createDealFormSchema = z.object({
-  brand_id: z.string().uuid({ message: "Please select a brand" }),
-  title: z
-    .string()
-    .trim()
-    .min(1, { message: "Title is required" })
-    .max(200, { message: "Title must be at most 200 characters" }),
-  total_value: z
-    .number({ message: "Total value is required" })
-    .finite({ message: "Total value must be a valid number" })
-    .positive({ message: "Total value must be greater than 0" }),
-  currency: z.enum(["USD", "INR"], {
-    message: "Please select a currency",
-  }),
-  status: z.enum(["INBOUND", "NEGOTIATING", "AGREED", "PAID", "CANCELLED"], {
-    message: "Please select a status",
-  }),
-  exclusivity_rules: z.array(exclusivityRuleFormSchema).default([]),
-});
+const createDealFormSchema = z
+  .object({
+    brand_id: z.string().uuid({ message: "Please select a brand" }),
+    title: z
+      .string()
+      .trim()
+      .min(1, { message: "Title is required" })
+      .max(200, { message: "Title must be at most 200 characters" }),
+    total_value: z
+      .number({ message: "Total value is required" })
+      .finite({ message: "Total value must be a valid number" })
+      .positive({ message: "Total value must be greater than 0" }),
+    currency: z.enum(["USD", "INR"], {
+      message: "Please select a currency",
+    }),
+    status: z.enum(
+      ["INBOUND", "NEGOTIATING", "AGREED", "PAID", "CANCELLED", "REJECTED"],
+      {
+        message: "Please select a status",
+      },
+    ),
+    compensation_model: z.enum(["FIXED", "AFFILIATE", "HYBRID"], {
+      message: "Please select a compensation model",
+    }),
+    cash_percent: z
+      .number({ message: "Cash percent is required" })
+      .int()
+      .min(0)
+      .max(100),
+    affiliate_percent: z
+      .number({ message: "Affiliate percent is required" })
+      .int()
+      .min(0)
+      .max(100),
+    guaranteed_cash_value: z.number().nonnegative().finite().optional(),
+    expected_affiliate_value: z.number().nonnegative().finite().optional(),
+    exclusivity_rules: z.array(exclusivityRuleFormSchema).default([]),
+  })
+  .refine((value) => value.cash_percent + value.affiliate_percent === 100, {
+    message: "Cash and affiliate percentages must add up to 100",
+    path: ["cash_percent"],
+  });
 
 type CreateDealFormValues = z.input<typeof createDealFormSchema>;
 
@@ -232,6 +258,11 @@ export default function NewDealPage() {
       total_value: undefined,
       currency: defaultCurrency,
       status: "INBOUND",
+      compensation_model: "FIXED",
+      cash_percent: 100,
+      affiliate_percent: 0,
+      guaranteed_cash_value: undefined,
+      expected_affiliate_value: undefined,
       exclusivity_rules: [],
     },
   });
@@ -282,14 +313,15 @@ export default function NewDealPage() {
   };
 
   const isSubmitting = createDealMutation.isPending;
+  const compensationModel = form.watch("compensation_model");
   const brandItems = brands?.items ?? [];
   const hasBrands = brandItems.length > 0;
   const normalizedBrandSearch = brandSearch.trim().toLowerCase();
   const exactBrandMatch =
     normalizedBrandSearch.length > 0
-      ? brandItems.find(
+      ? (brandItems.find(
           (brand) => brand.name.trim().toLowerCase() === normalizedBrandSearch,
-        ) ?? null
+        ) ?? null)
       : null;
   const canCreateBrandFromSearch =
     brandSearch.trim().length > 0 &&
@@ -551,7 +583,7 @@ export default function NewDealPage() {
               <div className="rounded-xl border dash-border p-4 sm:p-5 dash-border">
                 <p className="text-sm font-medium">Commercial Terms</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Enter value, currency, and current status.
+                  Enter value, compensation split, currency, and current status.
                 </p>
 
                 <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
@@ -620,6 +652,111 @@ export default function NewDealPage() {
                   />
                 </div>
 
+                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-5">
+                  <FormField
+                    control={form.control}
+                    name="compensation_model"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium">
+                          Compensation Model
+                        </FormLabel>
+                        <Select
+                          value={field.value}
+                          onValueChange={(nextValue) => {
+                            field.onChange(nextValue);
+                            if (nextValue === "FIXED") {
+                              form.setValue("cash_percent", 100, {
+                                shouldDirty: true,
+                                shouldValidate: true,
+                              });
+                              form.setValue("affiliate_percent", 0, {
+                                shouldDirty: true,
+                                shouldValidate: true,
+                              });
+                            } else if (nextValue === "AFFILIATE") {
+                              form.setValue("cash_percent", 0, {
+                                shouldDirty: true,
+                                shouldValidate: true,
+                              });
+                              form.setValue("affiliate_percent", 100, {
+                                shouldDirty: true,
+                                shouldValidate: true,
+                              });
+                            }
+                          }}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="focus:ring-emerald-500/30 focus:ring-offset-0">
+                              <SelectValue placeholder="Select model" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="FIXED">FIXED</SelectItem>
+                            <SelectItem value="AFFILIATE">AFFILIATE</SelectItem>
+                            <SelectItem value="HYBRID">HYBRID</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="cash_percent"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium">
+                          Cash %
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="1"
+                            value={field.value ?? 0}
+                            disabled={compensationModel !== "HYBRID"}
+                            onChange={(event) =>
+                              field.onChange(Number(event.target.value))
+                            }
+                            onBlur={field.onBlur}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="affiliate_percent"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium">
+                          Affiliate %
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="1"
+                            value={field.value ?? 0}
+                            disabled={compensationModel !== "HYBRID"}
+                            onChange={(event) =>
+                              field.onChange(Number(event.target.value))
+                            }
+                            onBlur={field.onBlur}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
                 <FormField
                   control={form.control}
                   name="status"
@@ -645,6 +782,7 @@ export default function NewDealPage() {
                           <SelectItem value="AGREED">AGREED</SelectItem>
                           <SelectItem value="PAID">PAID</SelectItem>
                           <SelectItem value="CANCELLED">CANCELLED</SelectItem>
+                          <SelectItem value="REJECTED">REJECTED</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />

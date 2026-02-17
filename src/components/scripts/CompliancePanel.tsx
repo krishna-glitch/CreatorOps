@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
-  CircleCheck,
   Save,
   Sparkles,
   XCircle,
@@ -13,7 +12,6 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -257,11 +255,11 @@ export function CompliancePanel({
   const [validationResult, setValidationResult] = useState(() =>
     checkCompliance(script, initialRules ?? {}),
   );
-  const [isValidating, setIsValidating] = useState(false);
+  const [_isValidating, setIsValidating] = useState(false);
   const [savingRules, setSavingRules] = useState(false);
   const [rulesSavedAt, setRulesSavedAt] = useState<Date | null>(null);
   const [showRulesForm, setShowRulesForm] = useState(true);
-  const [showPassedChecks, setShowPassedChecks] = useState(false);
+  const [_showPassedChecks, _setShowPassedChecks] = useState(false);
 
   useEffect(() => {
     setRules((prev) => ({ ...prev, ...(initialRules ?? {}) }));
@@ -398,15 +396,22 @@ export function CompliancePanel({
       <div className="rounded-xl border dash-border dash-bg-card p-4 shadow-sm">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className={cn("flex h-8 w-8 items-center justify-center rounded-full border dash-bg-card",
-              status.key === "error" ? "border-rose-200 bg-rose-50 text-rose-600" :
-                status.key === "warning" ? "border-amber-200 bg-amber-50 text-amber-600" :
-                  "border-emerald-200 bg-emerald-50 text-emerald-600"
-            )}>
+            <div
+              className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-full border dash-bg-card",
+                status.key === "error"
+                  ? "border-rose-200 bg-rose-50 text-rose-600"
+                  : status.key === "warning"
+                    ? "border-amber-200 bg-amber-50 text-amber-600"
+                    : "border-emerald-200 bg-emerald-50 text-emerald-600",
+              )}
+            >
               <status.Icon className="h-4 w-4" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-slate-900">{status.label}</p>
+              <p className="text-sm font-semibold text-slate-900">
+                {status.label}
+              </p>
               <p className="text-[10px] text-slate-500">{status.summary}</p>
             </div>
           </div>
@@ -427,7 +432,9 @@ export function CompliancePanel({
           {validationResult.issues.length === 0 ? (
             <div className="flex items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50/50 p-3 text-sm text-emerald-700">
               <CheckCircle2 className="h-4 w-4" />
-              <span className="text-xs font-medium">Script is fully compliant with brand rules.</span>
+              <span className="text-xs font-medium">
+                Script is fully compliant with brand rules.
+              </span>
             </div>
           ) : (
             <div className="space-y-2">
@@ -436,24 +443,44 @@ export function CompliancePanel({
                 if (issues.length === 0) return null;
 
                 return (
-                  <div key={issueType} className="overflow-hidden rounded-lg border dash-border dash-bg-card">
+                  <div
+                    key={issueType}
+                    className="overflow-hidden rounded-lg border dash-border dash-bg-card"
+                  >
                     <div className="flex items-center justify-between border-b dash-border dash-bg-card px-3 py-2">
-                      <span className="text-xs font-semibold text-slate-700">{ISSUE_TYPE_LABEL[issueType]}</span>
-                      <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-medium text-slate-600">
+                      <span className="text-xs font-semibold text-slate-700">
+                        {ISSUE_TYPE_LABEL[issueType]}
+                      </span>
+                      <Badge
+                        variant="secondary"
+                        className="h-5 px-1.5 text-[10px] font-medium text-slate-600"
+                      >
                         {issues.length}
                       </Badge>
                     </div>
                     <div className="divide-y divide-slate-100">
                       {issues.map((issue, index) => (
-                        <div key={`${issue.type}-${index}`} className="flex items-start justify-between gap-3 p-3">
+                        <div
+                          key={`${issue.type}-${index}`}
+                          className="flex items-start justify-between gap-3 p-3"
+                        >
                           <div className="space-y-1">
                             <div className="flex items-center gap-1.5">
-                              {issue.severity === "error" ? <XCircle className="h-3.5 w-3.5 text-rose-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
-                              <span className="text-xs font-medium text-slate-900">{issue.message}</span>
+                              {issue.severity === "error" ? (
+                                <XCircle className="h-3.5 w-3.5 text-rose-500" />
+                              ) : (
+                                <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                              )}
+                              <span className="text-xs font-medium text-slate-900">
+                                {issue.message}
+                              </span>
                             </div>
                             {issue.suggestion && (
                               <p className="ml-5 text-[10px] text-slate-500">
-                                Try: <span className="font-medium text-slate-700">"{issue.suggestion}"</span>
+                                Try:{" "}
+                                <span className="font-medium text-slate-700">
+                                  "{issue.suggestion}"
+                                </span>
                               </p>
                             )}
                           </div>
@@ -490,8 +517,12 @@ export function CompliancePanel({
               <Save className="h-3.5 w-3.5" />
             </div>
             <div>
-              <p className="text-xs font-semibold text-slate-900">Brand Rules</p>
-              <p className="text-[10px] text-slate-500">Configure requirements for this script</p>
+              <p className="text-xs font-semibold text-slate-900">
+                Brand Rules
+              </p>
+              <p className="text-[10px] text-slate-500">
+                Configure requirements for this script
+              </p>
             </div>
           </div>
           {showRulesForm ? (
@@ -516,7 +547,10 @@ export function CompliancePanel({
                     }
                     placeholder="e.g. Save 20%, Link in bio"
                     className="h-8 text-xs"
-                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addListItems("required_phrases"))}
+                    onKeyDown={(e) =>
+                      e.key === "Enter" &&
+                      (e.preventDefault(), addListItems("required_phrases"))
+                    }
                   />
                   <Button
                     type="button"
@@ -554,7 +588,10 @@ export function CompliancePanel({
                     }
                     placeholder="e.g. cheap, guarantee"
                     className="h-8 text-xs"
-                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addListItems("forbidden_words"))}
+                    onKeyDown={(e) =>
+                      e.key === "Enter" &&
+                      (e.preventDefault(), addListItems("forbidden_words"))
+                    }
                   />
                   <Button
                     type="button"
@@ -592,7 +629,10 @@ export function CompliancePanel({
                     }
                     placeholder="e.g. #ad, #sponsored"
                     className="h-8 text-xs"
-                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addListItems("required_hashtags"))}
+                    onKeyDown={(e) =>
+                      e.key === "Enter" &&
+                      (e.preventDefault(), addListItems("required_hashtags"))
+                    }
                   />
                   <Button
                     type="button"
@@ -622,7 +662,9 @@ export function CompliancePanel({
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">Min words</Label>
+                  <Label className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">
+                    Min words
+                  </Label>
                   <Input
                     type="number"
                     min={0}
@@ -640,7 +682,9 @@ export function CompliancePanel({
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">Max words</Label>
+                  <Label className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">
+                    Max words
+                  </Label>
                   <Input
                     type="number"
                     min={0}
@@ -695,7 +739,9 @@ export function CompliancePanel({
                       : "Unsaved changes"}
                   </span>
                 ) : (
-                  <span className="text-[10px] text-slate-400">Local only (no brand connected)</span>
+                  <span className="text-[10px] text-slate-400">
+                    Local only (no brand connected)
+                  </span>
                 )}
                 <Button
                   type="button"
@@ -715,6 +761,5 @@ export function CompliancePanel({
     </div>
   );
 }
-
 
 export type { BrandRules, ComplianceHighlight };

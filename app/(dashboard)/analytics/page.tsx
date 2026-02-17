@@ -1,6 +1,12 @@
 "use client";
 
-import { BarChart3, Download, Filter, RefreshCcw, TrendingUp } from "lucide-react";
+import {
+  BarChart3,
+  Download,
+  Filter,
+  RefreshCcw,
+  TrendingUp,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   Bar,
@@ -97,7 +103,10 @@ function EmptyChartState({ message }: { message: string }) {
 function LoadingChartState() {
   return (
     <div className="space-y-3">
-      <div className="h-[260px] animate-pulse rounded-xl dash-bg-card" aria-hidden="true" />
+      <div
+        className="h-[260px] animate-pulse rounded-xl dash-bg-card"
+        aria-hidden="true"
+      />
       <div className="flex gap-4">
         <div className="h-3 w-20 animate-pulse rounded dash-bg-card" />
         <div className="h-3 w-16 animate-pulse rounded dash-bg-card" />
@@ -113,13 +122,14 @@ export default function AnalyticsPage() {
 
   const [startDate, setStartDate] = useState<string>(toDateInput(defaultStart));
   const [endDate, setEndDate] = useState<string>(toDateInput(now));
+  const hasInvalidRange = !startDate || !endDate || startDate > endDate;
 
   const rangeInput = useMemo(() => {
-    if (!startDate || !endDate || startDate > endDate) {
+    if (hasInvalidRange) {
       return undefined;
     }
     return toIsoRange(startDate, endDate);
-  }, [startDate, endDate]);
+  }, [endDate, hasInvalidRange, startDate]);
 
   const insightsQuery = trpc.analytics.getAdvancedInsights.useQuery(
     rangeInput,
@@ -130,6 +140,17 @@ export default function AnalyticsPage() {
   );
 
   const insights = insightsQuery.data;
+
+  const resetToLastTwelveMonths = () => {
+    const reference = new Date();
+    const start = new Date(
+      reference.getFullYear(),
+      reference.getMonth() - 11,
+      1,
+    );
+    setStartDate(toDateInput(start));
+    setEndDate(toDateInput(reference));
+  };
 
   const topBrands = useMemo(
     () => (insights?.revenueByBrand ?? []).slice(0, 10),
@@ -235,7 +256,9 @@ export default function AnalyticsPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="font-serif text-3xl font-bold tracking-tight dash-text">Analytics</h1>
+          <h1 className="font-serif text-3xl font-bold tracking-tight dash-text">
+            Analytics
+          </h1>
           <p className="dash-text-muted">
             Revenue, pipeline, and brand performance across your selected range.
           </p>
@@ -277,19 +300,44 @@ export default function AnalyticsPage() {
             type="button"
             variant="outline"
             onClick={exportCsv}
-            disabled={!insights || insightsQuery.isLoading}
+            disabled={!insights || insightsQuery.isLoading || hasInvalidRange}
             className="gap-2"
           >
             <Download className="h-4 w-4" />
             Export CSV
           </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={resetToLastTwelveMonths}
+            className="text-xs"
+          >
+            Reset range
+          </Button>
         </div>
       </div>
 
-      {rangeInput === undefined ? (
+      {hasInvalidRange ? (
+        <div className="dash-inline-card dash-chip-tone-yellow flex items-center justify-between gap-3 rounded-xl border p-3 text-sm">
+          <div>
+            <Filter className="mr-1 inline h-4 w-4" />
+            Date range is invalid. Ensure start date is before end date.
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={resetToLastTwelveMonths}
+          >
+            Reset to last 12 months
+          </Button>
+        </div>
+      ) : null}
+
+      {rangeInput === undefined && !hasInvalidRange ? (
         <div className="dash-inline-card dash-chip-tone-yellow rounded-xl border p-3 text-sm">
           <Filter className="mr-1 inline h-4 w-4" />
-          Date range is invalid. Ensure start date is before end date.
+          Date range is incomplete.
         </div>
       ) : null}
 
@@ -300,9 +348,12 @@ export default function AnalyticsPage() {
               <Filter className="h-4 w-4 dash-text-danger" />
             </div>
             <div>
-              <p className="text-sm font-medium dash-text">Failed to load analytics</p>
+              <p className="text-sm font-medium dash-text">
+                Failed to load analytics
+              </p>
               <p className="text-xs dash-text-muted">
-                {insightsQuery.error?.message || "Try adjusting the date range or refreshing."}
+                {insightsQuery.error?.message ||
+                  "Try adjusting the date range or refreshing."}
               </p>
             </div>
           </div>
@@ -507,7 +558,9 @@ export default function AnalyticsPage() {
 
         <Card className="dash-card border dash-border">
           <CardHeader>
-            <CardTitle className="text-base dash-text">Platform Breakdown</CardTitle>
+            <CardTitle className="text-base dash-text">
+              Platform Breakdown
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {insightsQuery.isLoading ? (
@@ -531,7 +584,7 @@ export default function AnalyticsPage() {
                           key={`${entry.platform}-${entry.revenue}`}
                           fill={
                             CHART_COLORS.platform[
-                            index % CHART_COLORS.platform.length
+                              index % CHART_COLORS.platform.length
                             ]
                           }
                         />
@@ -553,7 +606,9 @@ export default function AnalyticsPage() {
 
         <Card className="dash-card border dash-border">
           <CardHeader>
-            <CardTitle className="text-base dash-text">Top Brands (Top 10)</CardTitle>
+            <CardTitle className="text-base dash-text">
+              Top Brands (Top 10)
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {insightsQuery.isLoading ? (
@@ -628,7 +683,7 @@ export default function AnalyticsPage() {
                           key={`${entry.stage}-${entry.value}`}
                           fill={
                             CHART_COLORS.funnel[
-                            index % CHART_COLORS.funnel.length
+                              index % CHART_COLORS.funnel.length
                             ]
                           }
                         />
@@ -644,7 +699,7 @@ export default function AnalyticsPage() {
                         style={{
                           backgroundColor:
                             CHART_COLORS.funnel[
-                            index % CHART_COLORS.funnel.length
+                              index % CHART_COLORS.funnel.length
                             ],
                         }}
                       />

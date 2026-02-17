@@ -1,25 +1,30 @@
 "use client";
 
-import { useVirtualizer } from "@tanstack/react-virtual";
 import type { inferRouterOutputs } from "@trpc/server";
-import { Check, Loader2 } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarClock,
+  Check,
+  Loader2,
+  PlayCircle,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { buttonVariants } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc/client";
+import { cn } from "@/lib/utils";
 import type { AppRouter } from "@/server/api/root";
 import { DealCardWithMenu } from "@/src/components/deals/DealCardWithMenu";
 import {
   formatDealCurrency,
-  formatDealDate,
   StatusBadge,
 } from "@/src/components/deals/StatusBadge";
 import { GestureTutorial } from "@/src/components/onboarding/GestureTutorial";
 import { VoiceCommandButton } from "@/src/components/voice/VoiceCommandButton";
-import { usePullToRefresh } from "@/src/hooks/usePullToRefresh";
 import { useDefaultCurrency } from "@/src/hooks/useDefaultCurrency";
+import { usePullToRefresh } from "@/src/hooks/usePullToRefresh";
 import type { ParsedCommand } from "@/src/lib/voice/commandParser";
 
 type DealsListResponse = inferRouterOutputs<AppRouter>["deals"]["list"];
@@ -29,6 +34,16 @@ type DealsListClientProps = {
   initialData: DealsListResponse | null;
   pageSize: number;
   aiExtractionEnabled: boolean;
+};
+
+type TimeLane = "ATTENTION" | "NOW" | "NEXT" | "LATER";
+
+type DealTimingSummary = {
+  lane: TimeLane;
+  label: string;
+  exact: string;
+  sortAt: number;
+  progressPercent: number;
 };
 
 function DealCardSkeleton() {
@@ -83,6 +98,178 @@ function isUnpaidStatus(status: DealItem["status"]) {
   return status !== "PAID";
 }
 
+function formatRelativeFromNow(target: Date, now: Date) {
+  const deltaMs = target.getTime() - now.getTime();
+  const absMs = Math.abs(deltaMs);
+  const minutes = Math.max(1, Math.floor(absMs / 60_000));
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  const unitValue = days > 0 ? days : hours > 0 ? hours : minutes;
+  const unit = days > 0 ? "d" : hours > 0 ? "h" : "m";
+  const suffix = `${unitValue}${unit}`;
+
+  if (deltaMs >= 0) {
+    return `in ${suffix}`;
+  }
+
+  return `${suffix} ago`;
+}
+
+function formatExactDate(value: Date) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(value);
+}
+
+function getDealTimingSummary(deal: DealItem, now: Date): DealTimingSummary {
+  const activeDeliverables = (deal.deliverables ?? []).filter(
+    (deliverable) => deliverable.status !== "POSTED" && !deliverable.postedAt,
+  );
+
+  const scheduleDates = activeDeliverables
+    .map((deliverable) => {
+      if (!deliverable.scheduledAt) {
+        return null;
+      }
+      const parsed = new Date(deliverable.scheduledAt);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    })
+    .filter((value): value is Date => value !== null)
+    .sort((a, b) => a.getTime() - b.getTime());
+
+  const overdue = scheduleDates.filter(
+    (value) => value.getTime() <= now.getTime(),
+  );
+  const upcoming = scheduleDates.filter(
+    (value) => value.getTime() > now.getTime(),
+  );
+
+  if (overdue.length > 0) {
+    const nearestOverdue = overdue[overdue.length - 1];
+    const overdueDuration = formatRelativeFromNow(nearestOverdue, now).replace(
+      " ago",
+      "",
+    );
+
+    return {
+      lane: "ATTENTION",
+      label: `Overdue by ${overdueDuration}`,
+      exact: formatExactDate(nearestOverdue),
+      sortAt: nearestOverdue.getTime(),
+      progressPercent: 100,
+    };
+  }
+
+  if (upcoming.length > 0) {
+    const nextDate = upcoming[0];
+    const diffMs = nextDate.getTime() - now.getTime();
+    const hourMs = 60 * 60 * 1000;
+    const dayMs = 24 * hourMs;
+
+    if (diffMs <= hourMs) {
+      const isNow = diffMs <= 15 * 60 * 1000;
+      return {
+        lane: "NOW",
+        label: isNow
+          ? "Running now"
+          : `Starts ${formatRelativeFromNow(nextDate, now)}`,
+        exact: formatExactDate(nextDate),
+        sortAt: nextDate.getTime(),
+        progressPercent: 85,
+      };
+    }
+
+    if (diffMs <= dayMs) {
+      const urgency = Math.max(35, Math.round(80 - (diffMs / dayMs) * 45));
+      return {
+        lane: "NEXT",
+        label: `Starts ${formatRelativeFromNow(nextDate, now)}`,
+        exact: formatExactDate(nextDate),
+        sortAt: nextDate.getTime(),
+        progressPercent: urgency,
+      };
+    }
+
+    return {
+      lane: "LATER",
+      label: `Starts ${formatRelativeFromNow(nextDate, now)}`,
+      exact: formatExactDate(nextDate),
+      sortAt: nextDate.getTime(),
+      progressPercent: 25,
+    };
+  }
+
+  if (
+    deal.status === "PAID" ||
+    deal.status === "CANCELLED" ||
+    deal.status === "REJECTED"
+  ) {
+    const completedAt = new Date(deal.updatedAt);
+    return {
+      lane: "LATER",
+      label:
+        deal.status === "PAID"
+          ? "Completed"
+          : deal.status === "REJECTED"
+            ? "Rejected"
+            : "Cancelled",
+      exact: Number.isNaN(completedAt.getTime())
+        ? "No schedule"
+        : formatExactDate(completedAt),
+      sortAt: completedAt.getTime() || 0,
+      progressPercent: 100,
+    };
+  }
+
+  return {
+    lane: "LATER",
+    label: "No schedule set",
+    exact: "Add a deliverable schedule",
+    sortAt: new Date(deal.createdAt).getTime(),
+    progressPercent: 18,
+  };
+}
+
+function lanePillClasses(lane: TimeLane) {
+  if (lane === "ATTENTION") {
+    return "border-rose-300 bg-rose-100 text-rose-700";
+  }
+  if (lane === "NOW") {
+    return "border-emerald-300 bg-emerald-100 text-emerald-700";
+  }
+  if (lane === "NEXT") {
+    return "border-blue-300 bg-blue-100 text-blue-700";
+  }
+  return "border-slate-300 bg-slate-100 text-slate-700";
+}
+
+function laneLabel(lane: TimeLane) {
+  if (lane === "ATTENTION") {
+    return "Overdue";
+  }
+  if (lane === "NOW") {
+    return "Running";
+  }
+  if (lane === "NEXT") {
+    return "Upcoming";
+  }
+  return "Later";
+}
+
+function laneIcon(lane: TimeLane) {
+  if (lane === "ATTENTION") {
+    return <AlertTriangle className="h-4 w-4" />;
+  }
+  if (lane === "NOW") {
+    return <PlayCircle className="h-4 w-4" />;
+  }
+  return <CalendarClock className="h-4 w-4" />;
+}
+
 export function DealsListClient({
   initialData,
   pageSize,
@@ -98,9 +285,18 @@ export function DealsListClient({
     null,
   );
   const [commandFilter, setCommandFilter] = useState<"ALL" | "UNPAID">("ALL");
+  const [focusMode, setFocusMode] = useState<
+    "ALL" | "NOW" | "NEXT" | "ACTION_NEEDED" | "REJECTED"
+  >("ALL");
   const [isVoiceInteractionActive, setIsVoiceInteractionActive] =
     useState(false);
+  const [now, setNow] = useState(() => new Date());
   const listParentRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   const dealsQuery = trpc.deals.list.useInfiniteQuery(
     { limit: pageSize },
@@ -116,7 +312,11 @@ export function DealsListClient({
           return undefined;
         }
 
-        return lastPage.nextCursor;
+        return {
+          cursor: lastPage.nextCursor,
+          cursorId: lastPage.nextCursorId ?? undefined,
+          limit: pageSize,
+        };
       },
       refetchOnWindowFocus: false,
     },
@@ -162,7 +362,7 @@ export function DealsListClient({
   const brandItems = brandsData?.items ?? [];
   const brandNames = brandItems.map((brand) => brand.name);
 
-  const visibleItems = useMemo(() => {
+  const filteredItems = useMemo(() => {
     if (commandFilter === "UNPAID") {
       return items.filter((item) =>
         isUnpaidStatus(optimisticStatusById[item.id] ?? item.status),
@@ -171,6 +371,79 @@ export function DealsListClient({
 
     return items;
   }, [commandFilter, items, optimisticStatusById]);
+
+  const timedItems = useMemo(() => {
+    return filteredItems.map((item) => {
+      const effectiveStatus = optimisticStatusById[item.id] ?? item.status;
+      const timing = getDealTimingSummary(item, now);
+      return {
+        item,
+        effectiveStatus,
+        timing,
+      };
+    });
+  }, [filteredItems, now, optimisticStatusById]);
+
+  const visibleTimedItems = useMemo(() => {
+    if (focusMode === "ACTION_NEEDED") {
+      return timedItems.filter(
+        ({ timing }) => timing.lane === "ATTENTION" || timing.lane === "NOW",
+      );
+    }
+    if (focusMode === "NOW") {
+      return timedItems.filter(({ timing }) => timing.lane === "NOW");
+    }
+    if (focusMode === "NEXT") {
+      return timedItems.filter(({ timing }) => timing.lane === "NEXT");
+    }
+    if (focusMode === "REJECTED") {
+      return timedItems.filter(
+        ({ effectiveStatus }) =>
+          effectiveStatus === "REJECTED" || effectiveStatus === "CANCELLED",
+      );
+    }
+    return timedItems;
+  }, [focusMode, timedItems]);
+
+  const groupedItems = useMemo(() => {
+    const attention: typeof visibleTimedItems = [];
+    const nowItems: typeof visibleTimedItems = [];
+    const next: typeof visibleTimedItems = [];
+    const later: typeof visibleTimedItems = [];
+
+    for (const entry of visibleTimedItems) {
+      if (entry.timing.lane === "ATTENTION") {
+        attention.push(entry);
+        continue;
+      }
+      if (entry.timing.lane === "NOW") {
+        nowItems.push(entry);
+        continue;
+      }
+      if (entry.timing.lane === "NEXT") {
+        next.push(entry);
+        continue;
+      }
+      later.push(entry);
+    }
+
+    const sortByTime = (
+      a: (typeof visibleTimedItems)[number],
+      b: (typeof visibleTimedItems)[number],
+    ) => a.timing.sortAt - b.timing.sortAt;
+
+    attention.sort(sortByTime);
+    nowItems.sort(sortByTime);
+    next.sort(sortByTime);
+    later.sort(sortByTime);
+
+    return {
+      attention,
+      nowItems,
+      next,
+      later,
+    };
+  }, [visibleTimedItems]);
 
   const isInitialLoading = dealsQuery.isLoading && items.length === 0;
   const isLoadingMore = dealsQuery.isFetchingNextPage;
@@ -188,18 +461,10 @@ export function DealsListClient({
     disabled: dealsQuery.isFetchingNextPage || isVoiceInteractionActive,
   });
 
-  const virtualizer = useVirtualizer({
-    count: visibleItems.length,
-    getScrollElement: () => listParentRef.current,
-    estimateSize: () => 104,
-    overscan: 6,
-  });
-  const virtualItems = virtualizer.getVirtualItems();
-
   const createdCountLabel = useMemo(() => {
-    if (visibleItems.length === 1) return "1 deal";
-    return `${visibleItems.length} deals`;
-  }, [visibleItems.length]);
+    if (visibleTimedItems.length === 1) return "1 deal";
+    return `${visibleTimedItems.length} deals`;
+  }, [visibleTimedItems.length]);
 
   const handleLoadMore = () => {
     if (!hasMore || isLoadingMore) {
@@ -208,17 +473,6 @@ export function DealsListClient({
 
     void dealsQuery.fetchNextPage();
   };
-
-  useEffect(() => {
-    if (!hasMore || isLoadingMore || virtualItems.length === 0) {
-      return;
-    }
-
-    const lastVirtualRow = virtualItems[virtualItems.length - 1];
-    if (lastVirtualRow && lastVirtualRow.index >= visibleItems.length - 4) {
-      void dealsQuery.fetchNextPage();
-    }
-  }, [dealsQuery, hasMore, isLoadingMore, virtualItems, visibleItems.length]);
 
   const findDealForBrand = useCallback(
     (brandName: string | undefined) => findDealByBrand(items, brandName),
@@ -266,6 +520,7 @@ export function DealsListClient({
 
       if (command.intent === "SHOW_UNPAID_DEALS") {
         setCommandFilter("UNPAID");
+        setFocusMode("ACTION_NEEDED");
         toast.success("Showing unpaid deals only.", { duration: 2000 });
         return;
       }
@@ -447,8 +702,42 @@ export function DealsListClient({
     createPaymentMutation.isPending ||
     updateDeliverableMutation.isPending;
 
+  const upcomingTopItem = groupedItems.next[0] ?? groupedItems.later[0] ?? null;
+  const timezoneLabel = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  const sections = [
+    {
+      key: "attention",
+      title: "Needs attention",
+      items: groupedItems.attention,
+      emptyLabel: "No overdue tasks.",
+      tone: "attention",
+    },
+    {
+      key: "now",
+      title: "Now",
+      items: groupedItems.nowItems,
+      emptyLabel: "Nothing running right now.",
+      tone: "now",
+    },
+    {
+      key: "next",
+      title: "Next (0-24h)",
+      items: groupedItems.next,
+      emptyLabel: "No upcoming tasks in the next 24 hours.",
+      tone: "next",
+    },
+    {
+      key: "later",
+      title: "Later",
+      items: groupedItems.later,
+      emptyLabel: "No later tasks.",
+      tone: "later",
+    },
+  ] as const;
+
   return (
-    <div className="mx-auto w-full max-w-4xl px-3 py-4 sm:px-6 sm:py-6">
+    <div className="mx-auto w-full max-w-5xl px-3 py-4 sm:px-6 sm:py-6">
       <GestureTutorial />
       <VoiceCommandButton
         brandVocabulary={brandNames}
@@ -465,6 +754,9 @@ export function DealsListClient({
             </h1>
             <p className="mt-1 text-sm dash-text-muted">
               {createdCountLabel} in your pipeline.
+            </p>
+            <p className="mt-1 text-xs dash-text-muted">
+              All times in {timezoneLabel}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -483,16 +775,154 @@ export function DealsListClient({
             <Link href="/deals/new" className={buttonVariants()}>
               Create New Deal
             </Link>
-            {commandFilter === "UNPAID" ? (
-              <button
-                type="button"
-                className={buttonVariants({ variant: "outline" })}
-                onClick={() => setCommandFilter("ALL")}
-              >
-                Show All Deals
-              </button>
-            ) : null}
           </div>
+        </div>
+
+        <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-4">
+          <button
+            type="button"
+            onClick={() => setFocusMode("NOW")}
+            className={cn(
+              "rounded-xl border p-3 text-left transition",
+              focusMode === "NOW"
+                ? "border-blue-300 bg-blue-50"
+                : "dash-border dash-bg-card",
+            )}
+          >
+            <p className="text-xs uppercase tracking-wide dash-text-muted">
+              Now
+            </p>
+            <p className="mt-1 text-lg font-semibold dash-text">
+              {groupedItems.nowItems.length} running
+            </p>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFocusMode("NEXT")}
+            className="rounded-xl border dash-border dash-bg-card p-3 text-left transition hover:border-blue-200"
+          >
+            <p className="text-xs uppercase tracking-wide dash-text-muted">
+              Next up
+            </p>
+            <p className="mt-1 text-sm font-medium dash-text">
+              {upcomingTopItem
+                ? `${upcomingTopItem.item.title} (${upcomingTopItem.timing.label})`
+                : "No upcoming tasks"}
+            </p>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFocusMode("ACTION_NEEDED")}
+            className={cn(
+              "rounded-xl border p-3 text-left transition",
+              focusMode === "ACTION_NEEDED"
+                ? "border-rose-300 bg-rose-50"
+                : "dash-border dash-bg-card",
+            )}
+          >
+            <p className="text-xs uppercase tracking-wide dash-text-muted">
+              Overdue
+            </p>
+            <p className="mt-1 text-lg font-semibold dash-text">
+              {groupedItems.attention.length} needs action
+            </p>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFocusMode("REJECTED")}
+            className={cn(
+              "rounded-xl border p-3 text-left transition",
+              focusMode === "REJECTED"
+                ? "border-rose-300 bg-rose-50"
+                : "dash-border dash-bg-card",
+            )}
+          >
+            <p className="text-xs uppercase tracking-wide dash-text-muted">
+              Rejected
+            </p>
+            <p className="mt-1 text-lg font-semibold dash-text">
+              {
+                timedItems.filter(
+                  ({ effectiveStatus }) =>
+                    effectiveStatus === "REJECTED" ||
+                    effectiveStatus === "CANCELLED",
+                ).length
+              }{" "}
+              archived
+            </p>
+          </button>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className={cn(
+              "rounded-full border px-3 py-1 text-xs font-medium",
+              focusMode === "ALL"
+                ? "border-blue-300 bg-blue-50 text-blue-700"
+                : "dash-border dash-text-muted",
+            )}
+            onClick={() => setFocusMode("ALL")}
+          >
+            All
+          </button>
+          <button
+            type="button"
+            className={cn(
+              "rounded-full border px-3 py-1 text-xs font-medium",
+              focusMode === "NOW"
+                ? "border-blue-300 bg-blue-50 text-blue-700"
+                : "dash-border dash-text-muted",
+            )}
+            onClick={() => setFocusMode("NOW")}
+          >
+            Now
+          </button>
+          <button
+            type="button"
+            className={cn(
+              "rounded-full border px-3 py-1 text-xs font-medium",
+              focusMode === "NEXT"
+                ? "border-blue-300 bg-blue-50 text-blue-700"
+                : "dash-border dash-text-muted",
+            )}
+            onClick={() => setFocusMode("NEXT")}
+          >
+            Next
+          </button>
+          <button
+            type="button"
+            className={cn(
+              "rounded-full border px-3 py-1 text-xs font-medium",
+              focusMode === "ACTION_NEEDED"
+                ? "border-rose-300 bg-rose-50 text-rose-700"
+                : "dash-border dash-text-muted",
+            )}
+            onClick={() => setFocusMode("ACTION_NEEDED")}
+          >
+            Action needed
+          </button>
+          <button
+            type="button"
+            className={cn(
+              "rounded-full border px-3 py-1 text-xs font-medium",
+              focusMode === "REJECTED"
+                ? "border-rose-300 bg-rose-50 text-rose-700"
+                : "dash-border dash-text-muted",
+            )}
+            onClick={() => setFocusMode("REJECTED")}
+          >
+            Rejected
+          </button>
+          {commandFilter === "UNPAID" ? (
+            <button
+              type="button"
+              className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700"
+              onClick={() => setCommandFilter("ALL")}
+            >
+              Show all deals
+            </button>
+          ) : null}
         </div>
 
         <div className="mt-6 space-y-3">
@@ -502,20 +932,20 @@ export function DealsListClient({
               <DealCardSkeleton />
               <DealCardSkeleton />
             </>
-          ) : visibleItems.length === 0 ? (
+          ) : visibleTimedItems.length === 0 ? (
             <p className="rounded-xl border border-dashed dash-border px-4 py-8 text-center text-sm dash-text-muted">
               No deals yet
             </p>
           ) : (
             <div
               ref={listParentRef}
-              className="relative max-h-[72vh] overflow-auto pr-1 touch-pan-y [overscroll-behavior-y:contain]"
+              className="relative max-h-[72vh] space-y-5 overflow-auto pr-1 touch-pan-y [overscroll-behavior-y:contain]"
               onTouchStart={pullToRefresh.handleTouchStart}
               onTouchMove={pullToRefresh.handleTouchMove}
               onTouchEnd={pullToRefresh.handleTouchEnd}
               onTouchCancel={pullToRefresh.handleTouchCancel}
             >
-              <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex justify-center pt-2">
+              <div className="pointer-events-none sticky top-0 z-20 flex justify-center py-2">
                 <div
                   className="flex h-10 w-10 items-center justify-center rounded-full border dash-border dash-bg-panel text-xs"
                   style={{
@@ -544,95 +974,163 @@ export function DealsListClient({
                 </div>
               </div>
 
-              <div style={pullToRefresh.containerStyle}>
-                <div
-                  className="relative w-full"
-                  style={{ height: `${virtualizer.getTotalSize()}px` }}
-                >
-                  {virtualItems.map((virtualRow) => {
-                    const deal = visibleItems[virtualRow.index];
-                    if (!deal) {
-                      return null;
-                    }
+              <div style={pullToRefresh.containerStyle} className="space-y-5">
+                {sections.map((section) => {
+                  const hideForFocusedMode =
+                    (focusMode === "NOW" && section.key !== "now") ||
+                    (focusMode === "NEXT" && section.key !== "next") ||
+                    (focusMode === "REJECTED" && section.key !== "later") ||
+                    (focusMode === "ACTION_NEEDED" &&
+                      section.key !== "attention" &&
+                      section.key !== "now");
 
-                    const effectiveStatus =
-                      optimisticStatusById[deal.id] ?? deal.status;
-                    const normalizedCurrency =
-                      deal.currency === "USD" || deal.currency === "INR"
-                        ? deal.currency
-                        : null;
+                  if (hideForFocusedMode) {
+                    return null;
+                  }
 
-                    return (
-                      <div
-                        key={deal.id}
-                        className="absolute top-0 left-0 w-full"
-                        style={{
-                          transform: `translateY(${virtualRow.start}px)`,
-                        }}
-                      >
-                        <div className="pb-3" ref={virtualizer.measureElement}>
-                          <DealCardWithMenu
-                            deal={{
-                              id: deal.id,
-                              status: effectiveStatus,
-                              title: deal.title,
-                              totalValue: deal.totalValue,
-                              currency: normalizedCurrency,
-                            }}
-                            activeCardId={activeSwipeCardId}
-                            setActiveCardId={setActiveSwipeCardId}
-                            gesturesDisabled={isVoiceInteractionActive}
-                            onOpen={() => router.push(`/deals/${deal.id}`)}
-                            onStatusUpdated={(dealId, status) => {
-                              setOptimisticStatusById((previous) => ({
-                                ...previous,
-                                [dealId]:
-                                  status === "INBOUND" ||
-                                  status === "NEGOTIATING" ||
-                                  status === "AGREED" ||
-                                  status === "PAID" ||
-                                  status === "CANCELLED"
-                                    ? status
-                                    : "INBOUND",
-                              }));
-                            }}
-                            className="pillowy-card transition-all hover:-translate-y-0.5 hover:shadow-md"
-                          >
-                            <div className="group relative flex items-center gap-4 p-4">
-                              <BrandAvatar name={deal.brand?.name ?? "?"} />
-
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2">
-                                  <h3 className="truncate font-semibold dash-text transition-colors group-hover:gold-text">
-                                    {deal.title}
-                                  </h3>
-                                  <StatusBadge status={effectiveStatus} />
-                                </div>
-                                <div className="mt-1 flex items-center gap-2 text-sm dash-text-muted">
-                                  <span className="font-medium dash-text">
-                                    {deal.brand?.name ?? "Unknown brand"}
-                                  </span>
-                                  <span>·</span>
-                                  <span>
-                                    Created {formatDealDate(deal.createdAt)}
-                                  </span>
-                                </div>
-                              </div>
-
-                              <div className="text-right">
-                                <p className="font-mono font-medium gold-text">
-                                  {formatDealCurrency(deal.totalValue, {
-                                    currency: deal.currency,
-                                  })}
-                                </p>
-                              </div>
-                            </div>
-                          </DealCardWithMenu>
-                        </div>
+                  return (
+                    <section key={section.key}>
+                      <div className="mb-2 flex items-center justify-between">
+                        <h2 className="text-sm font-semibold uppercase tracking-wide dash-text-muted">
+                          {section.title}
+                        </h2>
+                        <span className="text-xs dash-text-muted">
+                          {section.items.length}
+                        </span>
                       </div>
-                    );
-                  })}
-                </div>
+
+                      {section.items.length === 0 ? (
+                        <p className="rounded-xl border border-dashed dash-border px-4 py-4 text-sm dash-text-muted">
+                          {section.emptyLabel}
+                        </p>
+                      ) : (
+                        <div className="space-y-3">
+                          {section.items.map(
+                            ({ item: deal, effectiveStatus, timing }) => {
+                              const normalizedCurrency =
+                                deal.currency === "USD" ||
+                                deal.currency === "INR"
+                                  ? deal.currency
+                                  : null;
+
+                              return (
+                                <DealCardWithMenu
+                                  key={deal.id}
+                                  deal={{
+                                    id: deal.id,
+                                    status: effectiveStatus,
+                                    title: deal.title,
+                                    totalValue: deal.totalValue,
+                                    currency: normalizedCurrency,
+                                  }}
+                                  activeCardId={activeSwipeCardId}
+                                  setActiveCardId={setActiveSwipeCardId}
+                                  gesturesDisabled={isVoiceInteractionActive}
+                                  onOpen={() =>
+                                    router.push(`/deals/${deal.id}`)
+                                  }
+                                  onStatusUpdated={(dealId, status) => {
+                                    setOptimisticStatusById((previous) => ({
+                                      ...previous,
+                                      [dealId]:
+                                        status === "INBOUND" ||
+                                        status === "NEGOTIATING" ||
+                                        status === "AGREED" ||
+                                        status === "POSTED" ||
+                                        status === "PAID" ||
+                                        status === "CANCELLED" ||
+                                        status === "REJECTED"
+                                          ? status
+                                          : "INBOUND",
+                                    }));
+                                  }}
+                                  className={cn(
+                                    "pillowy-card transition-all hover:-translate-y-0.5 hover:shadow-md",
+                                    timing.lane === "ATTENTION" &&
+                                      "border-rose-300/70 ring-1 ring-rose-200/70",
+                                  )}
+                                >
+                                  <div className="group relative p-4">
+                                    <div className="flex items-start gap-4">
+                                      <BrandAvatar
+                                        name={deal.brand?.name ?? "?"}
+                                      />
+
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                          <h3 className="truncate font-semibold dash-text transition-colors group-hover:gold-text">
+                                            {deal.title}
+                                          </h3>
+                                          <span
+                                            className={cn(
+                                              "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium",
+                                              lanePillClasses(timing.lane),
+                                            )}
+                                          >
+                                            {laneIcon(timing.lane)}
+                                            {laneLabel(timing.lane)}
+                                          </span>
+                                        </div>
+
+                                        <p className="mt-1 text-sm font-medium dash-text">
+                                          {timing.label}
+                                          <span className="mx-2 dash-text-muted">
+                                            •
+                                          </span>
+                                          <span className="text-sm dash-text-muted">
+                                            {timing.exact}
+                                          </span>
+                                        </p>
+
+                                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs dash-text-muted">
+                                          <span className="font-medium dash-text">
+                                            {deal.brand?.name ??
+                                              "Unknown brand"}
+                                          </span>
+                                          <span>•</span>
+                                          <StatusBadge
+                                            status={effectiveStatus}
+                                            className="text-[10px]"
+                                          />
+                                        </div>
+                                      </div>
+
+                                      <div className="text-right">
+                                        <p className="font-mono font-medium gold-text">
+                                          {formatDealCurrency(deal.totalValue, {
+                                            currency: deal.currency,
+                                          })}
+                                        </p>
+                                      </div>
+                                    </div>
+
+                                    <div className="mt-3 h-1.5 overflow-hidden rounded-full dash-bg-card">
+                                      <div
+                                        className={cn(
+                                          "h-full rounded-full transition-all",
+                                          timing.lane === "ATTENTION"
+                                            ? "bg-rose-500"
+                                            : timing.lane === "NOW"
+                                              ? "bg-emerald-500"
+                                              : timing.lane === "NEXT"
+                                                ? "bg-blue-500"
+                                                : "bg-slate-400",
+                                        )}
+                                        style={{
+                                          width: `${timing.progressPercent}%`,
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                </DealCardWithMenu>
+                              );
+                            },
+                          )}
+                        </div>
+                      )}
+                    </section>
+                  );
+                })}
               </div>
             </div>
           )}

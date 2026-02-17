@@ -237,12 +237,7 @@ export function usePullToRefresh({
     }
 
     resetToIdle();
-  }, [
-    isTouchTracking,
-    resetToIdle,
-    runRefresh,
-    threshold,
-  ]);
+  }, [isTouchTracking, resetToIdle, runRefresh, threshold]);
 
   const handleTouchCancel = useCallback<TouchEventHandler<HTMLElement>>(() => {
     if (!isTouchTracking) {

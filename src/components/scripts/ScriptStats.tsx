@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -12,10 +12,10 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import {
+  type DurationEstimate,
   estimateDuration,
   speakingRates,
   targetDurations,
-  type DurationEstimate,
 } from "@/src/lib/utils/scriptAnalyzer";
 
 type Platform = keyof typeof speakingRates;
@@ -135,8 +135,8 @@ export function ScriptStats({ text, className }: ScriptStatsProps) {
   const [contentType, setContentType] = useState(
     getContentTypeOptions(defaultPlatform)[0] ?? "reel",
   );
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [isCalculating, setIsCalculating] = useState(false);
+  const [_isExpanded, _setIsExpanded] = useState(false);
+  const [_isCalculating, setIsCalculating] = useState(false);
   const [estimate, setEstimate] = useState<DurationEstimate>(() =>
     estimateDuration(text, defaultPlatform, contentType),
   );
@@ -145,10 +145,15 @@ export function ScriptStats({ text, className }: ScriptStatsProps) {
     if (typeof window === "undefined") return;
 
     const savedPlatform = window.localStorage.getItem(PLATFORM_STORAGE_KEY);
-    const savedContentType = window.localStorage.getItem(CONTENT_TYPE_STORAGE_KEY);
+    const savedContentType = window.localStorage.getItem(
+      CONTENT_TYPE_STORAGE_KEY,
+    );
 
     if (savedPlatform && isPlatform(savedPlatform)) {
-      const nextContent = isContentTypeForPlatform(savedPlatform, savedContentType ?? "")
+      const nextContent = isContentTypeForPlatform(
+        savedPlatform,
+        savedContentType ?? "",
+      )
         ? (savedContentType as string)
         : getContentTypeOptions(savedPlatform)[0];
       setPlatform(savedPlatform);
@@ -180,13 +185,19 @@ export function ScriptStats({ text, className }: ScriptStatsProps) {
     };
   }, [text, platform, contentType]);
 
-  const contentTypeOptions = useMemo(() => getContentTypeOptions(platform), [platform]);
+  const contentTypeOptions = useMemo(
+    () => getContentTypeOptions(platform),
+    [platform],
+  );
   const target = getTarget(platform, contentType);
   const indicator = getIndicator(estimate, platform, contentType);
   const indicatorStyles = getIndicatorStyles(indicator.kind);
 
   const progressPercent = target
-    ? Math.min((estimate.estimatedSeconds / Math.max(target.ideal, 1)) * 100, 100)
+    ? Math.min(
+        (estimate.estimatedSeconds / Math.max(target.ideal, 1)) * 100,
+        100,
+      )
     : 0;
 
   const rangeHint = target
@@ -197,17 +208,31 @@ export function ScriptStats({ text, className }: ScriptStatsProps) {
     <div className={cn("flex flex-col gap-4", className)}>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1 rounded-xl border dash-border dash-bg-card p-3 shadow-sm">
-          <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Words</p>
-          <p className="text-2xl font-bold text-slate-900">{estimate.wordCount}</p>
+          <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">
+            Words
+          </p>
+          <p className="text-2xl font-bold text-slate-900">
+            {estimate.wordCount}
+          </p>
         </div>
         <div className="space-y-1 rounded-xl border dash-border dash-bg-card p-3 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Duration</p>
-            <Badge variant="outline" className={cn("h-5 px-1.5 text-[10px]", indicatorStyles.badgeClass)}>
+            <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">
+              Duration
+            </p>
+            <Badge
+              variant="outline"
+              className={cn(
+                "h-5 px-1.5 text-[10px]",
+                indicatorStyles.badgeClass,
+              )}
+            >
               {indicatorStyles.iconText} {indicator.label}
             </Badge>
           </div>
-          <p className="text-2xl font-bold text-slate-900">{formatDuration(estimate.estimatedSeconds)}</p>
+          <p className="text-2xl font-bold text-slate-900">
+            {formatDuration(estimate.estimatedSeconds)}
+          </p>
         </div>
       </div>
 
@@ -260,7 +285,10 @@ export function ScriptStats({ text, className }: ScriptStatsProps) {
         <div className="mt-4">
           <div className="h-2 w-full overflow-hidden rounded-full dash-bg-card">
             <div
-              className={cn("h-full transition-all duration-500 ease-out", indicatorStyles.barClass)}
+              className={cn(
+                "h-full transition-all duration-500 ease-out",
+                indicatorStyles.barClass,
+              )}
               style={{ width: `${progressPercent}%` }}
             />
           </div>
@@ -279,5 +307,3 @@ export function ScriptStats({ text, className }: ScriptStatsProps) {
     </div>
   );
 }
-
-

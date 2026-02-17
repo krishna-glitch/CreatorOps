@@ -76,10 +76,12 @@ export const brandsRouter = createTRPCRouter({
       const items = hasMore ? results.slice(0, -1) : results;
       const nextCursor =
         hasMore && items.length > 0
-          ? items[items.length - 1]?.createdAt.toISOString() ?? null
+          ? (items[items.length - 1]?.createdAt.toISOString() ?? null)
           : null;
       const nextCursorId =
-        hasMore && items.length > 0 ? items[items.length - 1]?.id ?? null : null;
+        hasMore && items.length > 0
+          ? (items[items.length - 1]?.id ?? null)
+          : null;
 
       return {
         items,
@@ -179,7 +181,10 @@ export const brandsRouter = createTRPCRouter({
       try {
         const [deleted] = await ctx.db.transaction(async (tx) => {
           const linkedDeals = await tx.query.deals.findFirst({
-            where: and(eq(deals.brandId, input.id), eq(deals.userId, ctx.user.id)),
+            where: and(
+              eq(deals.brandId, input.id),
+              eq(deals.userId, ctx.user.id),
+            ),
             columns: { id: true },
           });
 

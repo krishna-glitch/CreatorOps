@@ -1,6 +1,7 @@
 "use client";
 
-export const APP_NOTIFICATIONS_ENABLED_KEY = "creatorops.notifications.enabled.v1";
+export const APP_NOTIFICATIONS_ENABLED_KEY =
+  "creatorops.notifications.enabled.v1";
 
 export function getAppNotificationsEnabled(): boolean {
   if (typeof window === "undefined") return true;
@@ -11,6 +12,8 @@ export function getAppNotificationsEnabled(): boolean {
 
 export function setAppNotificationsEnabled(enabled: boolean) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(APP_NOTIFICATIONS_ENABLED_KEY, enabled ? "true" : "false");
+  window.localStorage.setItem(
+    APP_NOTIFICATIONS_ENABLED_KEY,
+    enabled ? "true" : "false",
+  );
 }
-

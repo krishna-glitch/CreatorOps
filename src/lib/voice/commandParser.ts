@@ -5,7 +5,8 @@ export type VoiceDealStatus =
   | "NEGOTIATING"
   | "AGREED"
   | "PAID"
-  | "CANCELLED";
+  | "CANCELLED"
+  | "REJECTED";
 
 export type VoicePaymentCurrency = "USD" | "INR" | "OTHER";
 export type VoicePaymentKind = "DEPOSIT" | "FINAL" | "PARTIAL";

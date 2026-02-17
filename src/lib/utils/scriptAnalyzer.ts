@@ -128,7 +128,8 @@ export function countWords(text: string): number {
     return count;
   }
 
-  return stripped.split(/\s+/).filter((part) => /[\p{L}\p{N}]/u.test(part)).length;
+  return stripped.split(/\s+/).filter((part) => /[\p{L}\p{N}]/u.test(part))
+    .length;
 }
 
 export function countCharacters(text: string): number {
@@ -170,7 +171,8 @@ export function getSuggestions(
     };
   }
 
-  const wordsPerSecond = duration > 0 ? wordCount / duration : DEFAULT_WORDS_PER_MINUTE / 60;
+  const wordsPerSecond =
+    duration > 0 ? wordCount / duration : DEFAULT_WORDS_PER_MINUTE / 60;
 
   if (deltaSeconds > 0) {
     const wordsOver = Math.max(1, Math.round(deltaSeconds * wordsPerSecond));
@@ -215,7 +217,11 @@ export function estimateDuration(
     };
   }
 
-  const baseSuggestion = getSuggestions(wordCount, estimatedSeconds, target.ideal);
+  const baseSuggestion = getSuggestions(
+    wordCount,
+    estimatedSeconds,
+    target.ideal,
+  );
   const platformLabel = `${toTitle(toKey(platform))} ${toTitle(toKey(contentType))}`;
 
   let status: SuggestionStatus = baseSuggestion.status;
@@ -230,7 +236,10 @@ export function estimateDuration(
     const shortBy = target.min - estimatedSeconds;
     const wordsToAdd = Math.max(1, Math.round((shortBy / 60) * wordsPerMinute));
     suggestion = `${suggestion} Add ~${wordsToAdd} words to hit minimum ${target.min}s.`;
-  } else if (Math.abs(estimatedSeconds - target.ideal) <= Math.max(2, target.ideal * 0.12)) {
+  } else if (
+    Math.abs(estimatedSeconds - target.ideal) <=
+    Math.max(2, target.ideal * 0.12)
+  ) {
     status = "perfect";
     suggestion = `${suggestion} Great for ${platformLabel} (${target.ideal}s).`;
   } else {

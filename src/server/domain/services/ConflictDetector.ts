@@ -62,7 +62,11 @@ export function detectExclusivityConflicts(
   const deliverableCategory = normalizeCategory(deliverable.category);
   const deliverablePlatforms = normalizePlatforms(deliverable.platform);
 
-  if (!scheduledAt || !deliverableCategory || deliverablePlatforms.length === 0) {
+  if (
+    !scheduledAt ||
+    !deliverableCategory ||
+    deliverablePlatforms.length === 0
+  ) {
     return [];
   }
 
@@ -82,7 +86,12 @@ export function detectExclusivityConflicts(
 
     const startDate = toOptionalDate(rule.start_date);
     const endDate = toOptionalDate(rule.end_date);
-    if (!startDate || !endDate || scheduledAt < startDate || scheduledAt > endDate) {
+    if (
+      !startDate ||
+      !endDate ||
+      scheduledAt < startDate ||
+      scheduledAt > endDate
+    ) {
       continue;
     }
 

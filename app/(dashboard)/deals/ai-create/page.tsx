@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,13 @@ type Deliverable = {
 };
 
 type Currency = "USD" | "INR";
-type DealStatus = "INBOUND" | "NEGOTIATING" | "AGREED" | "PAID";
+type DealStatus =
+  | "INBOUND"
+  | "NEGOTIATING"
+  | "AGREED"
+  | "PAID"
+  | "CANCELLED"
+  | "REJECTED";
 type BrandItem = { id: string; name: string };
 type ParseMode = "smart" | "ai";
 type BrandMatchResult =
@@ -692,7 +698,7 @@ export default function AICreateDealPage() {
 
                 <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Brand</label>
+                    <p className="text-sm font-medium">Brand</p>
                     <Select
                       value={brandId}
                       onValueChange={(value) => {
@@ -724,7 +730,7 @@ export default function AICreateDealPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Title</label>
+                    <p className="text-sm font-medium">Title</p>
                     <Input
                       value={title}
                       onChange={(event) => setTitle(event.target.value)}
@@ -734,7 +740,7 @@ export default function AICreateDealPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Amount</label>
+                    <p className="text-sm font-medium">Amount</p>
                     <Input
                       type="number"
                       step="0.01"
@@ -747,7 +753,7 @@ export default function AICreateDealPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Currency</label>
+                    <p className="text-sm font-medium">Currency</p>
                     <Select
                       value={currency}
                       onValueChange={(value) => setCurrency(value as Currency)}
@@ -763,7 +769,7 @@ export default function AICreateDealPage() {
                   </div>
 
                   <div className="space-y-2 sm:col-span-2">
-                    <label className="text-sm font-medium">Status</label>
+                    <p className="text-sm font-medium">Status</p>
                     <Select
                       value={status}
                       onValueChange={(value) => setStatus(value as DealStatus)}
@@ -776,6 +782,8 @@ export default function AICreateDealPage() {
                         <SelectItem value="NEGOTIATING">NEGOTIATING</SelectItem>
                         <SelectItem value="AGREED">AGREED</SelectItem>
                         <SelectItem value="PAID">PAID</SelectItem>
+                        <SelectItem value="CANCELLED">CANCELLED</SelectItem>
+                        <SelectItem value="REJECTED">REJECTED</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

@@ -1,4 +1,11 @@
-import { index, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import {
+  index,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+  varchar,
+} from "drizzle-orm/pg-core";
 
 export const clientErrorLogs = pgTable(
   "client_error_logs",
@@ -17,7 +24,9 @@ export const clientErrorLogs = pgTable(
       reportedAtIdx: index("client_error_logs_reported_at_idx").on(
         table.reportedAt,
       ),
-      createdAtIdx: index("client_error_logs_created_at_idx").on(table.createdAt),
+      createdAtIdx: index("client_error_logs_created_at_idx").on(
+        table.createdAt,
+      ),
       typeIdx: index("client_error_logs_type_idx").on(table.type),
     };
   },

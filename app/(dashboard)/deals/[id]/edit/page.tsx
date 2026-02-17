@@ -28,7 +28,10 @@ import { trpc } from "@/lib/trpc/client";
 import type { ParsedCommand } from "@/src/lib/voice/commandParser";
 
 const VoiceCommandButton = dynamic(
-  () => import("@/src/components/voice/VoiceCommandButton").then((mod) => mod.VoiceCommandButton),
+  () =>
+    import("@/src/components/voice/VoiceCommandButton").then(
+      (mod) => mod.VoiceCommandButton,
+    ),
   { ssr: false },
 );
 
@@ -51,15 +54,32 @@ const exclusivityRuleFormSchema = z
     },
   );
 
-const updateDealFormSchema = z.object({
-  brand_id: z.string().uuid({ message: "Please select a brand" }),
-  title: z.string().trim().min(1).max(200),
-  total_value: z.number().positive().finite(),
-  currency: z.enum(["USD", "INR"]),
-  status: z.enum(["INBOUND", "NEGOTIATING", "AGREED", "PAID", "CANCELLED"]),
-  revision_limit: z.number().int().min(1).max(20).default(2),
-  exclusivity_rules: z.array(exclusivityRuleFormSchema).default([]),
-});
+const updateDealFormSchema = z
+  .object({
+    brand_id: z.string().uuid({ message: "Please select a brand" }),
+    title: z.string().trim().min(1).max(200),
+    total_value: z.number().positive().finite(),
+    currency: z.enum(["USD", "INR"]),
+    status: z.enum([
+      "INBOUND",
+      "NEGOTIATING",
+      "AGREED",
+      "PAID",
+      "CANCELLED",
+      "REJECTED",
+    ]),
+    compensation_model: z.enum(["FIXED", "AFFILIATE", "HYBRID"]),
+    cash_percent: z.number().int().min(0).max(100),
+    affiliate_percent: z.number().int().min(0).max(100),
+    guaranteed_cash_value: z.number().nonnegative().finite().optional(),
+    expected_affiliate_value: z.number().nonnegative().finite().optional(),
+    revision_limit: z.number().int().min(1).max(20).default(2),
+    exclusivity_rules: z.array(exclusivityRuleFormSchema).default([]),
+  })
+  .refine((value) => value.cash_percent + value.affiliate_percent === 100, {
+    message: "Cash and affiliate percentages must add up to 100",
+    path: ["cash_percent"],
+  });
 
 type UpdateDealFormValues = z.input<typeof updateDealFormSchema>;
 
@@ -213,6 +233,11 @@ export default function EditDealPage() {
       total_value: undefined,
       currency: "USD",
       status: "INBOUND",
+      compensation_model: "FIXED",
+      cash_percent: 100,
+      affiliate_percent: 0,
+      guaranteed_cash_value: undefined,
+      expected_affiliate_value: undefined,
       revision_limit: 2,
       exclusivity_rules: [],
     },
@@ -230,7 +255,7 @@ export default function EditDealPage() {
     }
 
     form.reset({
-      brand_id: deal.brandId,
+      brand_id: deal.brandId ?? deal.brand?.id ?? "",
       title: deal.title,
       total_value: Number(deal.totalValue),
       currency: deal.currency === "INR" ? "INR" : "USD",
@@ -238,9 +263,25 @@ export default function EditDealPage() {
         deal.status === "NEGOTIATING" ||
         deal.status === "AGREED" ||
         deal.status === "PAID" ||
-        deal.status === "CANCELLED"
+        deal.status === "CANCELLED" ||
+        deal.status === "REJECTED"
           ? deal.status
           : "INBOUND",
+      compensation_model:
+        deal.compensationModel === "AFFILIATE" ||
+        deal.compensationModel === "HYBRID"
+          ? deal.compensationModel
+          : "FIXED",
+      cash_percent:
+        typeof deal.cashPercent === "number" ? deal.cashPercent : 100,
+      affiliate_percent:
+        typeof deal.affiliatePercent === "number" ? deal.affiliatePercent : 0,
+      guaranteed_cash_value: deal.guaranteedCashValue
+        ? Number(deal.guaranteedCashValue)
+        : undefined,
+      expected_affiliate_value: deal.expectedAffiliateValue
+        ? Number(deal.expectedAffiliateValue)
+        : undefined,
       revision_limit: deal.revisionLimit,
       exclusivity_rules: (deal.exclusivityRules ?? []).map((rule) => ({
         category_path: rule.categoryPath,
@@ -291,9 +332,18 @@ export default function EditDealPage() {
       return;
     }
 
+    const fallbackBrandId =
+      dealQuery.data?.brandId ?? dealQuery.data?.brand?.id;
+    const brandId = values.brand_id || fallbackBrandId;
+    if (!brandId) {
+      toast.error("Please select a brand.", { duration: 3000 });
+      return;
+    }
+
     updateDealMutation.mutate({
       id: dealId,
       ...values,
+      brand_id: brandId,
     });
   };
   const onDeleteDeal = () => {
@@ -318,9 +368,29 @@ export default function EditDealPage() {
   };
 
   const isLoadingDeal = dealQuery.isLoading;
-  const brandItems = brands?.items ?? [];
+  const brandItems = (() => {
+    const items = brands?.items ?? [];
+    const currentDeal = dealQuery.data;
+    if (!currentDeal?.brand?.id) {
+      return items;
+    }
+    const alreadyPresent = items.some(
+      (brand) => brand.id === currentDeal.brand.id,
+    );
+    if (alreadyPresent) {
+      return items;
+    }
+    return [
+      ...items,
+      {
+        id: currentDeal.brand.id,
+        name: currentDeal.brand.name ?? "Current Brand",
+      },
+    ];
+  })();
   const hasBrands = brandItems.length > 0;
   const isSubmitting = updateDealMutation.isPending;
+  const compensationModel = form.watch("compensation_model");
   const brandNames = brandItems.map((brand) => brand.name);
   const [showExclusivityRules, setShowExclusivityRules] = useState(false);
 
@@ -339,7 +409,8 @@ export default function EditDealPage() {
           const matchedBrand =
             brandItems.find(
               (brand) =>
-                brand.name.toLowerCase() === command.entities.brand?.toLowerCase(),
+                brand.name.toLowerCase() ===
+                command.entities.brand?.toLowerCase(),
             ) ?? null;
 
           if (matchedBrand) {
@@ -368,9 +439,12 @@ export default function EditDealPage() {
       }
 
       if (command.intent === "ADD_PAYMENT") {
-        toast.error("This command is for payments. Open Add Payment to use it.", {
-          duration: 2800,
-        });
+        toast.error(
+          "This command is for payments. Open Add Payment to use it.",
+          {
+            duration: 2800,
+          },
+        );
         return;
       }
 
@@ -453,7 +527,7 @@ export default function EditDealPage() {
                                   Loading brands...
                                 </SelectItem>
                               ) : (
-                                (brands?.items ?? []).map((brand) => (
+                                brandItems.map((brand) => (
                                   <SelectItem key={brand.id} value={brand.id}>
                                     {brand.name}
                                   </SelectItem>
@@ -549,6 +623,113 @@ export default function EditDealPage() {
                     />
                   </div>
 
+                  <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-5">
+                    <FormField
+                      control={form.control}
+                      name="compensation_model"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-medium">
+                            Compensation Model
+                          </FormLabel>
+                          <Select
+                            value={field.value}
+                            onValueChange={(nextValue) => {
+                              field.onChange(nextValue);
+                              if (nextValue === "FIXED") {
+                                form.setValue("cash_percent", 100, {
+                                  shouldDirty: true,
+                                  shouldValidate: true,
+                                });
+                                form.setValue("affiliate_percent", 0, {
+                                  shouldDirty: true,
+                                  shouldValidate: true,
+                                });
+                              } else if (nextValue === "AFFILIATE") {
+                                form.setValue("cash_percent", 0, {
+                                  shouldDirty: true,
+                                  shouldValidate: true,
+                                });
+                                form.setValue("affiliate_percent", 100, {
+                                  shouldDirty: true,
+                                  shouldValidate: true,
+                                });
+                              }
+                            }}
+                          >
+                            <FormControl>
+                              <SelectTrigger className="focus:ring-emerald-500/30 focus:ring-offset-0">
+                                <SelectValue placeholder="Select model" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="FIXED">FIXED</SelectItem>
+                              <SelectItem value="AFFILIATE">
+                                AFFILIATE
+                              </SelectItem>
+                              <SelectItem value="HYBRID">HYBRID</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="cash_percent"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-medium">
+                            Cash %
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="1"
+                              value={field.value ?? 0}
+                              disabled={compensationModel !== "HYBRID"}
+                              onChange={(event) =>
+                                field.onChange(Number(event.target.value))
+                              }
+                              onBlur={field.onBlur}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="affiliate_percent"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-medium">
+                            Affiliate %
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="1"
+                              value={field.value ?? 0}
+                              disabled={compensationModel !== "HYBRID"}
+                              onChange={(event) =>
+                                field.onChange(Number(event.target.value))
+                              }
+                              onBlur={field.onBlur}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
                   <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
                     <FormField
                       control={form.control}
@@ -577,6 +758,7 @@ export default function EditDealPage() {
                               <SelectItem value="CANCELLED">
                                 CANCELLED
                               </SelectItem>
+                              <SelectItem value="REJECTED">REJECTED</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />

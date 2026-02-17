@@ -3,6 +3,8 @@ import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { deals } from "@/server/infrastructure/database/schema/deals";
 import { payments } from "@/server/infrastructure/database/schema/payments";
+import logger from "@/server/utils/logger";
+import { convertToUSD } from "@/src/server/services/currency/exchangeRateService";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const paymentCurrencySchema = z.enum(["USD", "INR", "OTHER"]);
@@ -51,9 +53,16 @@ const updatePaymentInputSchema = z
   );
 
 const markPaidInputSchema = z.object({
-  id: z.string().uuid(),
-  paid_at: z.string().datetime({ offset: true }).optional(),
-  payment_method: paymentMethodSchema.optional(),
+  paymentId: z.string().uuid(),
+  paidAt: z.date().default(() => new Date()),
+  manualExchangeRate: z.number().positive().optional(),
+  manualExchangeRateNote: z.string().max(500).optional(),
+});
+
+const updateExchangeRateInputSchema = z.object({
+  paymentId: z.string().uuid(),
+  rate: z.number().positive(),
+  note: z.string().max(500).optional(),
 });
 
 const listByDealInputSchema = z.object({
@@ -94,6 +103,18 @@ function calculatePaymentStatus(params: {
   }
 
   return "EXPECTED";
+}
+
+function calculateAmountUsdFromUsdToCurrencyRate(params: {
+  amount: number;
+  currency: string;
+  usdToCurrencyRate: number;
+}): number {
+  if (params.currency === "USD") {
+    return Number(params.amount.toFixed(2));
+  }
+
+  return Number((params.amount / params.usdToCurrencyRate).toFixed(2));
 }
 
 async function syncDealStatusFromPayments(params: {
@@ -146,7 +167,9 @@ async function syncDealStatusFromPayments(params: {
   const dealTotal = parseFloat(deal.totalValue ?? "0");
 
   // Floating point comparison tolerance
-  const isFullyPaid = Math.abs(totalPaid - dealTotal) < 0.01 || (dealTotal > 0 && totalPaid >= dealTotal);
+  const isFullyPaid =
+    Math.abs(totalPaid - dealTotal) < 0.01 ||
+    (dealTotal > 0 && totalPaid >= dealTotal);
 
   if (isFullyPaid && deal.status !== "PAID") {
     await tx
@@ -315,7 +338,7 @@ export const paymentsRouter = createTRPCRouter({
       try {
         const updated = await ctx.db.transaction(async (tx) => {
           const existing = await tx.query.payments.findFirst({
-            where: eq(payments.id, input.id),
+            where: eq(payments.id, input.paymentId),
             with: {
               deal: {
                 columns: {
@@ -333,21 +356,77 @@ export const paymentsRouter = createTRPCRouter({
             });
           }
 
+          const paidAt = input.paidAt;
+          const paymentAmount = Number(existing.amount);
+          const paymentCurrency = existing.currency;
+
+          let amountUsd: string | null = null;
+          let exchangeRate: string | null = null;
+          let exchangeRateDate: string | null = null;
+          let exchangeRateSource: "frankfurter" | "manual" | "cache" | null =
+            null;
+          let exchangeRateManual: string | null = null;
+
+          try {
+            if (input.manualExchangeRate) {
+              const manualAmountUsd = calculateAmountUsdFromUsdToCurrencyRate({
+                amount: paymentAmount,
+                currency: paymentCurrency,
+                usdToCurrencyRate: input.manualExchangeRate,
+              });
+
+              amountUsd = manualAmountUsd.toFixed(2);
+              exchangeRate = input.manualExchangeRate.toFixed(6);
+              exchangeRateDate = paidAt.toISOString().slice(0, 10);
+              exchangeRateSource = "manual";
+              exchangeRateManual = input.manualExchangeRate.toFixed(6);
+            } else if (paymentCurrency === "USD") {
+              amountUsd = paymentAmount.toFixed(2);
+              exchangeRate = "1.000000";
+              exchangeRateDate = paidAt.toISOString().slice(0, 10);
+              exchangeRateSource = "cache";
+            } else {
+              const result = await convertToUSD(
+                paymentAmount,
+                paymentCurrency,
+                paidAt,
+              );
+
+              if (result) {
+                amountUsd = result.amountUsd.toFixed(2);
+                exchangeRate = result.exchangeRate.toFixed(6);
+                exchangeRateDate = result.exchangeRateDate
+                  .toISOString()
+                  .slice(0, 10);
+                exchangeRateSource = result.exchangeRateSource;
+              }
+            }
+          } catch (error) {
+            logger.warn("Currency conversion failed for payment", {
+              paymentId: input.paymentId,
+              currency: paymentCurrency,
+              amount: paymentAmount,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+
           const [nextPayment] = await tx
             .update(payments)
             .set({
               status: calculatePaymentStatus({
-                paidAt: input.paid_at ? new Date(input.paid_at) : new Date(),
+                paidAt,
                 expectedDate: existing.expectedDate,
               }),
-              paidAt: input.paid_at ? new Date(input.paid_at) : new Date(),
-              paymentMethod:
-                input.payment_method !== undefined
-                  ? input.payment_method
-                  : existing.paymentMethod,
+              paidAt,
+              amountUsd,
+              exchangeRate,
+              exchangeRateDate,
+              exchangeRateSource,
+              exchangeRateManual,
+              exchangeRateManualNote: input.manualExchangeRateNote ?? null,
               updatedAt: new Date(),
             })
-            .where(eq(payments.id, input.id))
+            .where(eq(payments.id, input.paymentId))
             .returning();
 
           if (!nextPayment) {
@@ -374,6 +453,81 @@ export const paymentsRouter = createTRPCRouter({
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Could not mark payment as paid",
+          cause: error,
+        });
+      }
+    }),
+
+  updateExchangeRate: protectedProcedure
+    .input(updateExchangeRateInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const updated = await ctx.db.transaction(async (tx) => {
+          const existing = await tx.query.payments.findFirst({
+            where: eq(payments.id, input.paymentId),
+            with: {
+              deal: {
+                columns: {
+                  userId: true,
+                },
+              },
+            },
+          });
+
+          if (!existing || existing.deal.userId !== ctx.user.id) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "Payment not found",
+            });
+          }
+
+          if (existing.status !== "PAID" || !existing.paidAt) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Exchange rate can only be updated for paid payments",
+            });
+          }
+
+          const amount = Number(existing.amount);
+          const amountUsd = calculateAmountUsdFromUsdToCurrencyRate({
+            amount,
+            currency: existing.currency,
+            usdToCurrencyRate: input.rate,
+          });
+
+          const [nextPayment] = await tx
+            .update(payments)
+            .set({
+              amountUsd: amountUsd.toFixed(2),
+              exchangeRate: input.rate.toFixed(6),
+              exchangeRateDate: existing.paidAt.toISOString().slice(0, 10),
+              exchangeRateSource: "manual",
+              exchangeRateManual: input.rate.toFixed(6),
+              exchangeRateManualNote: input.note ?? null,
+              updatedAt: new Date(),
+            })
+            .where(eq(payments.id, input.paymentId))
+            .returning();
+
+          if (!nextPayment) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "Payment not found",
+            });
+          }
+
+          return nextPayment;
+        });
+
+        return updated;
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Could not update exchange rate",
           cause: error,
         });
       }

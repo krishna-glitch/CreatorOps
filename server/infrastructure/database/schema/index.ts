@@ -1,15 +1,15 @@
 // Auth reference (Supabase-managed)
 export { authUsers } from "./auth";
-// Tables
-export { clientErrorLogs } from "./clientErrorLogs";
 // Relations
 export { brands, brandsRelations } from "./brands";
+// Tables
+export { clientErrorLogs } from "./clientErrorLogs";
 export { deals, dealsRelations } from "./deals";
 export { deliverables, deliverablesRelations } from "./deliverables";
 export {
+  conflictSeverityEnum,
   conflicts,
   conflictsRelations,
-  conflictSeverityEnum,
   conflictTypeEnum,
   exclusivityPlatformEnum,
   exclusivityRegionEnum,
@@ -18,23 +18,23 @@ export {
   exclusivityScopeEnum,
 } from "./exclusivity";
 export { feedbackItems, feedbackItemsRelations } from "./feedback";
+export { idempotencyKeys } from "./idempotencyKeys";
 export {
+  mediaAssetStatusEnum,
   mediaAssets,
   mediaAssetsRelations,
-  mediaAssetStatusEnum,
   mediaAssetTypeEnum,
 } from "./media_assets";
 export { payments, paymentsRelations } from "./payments";
-export { reminders, remindersRelations } from "./reminders";
-export { reworkCycles, reworkCyclesRelations } from "./reworkCycles";
+export {
+  pushDeliveryStatusEnum,
+  pushNotificationDeliveries,
+  pushNotificationDeliveriesRelations,
+} from "./pushNotificationDeliveries";
 export {
   pushSubscriptions,
   pushSubscriptionsRelations,
 } from "./pushSubscriptions";
-export {
-  pushNotificationDeliveries,
-  pushNotificationDeliveriesRelations,
-  pushDeliveryStatusEnum,
-} from "./pushNotificationDeliveries";
-
-export { idempotencyKeys } from "./idempotencyKeys";
+export { reminders, remindersRelations } from "./reminders";
+export { reworkCycles, reworkCyclesRelations } from "./reworkCycles";
+export { scriptLabFiles, scriptLabFilesRelations } from "./scriptLabFiles";

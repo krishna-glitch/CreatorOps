@@ -8,6 +8,7 @@
 import { aiRouter } from "./routers/ai";
 import { analyticsRouter } from "./routers/analytics";
 import { brandsRouter } from "./routers/brands";
+import { calendarRouter } from "./routers/calendar";
 import { conflictsRouter } from "./routers/conflicts";
 import { dealsRouter } from "./routers/deals";
 import { deliverablesRouter } from "./routers/deliverables";
@@ -17,7 +18,7 @@ import { mediaAssetsRouter } from "./routers/mediaAssets";
 import { notificationsRouter } from "./routers/notifications";
 import { paymentsRouter } from "./routers/payments";
 import { remindersRouter } from "./routers/reminders";
-import { calendarRouter } from "./routers/calendar";
+import { scriptLabRouter } from "./routers/scriptLab";
 import { createTRPCRouter } from "./trpc";
 
 export const appRouter = createTRPCRouter({
@@ -35,6 +36,7 @@ export const appRouter = createTRPCRouter({
   notifications: notificationsRouter,
   payments: paymentsRouter,
   reminders: remindersRouter,
+  scriptLab: scriptLabRouter,
 });
 
 export type AppRouter = typeof appRouter;

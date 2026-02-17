@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { and, eq, gt } from "drizzle-orm";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
+import { and, eq, gt } from "drizzle-orm";
 import { db } from "@/db";
 import { createClient } from "@/lib/supabase/server";
 import { appRouter } from "@/server/api/root";
@@ -75,7 +75,9 @@ const handler = async (req: Request) => {
   }
 
   if (inserted.length === 0) {
-    let existing;
+    let existing: Awaited<
+      ReturnType<typeof db.query.idempotencyKeys.findFirst>
+    > = null;
     try {
       existing = await db.query.idempotencyKeys.findFirst({
         where: and(
@@ -169,7 +171,9 @@ const handler = async (req: Request) => {
           })
           .where(eq(idempotencyKeys.id, recordId));
       } else {
-        await db.delete(idempotencyKeys).where(eq(idempotencyKeys.id, recordId));
+        await db
+          .delete(idempotencyKeys)
+          .where(eq(idempotencyKeys.id, recordId));
       }
     }
 

@@ -1,6 +1,14 @@
-import { sql } from "drizzle-orm";
-import { relations } from "drizzle-orm";
-import { check, index, integer, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { relations, sql } from "drizzle-orm";
+import {
+  check,
+  index,
+  integer,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { deals } from "./deals";
 import { deliverables } from "./deliverables";
 
@@ -54,9 +62,15 @@ export const feedbackItems = pgTable(
   (table) => {
     return {
       dealIdIdx: index("feedback_items_deal_id_idx").on(table.dealId),
-      deliverableIdIdx: index("feedback_items_deliverable_id_idx").on(table.deliverableId),
-      receivedAtIdx: index("feedback_items_received_at_idx").on(table.receivedAt),
-      feedbackTypeIdx: index("feedback_items_feedback_type_idx").on(table.feedbackType),
+      deliverableIdIdx: index("feedback_items_deliverable_id_idx").on(
+        table.deliverableId,
+      ),
+      receivedAtIdx: index("feedback_items_received_at_idx").on(
+        table.receivedAt,
+      ),
+      feedbackTypeIdx: index("feedback_items_feedback_type_idx").on(
+        table.feedbackType,
+      ),
       statusIdx: index("feedback_items_status_idx").on(table.status),
       severityCheck: check(
         "feedback_items_severity_1_to_10_check",

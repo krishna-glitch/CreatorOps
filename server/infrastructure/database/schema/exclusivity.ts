@@ -36,7 +36,10 @@ export const conflictTypeEnum = pgEnum("conflict_type", [
   "PAYMENT_DISPUTE",
 ]);
 
-export const conflictSeverityEnum = pgEnum("conflict_severity", ["WARN", "BLOCK"]);
+export const conflictSeverityEnum = pgEnum("conflict_severity", [
+  "WARN",
+  "BLOCK",
+]);
 
 export const exclusivityRules = pgTable(
   "exclusivity_rules",
@@ -86,20 +89,23 @@ export const conflicts = pgTable(
       conflictingRuleIdIdx: index("conflicts_conflicting_rule_id_idx").on(
         table.conflictingRuleId,
       ),
-      newDealOrDeliverableIdIdx: index("conflicts_new_deal_or_deliverable_id_idx").on(
-        table.newDealOrDeliverableId,
-      ),
+      newDealOrDeliverableIdIdx: index(
+        "conflicts_new_deal_or_deliverable_id_idx",
+      ).on(table.newDealOrDeliverableId),
     };
   },
 );
 
-export const exclusivityRulesRelations = relations(exclusivityRules, ({ one, many }) => ({
-  deal: one(deals, {
-    fields: [exclusivityRules.dealId],
-    references: [deals.id],
+export const exclusivityRulesRelations = relations(
+  exclusivityRules,
+  ({ one, many }) => ({
+    deal: one(deals, {
+      fields: [exclusivityRules.dealId],
+      references: [deals.id],
+    }),
+    conflicts: many(conflicts),
   }),
-  conflicts: many(conflicts),
-}));
+);
 
 export const conflictsRelations = relations(conflicts, ({ one }) => ({
   conflictingRule: one(exclusivityRules, {

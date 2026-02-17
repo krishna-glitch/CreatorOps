@@ -45,7 +45,8 @@ const paymentFormSchema = z
     paid_at: z.string().optional(),
   })
   .refine(
-    (values) => !values.mark_as_paid || (values.paid_at?.trim().length ?? 0) > 0,
+    (values) =>
+      !values.mark_as_paid || (values.paid_at?.trim().length ?? 0) > 0,
     {
       message: "Paid date is required when Mark as Paid is enabled",
       path: ["paid_at"],
@@ -166,7 +167,10 @@ export function PaymentForm({
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-2">
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="space-y-4 pt-2"
+          >
             <FormField
               control={form.control}
               name="amount"
@@ -306,7 +310,10 @@ export function PaymentForm({
                   <FormItem>
                     <FormLabel>Paid at</FormLabel>
                     <FormControl>
-                      <DateInput value={field.value} onChange={field.onChange} />
+                      <DateInput
+                        value={field.value}
+                        onChange={field.onChange}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

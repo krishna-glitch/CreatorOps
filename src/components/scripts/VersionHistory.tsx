@@ -135,23 +135,31 @@ export function VersionHistory({
   const sortedVersions = useMemo(
     () =>
       [...versions].sort(
-        (a, b) => normalizeSavedAt(b.saved_at).getTime() - normalizeSavedAt(a.saved_at).getTime(),
+        (a, b) =>
+          normalizeSavedAt(b.saved_at).getTime() -
+          normalizeSavedAt(a.saved_at).getTime(),
       ),
     [versions],
   );
 
   const [activeIndex, setActiveIndex] = useState(0);
-  const [compareLeftVersion, setCompareLeftVersion] = useState<number | null>(null);
-  const [compareRightVersion, setCompareRightVersion] = useState<number | "current">("current");
-  const [confirmRestoreVersion, setConfirmRestoreVersion] = useState<ScriptVersion | null>(null);
+  const [compareLeftVersion, setCompareLeftVersion] = useState<number | null>(
+    null,
+  );
+  const [compareRightVersion, setCompareRightVersion] = useState<
+    number | "current"
+  >("current");
+  const [confirmRestoreVersion, setConfirmRestoreVersion] =
+    useState<ScriptVersion | null>(null);
   const [isSubmittingRestore, setIsSubmittingRestore] = useState(false);
 
   const activeVersion = sortedVersions[activeIndex] ?? null;
-  const leftVersion = sortedVersions.find((v) => v.version === compareLeftVersion) ?? null;
+  const leftVersion =
+    sortedVersions.find((v) => v.version === compareLeftVersion) ?? null;
   const rightVersion =
     compareRightVersion === "current"
       ? null
-      : sortedVersions.find((v) => v.version === compareRightVersion) ?? null;
+      : (sortedVersions.find((v) => v.version === compareRightVersion) ?? null);
 
   const diffRows = useMemo(() => {
     if (!leftVersion) {
@@ -186,7 +194,11 @@ export function VersionHistory({
         return;
       }
 
-      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === "r") {
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        event.shiftKey &&
+        event.key.toLowerCase() === "r"
+      ) {
         event.preventDefault();
         if (activeVersion) {
           setConfirmRestoreVersion(activeVersion);
@@ -224,7 +236,8 @@ export function VersionHistory({
                 Version History
               </DialogTitle>
               <DialogDescription className="text-slate-400">
-                `Alt + ↑/↓` jump versions, `Enter` compare, `Cmd/Ctrl + Shift + R` restore.
+                `Alt + ↑/↓` jump versions, `Enter` compare, `Cmd/Ctrl + Shift +
+                R` restore.
               </DialogDescription>
             </DialogHeader>
 
@@ -233,7 +246,8 @@ export function VersionHistory({
                 const older = sortedVersions[index + 1];
                 const selected = version.version === activeVersion?.version;
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={version.version}
                     className={cn(
                       "rounded-lg border p-3 transition-all duration-200",
@@ -245,9 +259,13 @@ export function VersionHistory({
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <p className="text-sm font-semibold text-white">Version {version.version}</p>
+                        <p className="text-sm font-semibold text-white">
+                          Version {version.version}
+                        </p>
                         <p className="text-xs text-slate-400">
-                          {formatRelativeTime(normalizeSavedAt(version.saved_at))}
+                          {formatRelativeTime(
+                            normalizeSavedAt(version.saved_at),
+                          )}
                         </p>
                       </div>
                       <div className="text-right text-xs text-slate-300">
@@ -299,7 +317,7 @@ export function VersionHistory({
                         Restore
                       </Button>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -312,12 +330,17 @@ export function VersionHistory({
                 className="rounded-md border border-white/20 bg-black/40 px-2 py-1 text-xs text-slate-100"
                 value={compareLeftVersion ?? ""}
                 onChange={(event) =>
-                  setCompareLeftVersion(event.target.value ? Number(event.target.value) : null)
+                  setCompareLeftVersion(
+                    event.target.value ? Number(event.target.value) : null,
+                  )
                 }
               >
                 <option value="">Left version</option>
                 {sortedVersions.map((version) => (
-                  <option key={`left-${version.version}`} value={version.version}>
+                  <option
+                    key={`left-${version.version}`}
+                    value={version.version}
+                  >
                     Version {version.version}
                   </option>
                 ))}
@@ -327,13 +350,18 @@ export function VersionHistory({
                 value={compareRightVersion}
                 onChange={(event) =>
                   setCompareRightVersion(
-                    event.target.value === "current" ? "current" : Number(event.target.value),
+                    event.target.value === "current"
+                      ? "current"
+                      : Number(event.target.value),
                   )
                 }
               >
                 <option value="current">Current Draft</option>
                 {sortedVersions.map((version) => (
-                  <option key={`right-${version.version}`} value={version.version}>
+                  <option
+                    key={`right-${version.version}`}
+                    value={version.version}
+                  >
                     Version {version.version}
                   </option>
                 ))}
@@ -351,9 +379,9 @@ export function VersionHistory({
                     Left: Version {leftVersion.version}
                   </div>
                   <div className="min-h-0 flex-1 overflow-auto">
-                    {diffRows.map((row, index) => (
+                    {diffRows.map((row) => (
                       <div
-                        key={`l-${index}`}
+                        key={`l-${row.leftType}-${row.left}-${row.rightType}-${row.right}`}
                         className={cn(
                           "border-b border-white/5 px-3 py-1 font-mono text-xs",
                           diffCellClass(row.leftType),
@@ -367,12 +395,14 @@ export function VersionHistory({
                 <div className="flex min-h-0 flex-col bg-[#0d1118]">
                   <div className="border-b border-white/10 px-3 py-2 text-xs font-medium text-slate-300">
                     Right:{" "}
-                    {rightVersion ? `Version ${rightVersion.version}` : "Current Draft"}
+                    {rightVersion
+                      ? `Version ${rightVersion.version}`
+                      : "Current Draft"}
                   </div>
                   <div className="min-h-0 flex-1 overflow-auto">
-                    {diffRows.map((row, index) => (
+                    {diffRows.map((row) => (
                       <div
-                        key={`r-${index}`}
+                        key={`r-${row.leftType}-${row.left}-${row.rightType}-${row.right}`}
                         className={cn(
                           "border-b border-white/5 px-3 py-1 font-mono text-xs",
                           diffCellClass(row.rightType),
@@ -391,8 +421,8 @@ export function VersionHistory({
         {confirmRestoreVersion ? (
           <div className="absolute bottom-4 left-4 right-4 rounded-lg border border-amber-400/40 bg-amber-500/10 p-3 backdrop-blur">
             <p className="text-sm text-amber-100">
-              Restore version {confirmRestoreVersion.version}? Current changes will be saved as
-              version {nextVersionNumber}.
+              Restore version {confirmRestoreVersion.version}? Current changes
+              will be saved as version {nextVersionNumber}.
             </p>
             <div className="mt-2 flex items-center gap-2">
               <Button

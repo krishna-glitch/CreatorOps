@@ -80,7 +80,7 @@ export function useScriptAutoSave(scriptId: string, initialContent: string) {
     setLastSaved(null);
     setSaveError(null);
     setVersionHistory([]);
-  }, [initialContent, scriptId]);
+  }, [initialContent]);
 
   useEffect(() => {
     if (!versionsQuery.data) {
@@ -128,7 +128,7 @@ export function useScriptAutoSave(scriptId: string, initialContent: string) {
     return () => {
       window.clearTimeout(timer);
     };
-  }, [content, saveNow]);
+  }, [saveNow]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {

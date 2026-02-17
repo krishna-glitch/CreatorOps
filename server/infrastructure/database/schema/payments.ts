@@ -1,13 +1,26 @@
 import { relations } from "drizzle-orm";
 import {
+  date,
   decimal,
   index,
   pgTable,
   text,
   timestamp,
   uuid,
+  varchar,
 } from "drizzle-orm/pg-core";
 import { deals } from "./deals";
+
+export type ExchangeRateSource = "frankfurter" | "manual" | "cache";
+
+export interface PaymentConversionData {
+  amountUsd: number | null;
+  exchangeRate: number | null;
+  exchangeRateDate: Date | null;
+  exchangeRateSource: ExchangeRateSource | null;
+  exchangeRateManual: number | null;
+  exchangeRateManualNote: string | null;
+}
 
 export const payments = pgTable(
   "payments",
@@ -23,6 +36,15 @@ export const payments = pgTable(
     expectedDate: timestamp("expected_date"),
     paidAt: timestamp("paid_at"),
     paymentMethod: text("payment_method"), // PAYPAL | WIRE | VENMO | ZELLE | OTHER
+    amountUsd: decimal("amount_usd", { precision: 12, scale: 2 }),
+    exchangeRate: decimal("exchange_rate", { precision: 10, scale: 6 }),
+    exchangeRateDate: date("exchange_rate_date"),
+    exchangeRateSource: varchar("exchange_rate_source", { length: 50 }),
+    exchangeRateManual: decimal("exchange_rate_manual", {
+      precision: 10,
+      scale: 6,
+    }),
+    exchangeRateManualNote: text("exchange_rate_manual_note"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
