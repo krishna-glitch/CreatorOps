@@ -2,12 +2,20 @@
 
 import { toast } from "sonner";
 
+function getBrowserNotificationApi() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  return typeof window.Notification === "function" ? window.Notification : null;
+}
+
 export async function requestNotificationPermission(): Promise<NotificationPermission> {
-  if (typeof window === "undefined" || !("Notification" in window)) {
+  const notificationApi = getBrowserNotificationApi();
+  if (!notificationApi) {
     throw new Error("Notifications not supported");
   }
 
-  const currentPermission = Notification.permission;
+  const currentPermission = notificationApi.permission;
 
   if (currentPermission === "granted") {
     return "granted";
@@ -19,7 +27,7 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
   }
 
   try {
-    const permission = await Notification.requestPermission();
+    const permission = await notificationApi.requestPermission();
     
     localStorage.setItem("notification-permission-asked", "true");
     localStorage.setItem("notification-permission-granted", permission === "granted" ? "true" : "false");
@@ -37,6 +45,9 @@ export function hasAskedForPermission(): boolean {
 }
 
 export function getStoredPermissionStatus(): string | null {
-  if (typeof window === "undefined") return null;
-  return Notification.permission;
+  const notificationApi = getBrowserNotificationApi();
+  if (!notificationApi) {
+    return null;
+  }
+  return notificationApi.permission;
 }
