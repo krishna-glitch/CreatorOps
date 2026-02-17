@@ -1,6 +1,5 @@
 "use client";
 
-import * as Tooltip from "@radix-ui/react-tooltip";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -143,32 +142,13 @@ export function CurrencyDisplay({
           <span>{formatRateLabel(currency, exchangeRate)}</span>
           <span>·</span>
           <span>{isManualRate ? "Manual" : rateDateLabel}</span>
-          <Tooltip.Provider delayDuration={200}>
-            <Tooltip.Root>
-              <Tooltip.Trigger asChild>
-                <button
-                  type="button"
-                  className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-border text-[10px] leading-none text-muted-foreground"
-                  aria-label="Exchange rate info"
-                >
-                  i
-                </button>
-              </Tooltip.Trigger>
-              <Tooltip.Portal>
-                <Tooltip.Content
-                  sideOffset={8}
-                  className="z-50 max-w-[260px] rounded-md border border-border bg-background p-2 text-xs text-foreground shadow-md"
-                >
-                  <p>Exchange rate source: European Central Bank</p>
-                  <p>via Frankfurter API</p>
-                  <p>Reference rate (mid-market)</p>
-                  <p>Actual received amount may vary 0.1-3%</p>
-                  <p>depending on payment method used</p>
-                  <Tooltip.Arrow className="fill-background" />
-                </Tooltip.Content>
-              </Tooltip.Portal>
-            </Tooltip.Root>
-          </Tooltip.Provider>
+          <span
+            className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-border text-[10px] leading-none text-muted-foreground"
+            aria-label="Exchange rate info"
+            title="Exchange rate source: European Central Bank via Frankfurter API. Reference rate (mid-market). Actual received amount may vary by payment method."
+          >
+            i
+          </span>
         </div>
       ) : (
         <div className={cn("flex flex-wrap items-center gap-2", styles.meta)}>

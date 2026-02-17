@@ -173,7 +173,7 @@ export function ContextMenu({
           </div>
         )}
         <div className="flex flex-col p-1">
-          {actions.map((action) => (
+          {actions.map((action, index) => (
             <div key={`${action.label}-${action.variant ?? "default"}`}>
               <button
                 type="button"

@@ -63,7 +63,7 @@ export function SwipeableDealCard({
   className,
   gestureDisabled = false,
 }: SwipeableDealCardProps) {
-  const cardRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLButtonElement>(null);
   const [announceText, setAnnounceText] = useState("");
   const [isCompleting, setIsCompleting] = useState(false);
   const [completionDirection, setCompletionDirection] =
@@ -249,7 +249,7 @@ export function SwipeableDealCard({
   }, [gestureDisabled, hasMoved, isCompleting, isDragging, onOpen]);
 
   const onKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLDivElement>) => {
+    (event: KeyboardEvent<HTMLButtonElement>) => {
       if (gestureDisabled) {
         return;
       }

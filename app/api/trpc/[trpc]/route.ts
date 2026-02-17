@@ -77,7 +77,7 @@ const handler = async (req: Request) => {
   if (inserted.length === 0) {
     let existing: Awaited<
       ReturnType<typeof db.query.idempotencyKeys.findFirst>
-    > = null;
+    >;
     try {
       existing = await db.query.idempotencyKeys.findFirst({
         where: and(
