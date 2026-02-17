@@ -245,6 +245,31 @@ export function SettingsClient({ user, storageUsage }: SettingsClientProps) {
     body.style.colorScheme = resolved;
   };
 
+  const resolveThemeMode = (preference: string): "light" | "dark" => {
+    if (preference === "light" || preference === "dark") {
+      return preference;
+    }
+
+    const supportsMatchMedia =
+      typeof window !== "undefined" && typeof window.matchMedia === "function";
+    if (!supportsMatchMedia) {
+      return "dark";
+    }
+
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  };
+
+  const applyThemePreference = (preference: string) => {
+    const root = document.documentElement;
+    const resolved = resolveThemeMode(preference);
+
+    root.classList.toggle("dark", resolved === "dark");
+    root.setAttribute("data-theme", resolved);
+    root.style.colorScheme = resolved;
+  };
+
   useEffect(() => {
     try {
       const rawTheme = localStorage.getItem("creatorops-theme");
